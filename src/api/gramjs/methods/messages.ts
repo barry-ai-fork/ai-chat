@@ -231,7 +231,6 @@ export function sendMessage(
   },
   onProgress?: ApiOnProgress,
 ) {
-  debugger
   const localMessage = buildLocalMessage(
     chat,
     text,
@@ -248,7 +247,6 @@ export function sendMessage(
     sendAs,
     serverTimeOffset,
   );
-  debugger
   onUpdate({
     '@type': localMessage.isScheduled ? 'newScheduledMessage' : 'newMessage',
     id: localMessage.id,

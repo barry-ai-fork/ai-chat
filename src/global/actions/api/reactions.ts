@@ -17,7 +17,6 @@ import {
 import { buildCollectionByKey, omit } from '../../../util/iteratees';
 import { ANIMATION_LEVEL_MAX } from '../../../config';
 import { isMessageLocal } from '../../helpers';
-import { MainViewTypeEnums } from '../../types';
 
 const INTERACTION_RANDOM_OFFSET = 40;
 
@@ -156,10 +155,6 @@ addActionHandler('sendReaction', (global, actions, payload) => {
 addActionHandler('openChat', (global) => {
   return {
     ...global,
-    ui:{
-      ...global.ui,
-      mainViewType:MainViewTypeEnums.noView,
-    },
     activeReactions: {},
   };
 });

@@ -8,7 +8,6 @@ import {
   selectChatMessage, selectCurrentMessageList, selectIsTrustedBot,
 } from '../../selectors';
 import generateIdFor from '../../../util/generateIdFor';
-import { MainViewTypeEnums } from '../../types';
 
 const MAX_STORED_EMOJIS = 18; // Represents two rows of recent emojis
 
@@ -104,12 +103,9 @@ addActionHandler('openChat', (global) => {
   if (!IS_SINGLE_COLUMN_LAYOUT && !IS_TABLET_COLUMN_LAYOUT) {
     return undefined;
   }
+
   return {
     ...global,
-    ui:{
-      ...global.ui,
-      mainViewType:MainViewTypeEnums.noView,
-    },
     isLeftColumnShown: global.messages.messageLists.length === 0,
   };
 });
@@ -370,17 +366,5 @@ addActionHandler('closeLimitReachedModal', (global) => {
   return {
     ...global,
     limitReachedModal: undefined,
-  };
-});
-
-
-addActionHandler('openMainView', (global,action,payload) => {
-  return {
-    ...global,
-    ui: {
-      ...global.ui,
-      ...payload,
-    },
-    isLeftColumnShown: false,
   };
 });

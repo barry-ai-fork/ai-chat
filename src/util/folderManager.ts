@@ -100,6 +100,7 @@ let inited = false;
 
 export function init() {
   inited = true;
+
   addCallback(updateFolderManagerThrottled);
   addActionHandler('reset', reset);
 
@@ -108,6 +109,7 @@ export function init() {
 
 export function getOrderedIds(folderId: number) {
   if (!inited) init();
+
   return results.orderedIdsByFolderId[folderId];
 }
 
@@ -163,6 +165,7 @@ function updateFolderManager(global: GlobalState) {
   if (DEBUG) {
     DEBUG_startedAt = performance.now();
   }
+
   const isAllFolderChanged = Boolean(
     global.chats.listIds.active
     && isMainFolderChanged(ALL_FOLDER_ID, global.chats.listIds.active, global.chats.orderedPinnedIds.active),

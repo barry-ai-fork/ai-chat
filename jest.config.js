@@ -13,7 +13,7 @@ module.exports = {
   testEnvironment: 'jsdom',
   transform: {
     '\\.(jsx?|tsx?)$': 'babel-jest',
-    '\\.txt$': '@glen/jest-raw-loader',
+    '\\.txt$': 'jest-raw-loader',
   },
   globals: {
     APP_REVISION: "jest-test",

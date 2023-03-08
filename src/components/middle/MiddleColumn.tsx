@@ -74,11 +74,8 @@ import ReactorListModal from './ReactorListModal.async';
 
 import './MiddleColumn.scss';
 import styles from './MiddleColumn.module.scss';
-import { MainViewTypeEnums } from '../../global/types';
-import MiddleMainViewHeader from './MiddleMainViewHeader';
 
 type StateProps = {
-  mainViewType:MainViewTypeEnums;
   chatId?: string;
   threadId?: number;
   messageListType?: MessageListType;
@@ -122,7 +119,6 @@ function isImage(item: DataTransferItem) {
 }
 
 const MiddleColumn: FC<StateProps> = ({
-  mainViewType,
   chatId,
   threadId,
   messageListType,
@@ -205,7 +201,6 @@ const MiddleColumn: FC<StateProps> = ({
   const renderingShouldSendJoinRequest = usePrevDuringAnimation(shouldSendJoinRequest, CLOSE_ANIMATION_DURATION);
 
   const prevTransitionKey = usePrevious(currentTransitionKey);
-  const prevMainViewType = usePrevious(mainViewType);
 
   const cleanupExceptionKey = (
     prevTransitionKey !== undefined && prevTransitionKey < currentTransitionKey ? prevTransitionKey : undefined
@@ -217,15 +212,6 @@ const MiddleColumn: FC<StateProps> = ({
     prevTransitionKey,
     chatId,
   );
-
-  const { isMainViewReady, handleMainViewOpenEnd, handleMainViewSlideStop } = useMainViewIsReady(
-    !shouldSkipHistoryAnimations && animationLevel !== ANIMATION_LEVEL_MIN,
-    mainViewType,
-    prevMainViewType,
-    String(mainViewType),
-  );
-
-
 
   useEffect(() => {
     return chatId
@@ -389,44 +375,7 @@ const MiddleColumn: FC<StateProps> = ({
     renderingCanRestartBot || renderingCanSubscribe || renderingCanStartBot || isPinnedMessageList,
   );
   const withExtraShift = Boolean(isMessagingDisabled || isSelectModeActive || isPinnedMessageList);
-  console.log({renderingChatId,renderingThreadId,mainViewType})
-  if(mainViewType > 0){
-    console.log({isMainViewReady})
-    return <div
-      id="MiddleColumn"
-      className={className}
-      onTransitionEnd={handleMainViewOpenEnd}
-      style={`
-        --composer-hidden-scale: ${composerHiddenScale};
-        --toolbar-hidden-scale: ${toolbarHiddenScale};
-        --unpin-hidden-scale: ${unpinHiddenScale};
-        --toolbar-unpin-hidden-scale: ${toolbarForUnpinHiddenScale};
-        --composer-translate-x: ${composerTranslateX}px;
-        --toolbar-translate-x: ${toolbarTranslateX}px;
-        --pattern-color: ${patternColor};
-        --theme-background-color:
-          ${backgroundColor || (theme === 'dark' ? DARK_THEME_BG_COLOR : LIGHT_THEME_BG_COLOR)};
-      `}
-      onClick={undefined}
-    >
-      <div
-        className={bgClassName}
-        style={customBackgroundValue ? `--custom-background: ${customBackgroundValue}` : undefined}
-      />
-      <div id="middle-column-portals" />
-      <div className="messages-layout" onDragEnter={renderingCanPost ? handleDragEnter : undefined}>
-        <MiddleMainViewHeader
-          chatId={renderingChatId}
-          threadId={renderingThreadId}
-          messageListType={renderingMessageListType}
-          mainViewType={mainViewType}
-          isReady={isMainViewReady}
-        />
-        {mainViewType}
 
-      </div>
-    </div>
-  }
   return (
     <div
       id="MiddleColumn"
@@ -450,7 +399,6 @@ const MiddleColumn: FC<StateProps> = ({
         style={customBackgroundValue ? `--custom-background: ${customBackgroundValue}` : undefined}
       />
       <div id="middle-column-portals" />
-
       {renderingChatId && renderingThreadId && (
         <>
           <div className="messages-layout" onDragEnter={renderingCanPost ? handleDragEnter : undefined}>
@@ -609,7 +557,6 @@ const MiddleColumn: FC<StateProps> = ({
 
 export default memo(withGlobal(
   (global): StateProps => {
-    const mainViewType = global.ui.mainViewType;
     const theme = selectTheme(global);
     const {
       isBlurred: isBackgroundBlurred, background: customBackground, backgroundColor, patternColor,
@@ -622,7 +569,6 @@ export default memo(withGlobal(
     } = global;
 
     const state: StateProps = {
-      mainViewType,
       theme,
       customBackground,
       backgroundColor,
@@ -722,9 +668,7 @@ function useIsReady(
   }, [withAnimations]);
 
   function handleOpenEnd(e: React.TransitionEvent<HTMLDivElement>) {
-
     if (e.propertyName === 'transform' && e.target === e.currentTarget) {
-      console.log("handleOpenEnd",chatId,Boolean(chatId),currentTransitionKey,prevTransitionKey)
       setIsReady(Boolean(chatId));
     }
   }
@@ -737,47 +681,5 @@ function useIsReady(
     isReady: isReady && !willSwitchMessageList,
     handleOpenEnd: withAnimations ? handleOpenEnd : undefined,
     handleSlideStop: withAnimations ? handleSlideStop : undefined,
-  };
-}
-
-function useMainViewIsReady(
-  withAnimations?: boolean,
-  currentTransitionKey?: number,
-  prevTransitionKey?: number,
-  id?: string,
-) {
-  const [isReady, setIsReady] = useState(!IS_SINGLE_COLUMN_LAYOUT);
-  const forceUpdate = useForceUpdate();
-
-  const willSwitchMessageList = prevTransitionKey !== undefined && prevTransitionKey !== currentTransitionKey;
-  if (willSwitchMessageList) {
-    if (withAnimations) {
-      setIsReady(false);
-    } else {
-      forceUpdate();
-    }
-  }
-
-  useOnChange(() => {
-    if (!withAnimations) {
-      setIsReady(true);
-    }
-  }, [withAnimations]);
-
-  function handleOpenEnd(e: React.TransitionEvent<HTMLDivElement>) {
-    if (e.propertyName === 'transform' && e.target === e.currentTarget) {
-      console.log("handleOpenEnd",Boolean(id))
-      setIsReady(Boolean(id));
-    }
-  }
-
-  function handleSlideStop() {
-    setIsReady(true);
-  }
-
-  return {
-    isMainViewReady: isReady && !willSwitchMessageList,
-    handleMainViewOpenEnd: withAnimations ? handleOpenEnd : undefined,
-    handleMainViewSlideStop: withAnimations ? handleSlideStop : undefined,
   };
 }

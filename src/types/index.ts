@@ -21,7 +21,7 @@ export enum FocusDirection {
 }
 
 export interface IAlbum {
-  albumId: string ;
+  albumId: string;
   messages: ApiMessage[];
   mainMessage: ApiMessage;
 }
@@ -47,17 +47,6 @@ export type NotifySettings = {
   hasPushNotifications: boolean;
   notificationSoundVolume: number;
 };
-
-
-export enum ComponentsScreens {
-  Main,
-  Icons,
-  Buttons,
-  DropdownMenu,
-  Tab,
-  UI,
-}
-
 
 export type LangCode = (
   'en' | 'ar' | 'be' | 'ca' | 'nl' | 'fr' | 'de' | 'id' | 'it' | 'ko' | 'ms' | 'fa' | 'pl' | 'pt-br' | 'ru' | 'es'
@@ -253,10 +242,6 @@ export enum LeftColumnContent {
   NewChannelStep2,
   NewGroupStep1,
   NewGroupStep2,
-  Components,
-  Chart,
-  Wallet,
-  Discover,
 }
 
 export enum GlobalSearchContent {

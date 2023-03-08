@@ -138,12 +138,12 @@ const AttachMenu: FC<OwnProps> = ({
         {canAttachMedia && (
           <>
             <MenuItem icon="photo" onClick={handleQuickSelect}>{lang('AttachmentMenu.PhotoOrVideo')}</MenuItem>
-            {/*<MenuItem icon="document" onClick={handleDocumentSelect}>{lang('AttachDocument')}</MenuItem>*/}
+            <MenuItem icon="document" onClick={handleDocumentSelect}>{lang('AttachDocument')}</MenuItem>
           </>
         )}
-        {/*{canAttachPolls && (*/}
-        {/*  <MenuItem icon="poll" onClick={onPollCreate}>{lang('Poll')}</MenuItem>*/}
-        {/*)}*/}
+        {canAttachPolls && (
+          <MenuItem icon="poll" onClick={onPollCreate}>{lang('Poll')}</MenuItem>
+        )}
 
         {canAttachMedia && !isScheduled && bots.map((bot) => (
           <AttachmentMenuBotItem

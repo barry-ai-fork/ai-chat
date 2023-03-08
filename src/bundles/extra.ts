@@ -29,7 +29,6 @@ export { default as EmojiInteractionAnimation } from '../components/middle/Emoji
 export { default as LeftSearch } from '../components/left/search/LeftSearch';
 // eslint-disable-next-line import/no-cycle
 export { default as Settings } from '../components/left/settings/Settings';
-export { default as Components } from '../components/left/components/Components';
 export { default as ContactList } from '../components/left/main/ContactList';
 export { default as NewChat } from '../components/left/newChat/NewChat';
 export { default as NewChatStep1 } from '../components/left/newChat/NewChatStep1';

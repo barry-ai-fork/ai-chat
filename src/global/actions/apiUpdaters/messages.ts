@@ -624,10 +624,9 @@ function updateThreadUnread(global: GlobalState, actions: GlobalActions, message
 }
 
 function updateListedAndViewportIds(global: GlobalState, actions: GlobalActions, message: ApiMessage) {
-
   const { id, chatId } = message;
 
-  let { threadInfo, firstMessageId } = selectThreadByMessage(global, chatId, message) || {};
+  const { threadInfo, firstMessageId } = selectThreadByMessage(global, chatId, message) || {};
 
   const chat = selectChat(global, chatId);
   const isUnreadChatNotLoaded = chat?.unreadCount && !selectListedIds(global, chatId, MAIN_THREAD_ID);

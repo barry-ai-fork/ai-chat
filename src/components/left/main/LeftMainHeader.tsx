@@ -47,7 +47,6 @@ type OwnProps = {
   shouldSkipTransition?: boolean;
   onSearchQuery: (query: string) => void;
   onSelectSettings: () => void;
-  onSelectComponents: () => void;
   onSelectContacts: () => void;
   onSelectArchived: () => void;
   onReset: () => void;
@@ -81,7 +80,6 @@ const LeftMainHeader: FC<OwnProps & StateProps> = ({
   onSearchQuery,
   onSelectSettings,
   onSelectContacts,
-  onSelectComponents,
   onSelectArchived,
   onReset,
   searchQuery,
@@ -115,12 +113,7 @@ const LeftMainHeader: FC<OwnProps & StateProps> = ({
   } = getActions();
 
   const lang = useLang();
-  const hasMenu = [
-    LeftColumnContent.ChatList,
-    LeftColumnContent.Discover,
-    LeftColumnContent.Wallet,
-    LeftColumnContent.Chart
-  ].includes(content);
+  const hasMenu = content === LeftColumnContent.ChatList;
   const clearedDateSearchParam = { date: undefined };
   const clearedChatSearchParam = { id: undefined };
   const selectedSearchDate = useMemo(() => {
@@ -254,12 +247,6 @@ const LeftMainHeader: FC<OwnProps & StateProps> = ({
           trigger={MainButton}
           footer={`${APP_NAME} ${versionString}`}
         >
-          <MenuItem
-            icon="loop"
-            onClick={onSelectComponents}
-          >
-            {lang('Components')}
-          </MenuItem>
           <MenuItem
             icon="saved-messages"
             onClick={handleSelectSaved}

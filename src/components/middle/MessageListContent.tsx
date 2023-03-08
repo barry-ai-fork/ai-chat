@@ -170,7 +170,7 @@ const MessageListContent: FC<OwnProps> = ({
         const nextDocumentGroupId = nextMessage && !isAlbum(nextMessage) ? nextMessage.groupedId : undefined;
 
         const position = {
-            isFirstInGroup: messageIndex === 0,
+          isFirstInGroup: messageIndex === 0,
           isLastInGroup: messageIndex === senderGroup.length - 1,
           isFirstInDocumentGroup: Boolean(documentGroupId && documentGroupId !== currentDocumentGroupId),
           isLastInDocumentGroup: Boolean(documentGroupId && documentGroupId !== nextDocumentGroupId),

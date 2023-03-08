@@ -13,7 +13,7 @@ import {
   buildPollResults,
   buildApiMessageFromNotification,
   buildMessageDraft,
-  buildMessageReactions, buildApiMessageWithChatId,
+  buildMessageReactions,
 } from './apiBuilders/messages';
 import {
   buildChatMember,
@@ -51,7 +51,6 @@ import {
 import { buildApiPeerId, getApiChatIdFromMtpPeer } from './apiBuilders/peers';
 import { buildApiEmojiInteraction, buildStickerSet } from './apiBuilders/symbols';
 import { buildApiBotMenuButton } from './apiBuilders/bots';
-import {ApiUpdate} from "../types";
 
 type Update = (
   (GramJs.TypeUpdate | GramJs.TypeUpdates) & { _entities?: (GramJs.TypeUser | GramJs.TypeChat)[] }
@@ -982,4 +981,3 @@ export function updater(update: Update, originRequest?: GramJs.AnyRequest) {
     console.warn('[GramJs/updater] Unexpected update:', params);
   }
 }
-

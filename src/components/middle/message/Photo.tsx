@@ -71,7 +71,7 @@ const Photo: FC<OwnProps> = ({
 }) => {
   // eslint-disable-next-line no-null/no-null
   const ref = useRef<HTMLDivElement>(null);
-  debugger
+
   const photo = (getMessagePhoto(message) || getMessageWebPagePhoto(message))!;
   const localBlobUrl = photo.blobUrl;
 
@@ -137,7 +137,7 @@ const Photo: FC<OwnProps> = ({
       contentEl.classList.add('has-appendix-thumb');
     }
   }, [fullMediaData, isOwn, shouldAffectAppendix, isInSelectMode, isSelected, theme]);
-  debugger
+
   const { width, height, isSmall } = dimensions || calculateMediaDimensions(message, noAvatars);
 
   const className = buildClassName(

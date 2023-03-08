@@ -7,7 +7,6 @@ import {
 } from '../../reducers';
 import { selectCurrentMessageList } from '../../selectors';
 import { closeLocalTextSearch } from './localSearch';
-import { MainViewTypeEnums } from '../../types';
 
 addActionHandler('openChat', (global, actions, payload) => {
   const {
@@ -44,10 +43,6 @@ addActionHandler('openChat', (global, actions, payload) => {
 
     global = {
       ...global,
-      ui:{
-        ...global.ui,
-        mainViewType:MainViewTypeEnums.noView,
-      },
       isStatisticsShown: false,
       messages: {
         ...global.messages,

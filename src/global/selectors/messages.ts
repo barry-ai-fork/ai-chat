@@ -85,6 +85,7 @@ export function selectThreadParam<K extends keyof Thread>(
   if (!thread) {
     return undefined;
   }
+
   return thread[key];
 }
 
@@ -101,8 +102,7 @@ export function selectCurrentMessageIds(
 ) {
   switch (messageListType) {
     case 'thread':
-      return Object.keys(global.messages.byChatId[chatId].byId)
-      // return selectViewportIds(global, chatId, threadId);
+      return selectViewportIds(global, chatId, threadId);
     case 'pinned':
       return selectPinnedIds(global, chatId);
     case 'scheduled':

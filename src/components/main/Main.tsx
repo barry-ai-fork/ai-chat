@@ -189,10 +189,7 @@ const Main: FC<StateProps> = ({
   }
 
   useEffect(() => {
-    // if (connectionState === 'connectionStateReady' && authState === 'authorizationStateReady') {
-    //   sync();
-    // }
-    if (connectionState === 'connectionStateReady') {
+    if (connectionState === 'connectionStateReady' && authState === 'authorizationStateReady') {
       sync();
     }
   }, [connectionState, authState, sync]);

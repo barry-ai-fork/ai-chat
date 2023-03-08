@@ -25,7 +25,8 @@
     "prepare": "husky install",
     "statoscope:validate": "statoscope validate --input  public/build-stats.json",
     "statoscope:validate-diff": "statoscope validate --input input.json --reference reference.json",
-    "wr:build:prod": "npm run build:production && rm -rf dist/statoscope-report.html dist/build-stats.json dist/*.css.map dist/*.js.map",
+    "clean:map": "rm -rf dist/*.map && rm -rf dist/statoscope-report.html dist/build-stats.json",
+    "wr:build:prod": "npm run build:production && npm run clean:map",
     "wr:deploy": "wrangler publish",
     "wr:dev": "wrangler dev --local"
   },
@@ -129,7 +130,6 @@
   "dependencies": {
     "@cryptography/aes": "^0.1.1",
     "async-mutex": "^0.3.2",
-    "axios": "^0.27.2",
     "big-integer": "github:painor/BigInteger.js",
     "bip39": "^3.0.4",
     "bn.js": "^4.12.0",

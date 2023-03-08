@@ -22,9 +22,6 @@ import NewChatButton from '../NewChatButton';
 import Button from '../../ui/Button';
 
 import './LeftMain.scss';
-import TabList from '../../ui/TabList';
-import TabBarList from '../../ui/TabBarList';
-import TabWalletView from './TabWalletView';
 
 type OwnProps = {
   content: LeftColumnContent;
@@ -63,10 +60,6 @@ const LeftMain: FC<OwnProps> = ({
 
   const handleSelectSettings = useCallback(() => {
     onContentChange(LeftColumnContent.Settings);
-  }, [onContentChange]);
-
-  const handleSelectComponents = useCallback(() => {
-    onContentChange(LeftColumnContent.Components);
   }, [onContentChange]);
 
   const handleSelectContacts = useCallback(() => {
@@ -108,31 +101,7 @@ const LeftMain: FC<OwnProps> = ({
     }, BUTTON_CLOSE_DELAY_MS);
   }, []);
 
-
-  const [shouldRenderUpdateButton, updateButtonClassNames, handleUpdateClick] = useAppOutdatedCheck();
-
-  const lang = useLang();
-
-  const tabs = [
-    { type: LeftColumnContent.ChatList,icon:"fa-message fas"},
-    { type: LeftColumnContent.Wallet, icon:"fa-wallet fas"},
-    { type: LeftColumnContent.Chart, icon:"fa-chart-column fas"},
-    { type: LeftColumnContent.Discover, icon:"fas fa-location-arrow"},
-  ];
-
-  let defaultCurrentTab = 0;
-  for (let i = 0; i < tabs.length; i++) {
-    if(tabs[i].type === content){
-      defaultCurrentTab = i
-      break
-    }
-  }
-  const [currentTab,setCurrentTab] = useState(defaultCurrentTab)
-
   useEffect(() => {
-    if(currentTab !== defaultCurrentTab){
-      setCurrentTab(defaultCurrentTab)
-    }
     let autoCloseTimeout: number | undefined;
     if (content !== LeftColumnContent.ChatList) {
       autoCloseTimeout = window.setTimeout(() => {
@@ -148,7 +117,12 @@ const LeftMain: FC<OwnProps> = ({
         autoCloseTimeout = undefined;
       }
     };
-  }, [content,setCurrentTab,currentTab,defaultCurrentTab]);
+  }, [content]);
+
+  const [shouldRenderUpdateButton, updateButtonClassNames, handleUpdateClick] = useAppOutdatedCheck();
+
+  const lang = useLang();
+
   return (
     <div
       id="LeftColumn-main"
@@ -160,7 +134,6 @@ const LeftMain: FC<OwnProps> = ({
         contactsFilter={contactsFilter}
         onSearchQuery={onSearchQuery}
         onSelectSettings={handleSelectSettings}
-        onSelectComponents={handleSelectComponents}
         onSelectContacts={handleSelectContacts}
         onSelectArchived={handleSelectArchived}
         onReset={onReset}
@@ -177,12 +150,6 @@ const LeftMain: FC<OwnProps> = ({
           switch (content) {
             case LeftColumnContent.ChatList:
               return <ChatFolders onScreenSelect={onScreenSelect} foldersDispatch={foldersDispatch} />;
-            case LeftColumnContent.Chart:
-              return <TabWalletView onScreenSelect={onScreenSelect} foldersDispatch={foldersDispatch} />;
-            case LeftColumnContent.Wallet:
-              return <TabWalletView onScreenSelect={onScreenSelect} foldersDispatch={foldersDispatch} />;
-            case LeftColumnContent.Discover:
-              return <TabWalletView onScreenSelect={onScreenSelect} foldersDispatch={foldersDispatch} />;
             case LeftColumnContent.GlobalSearch:
               return (
                 <LeftSearch
@@ -209,20 +176,12 @@ const LeftMain: FC<OwnProps> = ({
           {lang('lng_update_telegram')}
         </Button>
       )}
-
-
-      <TabBarList activeTab={currentTab} tabs={tabs} onSwitchTab={(index)=>{
-        setCurrentTab(index)
-        onContentChange(tabs[index].type);
-      }} />
-
-      {/*<NewChatButton*/}
-      {/*  isShown={isNewChatButtonShown}*/}
-      {/*  onNewPrivateChat={handleSelectContacts}*/}
-      {/*  onNewChannel={handleSelectNewChannel}*/}
-      {/*  onNewGroup={handleSelectNewGroup}*/}
-      {/*/>*/}
-
+      <NewChatButton
+        isShown={isNewChatButtonShown}
+        onNewPrivateChat={handleSelectContacts}
+        onNewChannel={handleSelectNewChannel}
+        onNewGroup={handleSelectNewGroup}
+      />
     </div>
   );
 };
