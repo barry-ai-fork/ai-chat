@@ -8,22 +8,27 @@
     transition: none !important;
   }
 
-  > .Button, & > .playback-rate-menu {
+  > .Button {
     flex-shrink: 0;
     margin: 0.125rem;
   }
 
-  .player-button {
+  > .player-button {
     --color-text-secondary: var(--color-primary);
     --color-text-secondary-rgb: var(--color-primary-shade-rgb);
     --color-primary-shade: var(--color-green);
     --color-white: var(--color-background-own);
+  }
 
-    margin: 0.125rem;
+  .player-button {
+    &.smaller {
+      width: 3rem;
+      height: 3rem;
 
-    &.smaller i {
-      font-size: 1.625rem;
-      margin-top: -0.0625rem;
+      i {
+        font-size: 1.625rem;
+        margin-top: -0.0625rem;
+      }
     }
 
     i {
@@ -52,17 +57,9 @@
     }
   }
 
-  .volume-button-wrapper {
+  .volume-button {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-
-    .volume-slider-wrapper {
-      position: absolute;
-      width: 8rem;
-      top: 2.625rem;
-    }
+    overflow: visible;
 
     .volume-slider-spacer {
       position: absolute;
@@ -110,43 +107,19 @@
     }
   }
 
-  .playback-wrapper {
-    position: relative;
-  }
-  .playback-backdrop {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 5rem;
-    height: 4rem;
-    z-index: calc(var(--z-menu-backdrop) + 1);
-  }
-
   .playback-button {
-    &.on-top {
-      z-index: calc(var(--z-menu-backdrop) + 2);
-    }
-
     &.applied {
       --color-text-secondary: var(--color-primary);
     }
 
     .playback-button-inner {
-      transition: 0.15s color ease-out;
+      transition: 0.2s color ease-in-out;
       font-size: 0.75rem;
       font-weight: bold;
       border: 2px solid;
       border-radius: 0.375rem;
       padding: 0.125rem 0.25rem;
       font-variant-numeric: tabular-nums;
-
-      &.small {
-        transform: scale(0.83);
-      }
-
-      &.tiny {
-        transform: scale(0.75);
-      }
     }
   }
 
@@ -200,7 +173,7 @@
     .subtitle {
       font-size: 0.8125rem !important;
       color: var(--color-text-secondary);
-      line-height: 0.9375rem;
+      line-height: 0.8125rem;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -210,16 +183,6 @@
         font-size: 0.9375rem !important;
         line-height: 1.125rem;
       }
-    }
-  }
-
-  .playback-rate-menu .bubble {
-    min-width: auto;
-
-    .icon-check, .icon-placeholder {
-      margin-left: 0.25rem;
-      margin-right: 0.25rem;
-      width: 1.5rem;
     }
   }
 }

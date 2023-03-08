@@ -1,26 +1,10 @@
 import type { LangCode } from '../types';
 
-export function formatCurrency(
-  totalPrice: number,
-  currency: string,
-  locale: LangCode = 'en',
-  shouldOmitFractions = false,
-) {
-  const price = totalPrice / 10 ** getCurrencyExp(currency);
-
-  if (shouldOmitFractions && price % 1 === 0) {
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price);
-  }
-
+export function formatCurrency(totalPrice: number, currency: string, locale: LangCode = 'en') {
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
-  }).format(price);
+  }).format(totalPrice / 10 ** getCurrencyExp(currency));
 }
 
 function getCurrencyExp(currency: string) {

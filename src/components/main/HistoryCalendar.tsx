@@ -2,7 +2,6 @@ import type { FC } from '../../lib/teact/teact';
 import React, { memo, useCallback } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
-import { selectTabState } from '../../global/selectors';
 import useLang from '../../hooks/useLang';
 
 import CalendarModal from '../common/CalendarModal';
@@ -41,6 +40,6 @@ const HistoryCalendar: FC<OwnProps & StateProps> = ({
 
 export default memo(withGlobal<OwnProps>(
   (global): StateProps => {
-    return { selectedAt: selectTabState(global).historyCalendarSelectedAt };
+    return { selectedAt: global.historyCalendarSelectedAt };
   },
 )(HistoryCalendar));

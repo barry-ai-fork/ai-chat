@@ -1,7 +1,6 @@
 import type { ApiMessage } from '../../../api/types';
 import { ApiMessageEntityTypes } from '../../../api/types';
 import type { TextPart } from '../../../types';
-import type { LangFn } from '../../../hooks/useLang';
 
 import {
   getMessageSummaryDescription,
@@ -10,6 +9,7 @@ import {
   getMessageText,
   TRUNCATED_SUMMARY_LENGTH,
 } from '../../../global/helpers';
+import type { LangFn } from '../../../hooks/useLang';
 import renderText from './renderText';
 import { renderTextWithEntities } from './renderTextWithEntities';
 import trimText from '../../../util/trimText';
@@ -17,11 +17,10 @@ import trimText from '../../../util/trimText';
 export function renderMessageText(
   message: ApiMessage,
   highlight?: string,
-  emojiSize?: number,
+  shouldRenderHqEmoji?: boolean,
   isSimple?: boolean,
   truncateLength?: number,
   isProtected?: boolean,
-  shouldRenderAsHtml?: boolean,
 ) {
   const { text, entities } = message.content.text || {};
 
@@ -34,15 +33,14 @@ export function renderMessageText(
     trimText(text, truncateLength),
     entities,
     highlight,
-    emojiSize,
-    shouldRenderAsHtml,
+    shouldRenderHqEmoji,
+    undefined,
     message.id,
     isSimple,
     isProtected,
   );
 }
 
-// TODO Use Message Summary component instead
 export function renderMessageSummary(
   lang: LangFn,
   message: ApiMessage,
@@ -53,8 +51,7 @@ export function renderMessageSummary(
   const { entities } = message.content.text || {};
 
   const hasSpoilers = entities?.some((e) => e.type === ApiMessageEntityTypes.Spoiler);
-  const hasCustomEmoji = entities?.some((e) => e.type === ApiMessageEntityTypes.CustomEmoji);
-  if (!hasSpoilers && !hasCustomEmoji) {
+  if (!hasSpoilers) {
     const text = trimText(getMessageSummaryText(lang, message, noEmoji), truncateLength);
 
     if (highlight) {
@@ -71,7 +68,7 @@ export function renderMessageSummary(
   const description = getMessageSummaryDescription(lang, message, text);
 
   return [
-    ...renderText(emojiWithSpace),
+    emojiWithSpace,
     ...(Array.isArray(description) ? description : [description]),
-  ].filter(Boolean);
+  ].filter<TextPart>(Boolean);
 }

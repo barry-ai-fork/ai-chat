@@ -1,44 +1,36 @@
 import { addActionHandler } from '../../index';
 
 import { closeNewContactDialog, updateUserSearch } from '../../reducers';
-import type { ActionReturnType } from '../../types';
-import { updateTabState } from '../../reducers/tabs';
-import { getCurrentTabId } from '../../../util/establishMultitabRole';
 
-addActionHandler('setUserSearchQuery', (global, actions, payload): ActionReturnType => {
-  const {
-    query,
-    tabId = getCurrentTabId(),
-  } = payload!;
+addActionHandler('setUserSearchQuery', (global, actions, payload) => {
+  const { query } = payload!;
 
   return updateUserSearch(global, {
     globalUserIds: undefined,
     localUserIds: undefined,
     fetchingStatus: Boolean(query),
     query,
-  }, tabId);
+  });
 });
 
-addActionHandler('openAddContactDialog', (global, actions, payload): ActionReturnType => {
-  const { userId, tabId = getCurrentTabId() } = payload!;
+addActionHandler('openAddContactDialog', (global, actions, payload) => {
+  const { userId } = payload!;
 
-  return updateTabState(global, {
+  return {
+    ...global,
     newContact: { userId },
-  }, tabId);
+  };
 });
 
-addActionHandler('openNewContactDialog', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-
-  return updateTabState(global, {
+addActionHandler('openNewContactDialog', (global) => {
+  return {
+    ...global,
     newContact: {
       isByPhoneNumber: true,
     },
-  }, tabId);
+  };
 });
 
-addActionHandler('closeNewContactDialog', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-
-  return closeNewContactDialog(global, tabId);
+addActionHandler('closeNewContactDialog', (global) => {
+  return closeNewContactDialog(global);
 });

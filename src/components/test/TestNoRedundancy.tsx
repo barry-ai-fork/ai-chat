@@ -1,4 +1,3 @@
-/* eslint-disable eslint-multitab-tt/set-global-only-variable */
 import type { FC } from '../../lib/teact/teact';
 import React from '../../lib/teact/teact';
 import { getGlobal, setGlobal, withGlobal } from '../../global';

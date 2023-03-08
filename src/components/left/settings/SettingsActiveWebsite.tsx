@@ -3,8 +3,8 @@ import { getActions, withGlobal } from '../../../global';
 
 import type { FC } from '../../../lib/teact/teact';
 import type { ApiUser, ApiWebSession } from '../../../api/types';
-import type { AnimationLevel } from '../../../types';
 
+import { getUserFullName } from '../../../global/helpers';
 import buildClassName from '../../../util/buildClassName';
 
 import useLang from '../../../hooks/useLang';
@@ -13,7 +13,6 @@ import useCurrentOrPrev from '../../../hooks/useCurrentOrPrev';
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
 import Avatar from '../../common/Avatar';
-import FullNameTitle from '../../common/FullNameTitle';
 
 import styles from './SettingsActiveWebsite.module.scss';
 
@@ -26,15 +25,10 @@ type OwnProps = {
 type StateProps = {
   session?: ApiWebSession;
   bot?: ApiUser;
-  animationLevel: AnimationLevel;
 };
 
 const SettingsActiveWebsite: FC<OwnProps & StateProps> = ({
-  isOpen,
-  session,
-  bot,
-  animationLevel,
-  onClose,
+  isOpen, session, bot, onClose,
 }) => {
   const { terminateWebAuthorization } = getActions();
   const lang = useLang();
@@ -76,9 +70,9 @@ const SettingsActiveWebsite: FC<OwnProps & StateProps> = ({
       onClose={onClose}
       className={styles.root}
     >
-      <Avatar className={styles.avatar} user={renderingBot} size="large" animationLevel={animationLevel} withVideo />
-      {renderingBot && <FullNameTitle className={styles.title} peer={renderingBot} />}
-      <div className={styles.note}>
+      <Avatar className={styles.avatar} user={renderingBot} size="large" />
+      <h3 className={styles.title} dir="auto">{getUserFullName(renderingBot)}</h3>
+      <div className={styles.date} aria-label={lang('PrivacySettings.LastSeen')}>
         {renderingSession?.domain}
       </div>
 
@@ -105,6 +99,5 @@ export default memo(withGlobal<OwnProps>((global, { hash }) => {
   return {
     session,
     bot,
-    animationLevel: global.settings.byKey.animationLevel,
   };
 })(SettingsActiveWebsite));

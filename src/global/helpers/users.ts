@@ -4,7 +4,7 @@ import { SERVICE_NOTIFICATIONS_USER_ID } from '../../config';
 import { formatFullDate, formatTime } from '../../util/dateFormat';
 import { orderBy } from '../../util/iteratees';
 import type { LangFn } from '../../hooks/useLang';
-import { getServerTime, getServerTimeOffset } from '../../util/serverTime';
+import { getServerTime } from '../../util/serverTime';
 import { prepareSearchWordsForNeedle } from '../../util/searchWords';
 import { formatPhoneNumber } from '../../util/phoneNumber';
 
@@ -37,7 +37,7 @@ export function getUserFullName(user?: ApiUser) {
   }
 
   if (isDeletedUser(user)) {
-    return 'Deleted Account';
+    return 'Deleted account';
   }
 
   switch (user.type) {
@@ -61,13 +61,18 @@ export function getUserFullName(user?: ApiUser) {
 
       break;
     }
+
+    case 'userTypeDeleted':
+    case 'userTypeUnknown': {
+      return 'Deleted account';
+    }
   }
 
   return undefined;
 }
 
 export function getUserStatus(
-  lang: LangFn, user: ApiUser, userStatus: ApiUserStatus | undefined,
+  lang: LangFn, user: ApiUser, userStatus: ApiUserStatus | undefined, serverTimeOffset: number,
 ) {
   if (user.id === SERVICE_NOTIFICATIONS_USER_ID) {
     return lang('ServiceNotifications').toLowerCase();
@@ -99,7 +104,6 @@ export function getUserStatus(
 
       if (!wasOnline) return lang('LastSeen.Offline');
 
-      const serverTimeOffset = getServerTimeOffset();
       const now = new Date(new Date().getTime() + serverTimeOffset * 1000);
       const wasOnlineDate = new Date(wasOnline * 1000);
 
@@ -175,8 +179,12 @@ export function isUserOnline(user: ApiUser, userStatus?: ApiUserStatus) {
 }
 
 export function isDeletedUser(user: ApiUser) {
-  return (user.type === 'userTypeDeleted' || user.type === 'userTypeUnknown')
-    && user.id !== SERVICE_NOTIFICATIONS_USER_ID;
+  if (user.noStatus || user.type === 'userTypeBot' || user.id === SERVICE_NOTIFICATIONS_USER_ID) {
+    return false;
+  }
+
+  return user.type === 'userTypeDeleted'
+    || user.type === 'userTypeUnknown';
 }
 
 export function isUserBot(user: ApiUser) {
@@ -192,9 +200,10 @@ export function sortUserIds(
   usersById: Record<string, ApiUser>,
   userStatusesById: Record<string, ApiUserStatus>,
   priorityIds?: string[],
+  serverTimeOffset = 0,
 ) {
   return orderBy(userIds, (id) => {
-    const now = getServerTime();
+    const now = getServerTime(serverTimeOffset);
 
     if (priorityIds && priorityIds.includes(id)) {
       // Assuming that online status expiration date can't be as far as two days from now,
@@ -248,8 +257,7 @@ export function filterUsersByName(
     }
 
     const name = id === currentUserId ? savedMessagesLang : getUserFullName(user);
-
-    return (name && searchWords(name)) || Boolean(user.usernames?.find(({ username }) => searchWords(username)));
+    return (name && searchWords(name)) || searchWords(user.username);
   });
 }
 
@@ -262,13 +270,10 @@ export function getUserIdDividend(userId: string) {
   return Math.abs(Number(userId));
 }
 
+// eslint-disable-next-line max-len
 // https://github.com/telegramdesktop/tdesktop/blob/371510cfe23b0bd226de8c076bc49248fbe40c26/Telegram/SourceFiles/data/data_peer.cpp#L53
 export function getUserColorKey(peer: ApiUser | ApiChat | undefined) {
   const index = peer ? getUserIdDividend(peer.id) % 7 : 0;
 
   return USER_COLOR_KEYS[index];
-}
-
-export function getMainUsername(userOrChat: ApiUser | ApiChat) {
-  return userOrChat.usernames?.find((u) => u.isActive)?.username;
 }

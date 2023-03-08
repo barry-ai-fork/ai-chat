@@ -33,23 +33,20 @@ export type OwnProps = {
   href?: string;
   download?: string;
   disabled?: boolean;
-  allowDisabledClick?: boolean;
   ripple?: boolean;
   faded?: boolean;
   tabIndex?: number;
   isRtl?: boolean;
   isShiny?: boolean;
-  withPremiumGradient?: boolean;
   noPreventDefault?: boolean;
   shouldStopPropagation?: boolean;
   style?: string;
   onClick?: (e: ReactMouseEvent<HTMLButtonElement, MouseEvent>) => void;
   onContextMenu?: (e: ReactMouseEvent<HTMLButtonElement, MouseEvent>) => void;
   onMouseDown?: (e: ReactMouseEvent<HTMLButtonElement>) => void;
-  onMouseEnter?: (e: ReactMouseEvent<HTMLButtonElement>) => void;
+  onMouseEnter?: NoneToVoidFunction;
   onMouseLeave?: NoneToVoidFunction;
   onFocus?: NoneToVoidFunction;
-  onTransitionEnd?: NoneToVoidFunction;
 };
 
 // Longest animation duration;
@@ -76,15 +73,12 @@ const Button: FC<OwnProps> = ({
   isText,
   isLoading,
   isShiny,
-  withPremiumGradient,
-  onTransitionEnd,
   ariaLabel,
   ariaControls,
   hasPopup,
   href,
   download,
   disabled,
-  allowDisabledClick,
   ripple,
   faded,
   tabIndex,
@@ -110,7 +104,6 @@ const Button: FC<OwnProps> = ({
     pill && 'pill',
     fluid && 'fluid',
     disabled && 'disabled',
-    allowDisabledClick && 'click-allowed',
     isText && 'text',
     isLoading && 'loading',
     ripple && 'has-ripple',
@@ -118,11 +111,10 @@ const Button: FC<OwnProps> = ({
     isClicked && 'clicked',
     backgroundImage && 'with-image',
     isShiny && 'shiny',
-    withPremiumGradient && 'premium',
   );
 
   const handleClick = useCallback((e: ReactMouseEvent<HTMLButtonElement, MouseEvent>) => {
-    if ((allowDisabledClick || !disabled) && onClick) {
+    if (!disabled && onClick) {
       onClick(e);
     }
 
@@ -132,15 +124,15 @@ const Button: FC<OwnProps> = ({
     setTimeout(() => {
       setIsClicked(false);
     }, CLICKED_TIMEOUT);
-  }, [allowDisabledClick, disabled, onClick, shouldStopPropagation]);
+  }, [disabled, onClick, shouldStopPropagation]);
 
   const handleMouseDown = useCallback((e: ReactMouseEvent<HTMLButtonElement>) => {
     if (!noPreventDefault) e.preventDefault();
 
-    if ((allowDisabledClick || !disabled) && onMouseDown) {
+    if (!disabled && onMouseDown) {
       onMouseDown(e);
     }
-  }, [allowDisabledClick, disabled, noPreventDefault, onMouseDown]);
+  }, [disabled, noPreventDefault, onMouseDown]);
 
   if (href) {
     return (
@@ -156,7 +148,6 @@ const Button: FC<OwnProps> = ({
         aria-label={ariaLabel}
         aria-controls={ariaControls}
         style={style}
-        onTransitionEnd={onTransitionEnd}
       >
         {children}
         {!disabled && ripple && (
@@ -177,7 +168,6 @@ const Button: FC<OwnProps> = ({
       onMouseDown={handleMouseDown}
       onMouseEnter={onMouseEnter && !disabled ? onMouseEnter : undefined}
       onMouseLeave={onMouseLeave && !disabled ? onMouseLeave : undefined}
-      onTransitionEnd={onTransitionEnd}
       onFocus={onFocus && !disabled ? onFocus : undefined}
       aria-label={ariaLabel}
       aria-controls={ariaControls}
@@ -185,7 +175,7 @@ const Button: FC<OwnProps> = ({
       title={ariaLabel}
       tabIndex={tabIndex}
       dir={isRtl ? 'rtl' : undefined}
-      style={buildStyle(style, backgroundImage && `background-image: url(${backgroundImage})`)}
+      style={buildStyle(backgroundImage && `background-image: url(${backgroundImage})`)}
     >
       {isLoading ? (
         <div>

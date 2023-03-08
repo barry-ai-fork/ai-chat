@@ -1,11 +1,10 @@
-/* eslint-disable eslint-multitab-tt/set-global-only-variable */
 import type { FC, FC_withDebug, Props } from './teact';
 import React, { useEffect, useState } from './teact';
 
 import { DEBUG, DEBUG_MORE } from '../../config';
 import useForceUpdate from '../../hooks/useForceUpdate';
 import generateIdFor from '../../util/generateIdFor';
-import { fastRafWithFallback, throttleWithTickEnd } from '../../util/schedulers';
+import { fastRaf, throttleWithTickEnd } from '../../util/schedulers';
 import arePropsShallowEqual, { getUnequalProps } from '../../util/arePropsShallowEqual';
 import { orderBy } from '../../util/iteratees';
 import { handleError } from '../../util/handleError';
@@ -19,11 +18,10 @@ type GlobalState =
 type ActionNames = string;
 type ActionPayload = any;
 
-export interface ActionOptions {
+interface ActionOptions {
   forceOnHeavyAnimation?: boolean;
   // Workaround for iOS gesture history navigation
   forceSyncOnIOs?: boolean;
-  noUpdate?: boolean;
 }
 
 type Actions = Record<ActionNames, (payload?: ActionPayload, options?: ActionOptions) => void>;
@@ -34,10 +32,7 @@ type ActionHandler = (
   payload: any,
 ) => GlobalState | void | Promise<void>;
 
-type DetachWhenChanged = (current: any) => void;
-type MapStateToProps<OwnProps = undefined> = (
-  (global: GlobalState, ownProps: OwnProps, detachWhenChanged: DetachWhenChanged) => AnyLiteral
-  );
+type MapStateToProps<OwnProps = undefined> = ((global: GlobalState, ownProps: OwnProps) => AnyLiteral);
 
 let currentGlobal = {} as GlobalState;
 
@@ -50,29 +45,22 @@ const DEBUG_releaseCapturedIdThrottled = throttleWithTickEnd(() => {
 
 const actionHandlers: Record<string, ActionHandler[]> = {};
 const callbacks: Function[] = [updateContainers];
-const immediateCallbacks: Function[] = [];
 const actions = {} as Actions;
 const containers = new Map<string, {
   mapStateToProps: MapStateToProps<any>;
   ownProps: Props;
   mappedProps?: Props;
   forceUpdate: Function;
-  isDetached: boolean;
-  detachReason: any;
-  detachWhenChanged: DetachWhenChanged;
+  areMappedPropsChanged: boolean;
   DEBUG_updates: number;
   DEBUG_componentName: string;
 }>();
 
 const runCallbacksThrottled = throttleWithTickEnd(runCallbacks);
 
-function runImmediateCallbacks() {
-  immediateCallbacks.forEach((cb) => cb(currentGlobal));
-}
-
 function runCallbacks(forceOnHeavyAnimation = false) {
   if (!forceOnHeavyAnimation && isHeavyAnimating()) {
-    fastRafWithFallback(runCallbacksThrottled);
+    fastRaf(runCallbacksThrottled);
     return;
   }
 
@@ -90,9 +78,6 @@ export function setGlobal(newGlobal?: GlobalState, options?: ActionOptions) {
     }
 
     currentGlobal = newGlobal;
-
-    if (!options?.noUpdate) runImmediateCallbacks();
-
     if (options?.forceSyncOnIOs) {
       runCallbacks(true);
     } else {
@@ -154,21 +139,13 @@ function updateContainers() {
   // eslint-disable-next-line no-restricted-syntax
   for (const container of containers.values()) {
     const {
-      mapStateToProps, ownProps, mappedProps, forceUpdate, isDetached, detachWhenChanged,
+      mapStateToProps, ownProps, mappedProps, forceUpdate,
     } = container;
-
-    if (isDetached) {
-      continue;
-    }
 
     let newMappedProps;
 
     try {
-      newMappedProps = mapStateToProps(currentGlobal, ownProps, detachWhenChanged);
-
-      if (container.isDetached) {
-        continue;
-      }
+      newMappedProps = mapStateToProps(currentGlobal, ownProps);
     } catch (err: any) {
       handleError(err);
 
@@ -197,6 +174,7 @@ function updateContainers() {
       }
 
       container.mappedProps = newMappedProps;
+      container.areMappedPropsChanged = true;
       container.DEBUG_updates++;
 
       forceUpdate();
@@ -224,18 +202,18 @@ export function addActionHandler(name: ActionNames, handler: ActionHandler) {
   actionHandlers[name].push(handler);
 }
 
-export function addCallback(cb: Function, isImmediate = false) {
-  (isImmediate ? immediateCallbacks : callbacks).push(cb);
+export function addCallback(cb: Function) {
+  callbacks.push(cb);
 }
 
-export function removeCallback(cb: Function, isImmediate = false) {
-  const index = (isImmediate ? immediateCallbacks : callbacks).indexOf(cb);
+export function removeCallback(cb: Function) {
+  const index = callbacks.indexOf(cb);
   if (index !== -1) {
-    (isImmediate ? immediateCallbacks : callbacks).splice(index, 1);
+    callbacks.splice(index, 1);
   }
 }
 
-export function withGlobal<OwnProps extends AnyLiteral>(
+export function withGlobal<OwnProps>(
   mapStateToProps: MapStateToProps<OwnProps> = () => ({}),
 ) {
   return (Component: FC) => {
@@ -251,24 +229,13 @@ export function withGlobal<OwnProps extends AnyLiteral>(
         };
       }, [id]);
 
-      let container = containers.get(id)!;
+      let container = containers.get(id);
       if (!container) {
         container = {
           mapStateToProps,
           ownProps: props,
+          areMappedPropsChanged: false,
           forceUpdate,
-          isDetached: false,
-          detachReason: undefined,
-          // This allows to ignore changes in global during animation before unmount
-          detachWhenChanged: (current) => {
-            const { detachReason } = container!;
-
-            if (detachReason === undefined && current !== undefined) {
-              container!.detachReason = current;
-            } else if (detachReason !== undefined && detachReason !== current) {
-              container!.isDetached = true;
-            }
-          },
           DEBUG_updates: 0,
           DEBUG_componentName: Component.name,
         };
@@ -276,15 +243,17 @@ export function withGlobal<OwnProps extends AnyLiteral>(
         containers.set(id, container);
       }
 
+      if (container.areMappedPropsChanged) {
+        container.areMappedPropsChanged = false;
+      }
+
       if (!container.mappedProps || !arePropsShallowEqual(container.ownProps, props)) {
         container.ownProps = props;
 
-        if (!container.isDetached) {
-          try {
-            container.mappedProps = mapStateToProps(currentGlobal, props, container.detachWhenChanged);
-          } catch (err: any) {
-            handleError(err);
-          }
+        try {
+          container.mappedProps = mapStateToProps(currentGlobal, props);
+        } catch (err: any) {
+          handleError(err);
         }
       }
 
@@ -294,45 +263,48 @@ export function withGlobal<OwnProps extends AnyLiteral>(
   };
 }
 
-export function typify<
-  ProjectGlobalState,
-  ActionPayloads,
->() {
-  type ProjectActionNames = keyof ActionPayloads;
+export function typify<ProjectGlobalState, ActionPayloads, NonTypedActionNames extends string = never>() {
+  type NonTypedActionPayloads = {
+    [ActionName in NonTypedActionNames]: ActionPayload;
+  };
+
+  type ProjectActionTypes =
+    ActionPayloads
+    & NonTypedActionPayloads;
+
+  type ProjectActionNames = keyof ProjectActionTypes;
 
   type ProjectActions = {
     [ActionName in ProjectActionNames]: (
-      payload?: ActionPayloads[ActionName],
+      payload?: ProjectActionTypes[ActionName],
       options?: ActionOptions,
     ) => void;
   };
 
   type ActionHandlers = {
-    [ActionName in keyof ActionPayloads]: (
+    [ActionName in keyof ProjectActionTypes]: (
       global: ProjectGlobalState,
       actions: ProjectActions,
-      payload: ActionPayloads[ActionName],
+      payload: ProjectActionTypes[ActionName],
     ) => ProjectGlobalState | void | Promise<void>;
   };
 
   return {
-    getGlobal: getGlobal as <T extends ProjectGlobalState>() => T,
+    getGlobal: getGlobal as () => ProjectGlobalState,
     setGlobal: setGlobal as (state: ProjectGlobalState, options?: ActionOptions) => void,
     getActions: getActions as () => ProjectActions,
     addActionHandler: addActionHandler as <ActionName extends ProjectActionNames>(
       name: ActionName,
       handler: ActionHandlers[ActionName],
     ) => void,
-    withGlobal: withGlobal as <OwnProps extends AnyLiteral>(
-      mapStateToProps: (
-        (global: ProjectGlobalState, ownProps: OwnProps, detachWhenChanged: DetachWhenChanged) => AnyLiteral),
+    withGlobal: withGlobal as <OwnProps>(
+      mapStateToProps: ((global: ProjectGlobalState, ownProps: OwnProps) => AnyLiteral),
     ) => (Component: FC) => FC<OwnProps>,
   };
 }
 
 if (DEBUG) {
   (window as any).getGlobal = getGlobal;
-  (window as any).setGlobal = setGlobal;
 
   document.addEventListener('dblclick', () => {
     // eslint-disable-next-line no-console

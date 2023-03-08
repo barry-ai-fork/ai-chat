@@ -27,7 +27,7 @@ function main() {
 }
 
 function extractParams(fileContent) {
-    const defInterator = parseTl(fileContent);
+    const defInterator = parseTl(fileContent, 109);
     const types = {};
     const constructors = [];
     const functions = [];

@@ -70,7 +70,6 @@
   .Checkbox-main {
     &::before,
     &::after {
-      pointer-events: none;
       content: "";
       display: block;
       position: absolute;
@@ -97,17 +96,8 @@
     }
 
     .label {
-      display: flex;
-      align-items: center;
+      display: block;
       text-align: initial;
-      flex-wrap: wrap;
-      column-gap: 0.25rem;
-    }
-
-    .right-icon {
-      margin-left: auto;
-      color: var(--color-text-secondary);
-      font-size: 1.25rem;
     }
 
     .subLabel {

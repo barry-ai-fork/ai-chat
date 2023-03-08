@@ -5,11 +5,9 @@ import type {
   ApiOnProgress,
 } from '../types';
 import type { Methods, MethodArgs, MethodResponse } from './methods/types';
-import type { LocalDb } from './localDb';
 
 import { API_THROTTLE_RESET_UPDATES, API_UPDATE_THROTTLE } from '../../config';
 import { throttle, throttleWithTickEnd } from '../../util/schedulers';
-import { updateFullLocalDb } from './localDb';
 import { init as initUpdater } from './updater';
 import { init as initAuth } from './methods/auth';
 import { init as initChats } from './methods/chats';
@@ -26,9 +24,8 @@ import * as methods from './methods';
 
 let onUpdate: OnApiUpdate;
 
-export async function initApi(_onUpdate: OnApiUpdate, initialArgs: ApiInitialArgs, initialLocalDb?: LocalDb) {
+export async function initApi(_onUpdate: OnApiUpdate, initialArgs: ApiInitialArgs) {
   onUpdate = _onUpdate;
-
   initUpdater(handleUpdate);
   initAuth(handleUpdate);
   initChats(handleUpdate);
@@ -41,9 +38,7 @@ export async function initApi(_onUpdate: OnApiUpdate, initialArgs: ApiInitialArg
   initCalls(handleUpdate);
   initPayments(handleUpdate);
 
-  if (initialLocalDb) updateFullLocalDb(initialLocalDb);
-
-  await initClient(handleUpdate, initialArgs);
+  // await initClient(handleUpdate, initialArgs);
 }
 
 export function callApi<T extends keyof Methods>(fnName: T, ...args: MethodArgs<T>): MethodResponse<T> {

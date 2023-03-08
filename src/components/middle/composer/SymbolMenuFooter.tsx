@@ -10,34 +10,27 @@ type OwnProps = {
   onSwitchTab: (tab: SymbolMenuTabs) => void;
   onRemoveSymbol: () => void;
   onSearchOpen: (type: 'stickers' | 'gifs') => void;
-  isAttachmentModal?: boolean;
-  canSendPlainText?: boolean;
 };
 
 export enum SymbolMenuTabs {
   'Emoji',
-  'CustomEmoji',
   'Stickers',
   'GIFs',
 }
 
-export const SYMBOL_MENU_TAB_TITLES: Record<SymbolMenuTabs, string> = {
-  [SymbolMenuTabs.Emoji]: 'Emoji',
-  [SymbolMenuTabs.CustomEmoji]: 'StickersList.EmojiItem',
-  [SymbolMenuTabs.Stickers]: 'AccDescrStickers',
-  [SymbolMenuTabs.GIFs]: 'GifsTab',
-};
+// Getting enum string values for display in Tabs.
+// See: https://www.typescriptlang.org/docs/handbook/enums.html#reverse-mappings
+export const SYMBOL_MENU_TAB_TITLES = Object.values(SymbolMenuTabs)
+  .filter((value): value is string => typeof value === 'string');
 
 const SYMBOL_MENU_TAB_ICONS = {
   [SymbolMenuTabs.Emoji]: 'icon-smile',
-  [SymbolMenuTabs.CustomEmoji]: 'icon-favorite',
   [SymbolMenuTabs.Stickers]: 'icon-stickers',
   [SymbolMenuTabs.GIFs]: 'icon-gifs',
 };
 
 const SymbolMenuFooter: FC<OwnProps> = ({
-  activeTab, onSwitchTab, onRemoveSymbol, onSearchOpen, isAttachmentModal,
-  canSendPlainText,
+  activeTab, onSwitchTab, onRemoveSymbol, onSearchOpen,
 }) => {
   const lang = useLang();
 
@@ -47,7 +40,7 @@ const SymbolMenuFooter: FC<OwnProps> = ({
         className={`symbol-tab-button ${activeTab === tab ? 'activated' : ''}`}
         // eslint-disable-next-line react/jsx-no-bind
         onClick={() => onSwitchTab(tab)}
-        ariaLabel={lang(SYMBOL_MENU_TAB_TITLES[tab])}
+        ariaLabel={SYMBOL_MENU_TAB_TITLES[tab]}
         round
         faded
         color="translucent"
@@ -67,7 +60,7 @@ const SymbolMenuFooter: FC<OwnProps> = ({
 
   return (
     <div className="SymbolMenu-footer" onClick={stopPropagation} dir={lang.isRtl ? 'rtl' : undefined}>
-      {activeTab !== SymbolMenuTabs.Emoji && activeTab !== SymbolMenuTabs.CustomEmoji && (
+      {activeTab !== SymbolMenuTabs.Emoji && (
         <Button
           className="symbol-search-button"
           ariaLabel={activeTab === SymbolMenuTabs.Stickers ? 'Search Stickers' : 'Search GIFs'}
@@ -80,12 +73,11 @@ const SymbolMenuFooter: FC<OwnProps> = ({
         </Button>
       )}
 
-      {canSendPlainText && renderTabButton(SymbolMenuTabs.Emoji)}
-      {canSendPlainText && renderTabButton(SymbolMenuTabs.CustomEmoji)}
-      {!isAttachmentModal && renderTabButton(SymbolMenuTabs.Stickers)}
-      {!isAttachmentModal && renderTabButton(SymbolMenuTabs.GIFs)}
+      {/*{renderTabButton(SymbolMenuTabs.Emoji)}*/}
+      {/*{renderTabButton(SymbolMenuTabs.Stickers)}*/}
+      {/*{renderTabButton(SymbolMenuTabs.GIFs)}*/}
 
-      {(activeTab === SymbolMenuTabs.Emoji || activeTab === SymbolMenuTabs.CustomEmoji) && (
+      {activeTab === SymbolMenuTabs.Emoji && (
         <Button
           className="symbol-delete-button"
           onClick={onRemoveSymbol}

@@ -1,6 +1,5 @@
 import type { ApiInitialArgs, ApiUpdate } from '../../types';
 import type { Methods, MethodArgs, MethodResponse } from '../methods/types';
-import type { LocalDb } from '../localDb';
 
 export type ThenArg<T> = T extends Promise<infer U> ? U : T;
 
@@ -28,13 +27,12 @@ export interface WorkerMessageEvent {
 export type OriginRequest = {
   type: 'initApi';
   messageId?: string;
-  args: [ApiInitialArgs, LocalDb];
+  args: [ApiInitialArgs];
 } | {
   type: 'callMethod';
   messageId?: string;
   name: keyof Methods;
   args: MethodArgs<keyof Methods>;
-  withCallback?: boolean;
 } | {
   type: 'ping';
   messageId?: string;

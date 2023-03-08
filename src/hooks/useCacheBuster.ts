@@ -1,10 +1,10 @@
 import { useCallback, useState } from '../lib/teact/teact';
 
 const useCacheBuster = () => {
-  const [cacheBuster, setCacheBuster] = useState(0);
+  const [cacheBuster, setCacheBuster] = useState<boolean>(false);
 
   const updateCacheBuster = useCallback(() => {
-    setCacheBuster((current) => current + 1);
+    setCacheBuster((current) => !current);
   }, []);
 
   return [cacheBuster, updateCacheBuster] as const;

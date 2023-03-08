@@ -1,7 +1,7 @@
 import BigInt from 'big-integer';
 import { Api as GramJs } from '../../../lib/gramjs';
 import type {
-  OnApiUpdate, ApiUser, ApiChat, ApiSticker,
+  OnApiUpdate, ApiUser, ApiChat, ApiPhoto,
 } from '../../types';
 
 import { COMMON_CHATS_LIMIT, PROFILE_PHOTOS_LIMIT } from '../../../config';
@@ -13,7 +13,6 @@ import {
   buildInputContact,
   buildMtpPeerId,
   getEntityTypeById,
-  buildInputEmojiStatus,
 } from '../gramjsBuilders';
 import { buildApiUser, buildApiUserFromFull, buildApiUsersAndStatuses } from '../apiBuilders/users';
 import { buildApiChatFromPreview } from '../apiBuilders/chats';
@@ -37,28 +36,17 @@ export async function fetchFullUser({
 }) {
   const input = buildInputEntity(id, accessHash);
   if (!(input instanceof GramJs.InputUser)) {
-    return undefined;
+    return;
   }
 
   const fullInfo = await invokeRequest(new GramJs.users.GetFullUser({ id: input }));
 
   if (!fullInfo) {
-    return undefined;
+    return;
   }
-
-  updateLocalDb(fullInfo);
-  addUserToLocalDb(fullInfo.users[0], true);
 
   if (fullInfo.fullUser.profilePhoto instanceof GramJs.Photo) {
     localDb.photos[fullInfo.fullUser.profilePhoto.id.toString()] = fullInfo.fullUser.profilePhoto;
-  }
-
-  if (fullInfo.fullUser.personalPhoto instanceof GramJs.Photo) {
-    localDb.photos[fullInfo.fullUser.personalPhoto.id.toString()] = fullInfo.fullUser.personalPhoto;
-  }
-
-  if (fullInfo.fullUser.fallbackPhoto instanceof GramJs.Photo) {
-    localDb.photos[fullInfo.fullUser.fallbackPhoto.id.toString()] = fullInfo.fullUser.fallbackPhoto;
   }
 
   const botInfo = fullInfo.fullUser.botInfo;
@@ -70,19 +58,14 @@ export async function fetchFullUser({
   }
 
   const userWithFullInfo = buildApiUserFromFull(fullInfo);
-  const user = buildApiUser(fullInfo.users[0]);
 
   onUpdate({
     '@type': 'updateUser',
     id,
     user: {
-      ...user,
-      avatarHash: user?.avatarHash || undefined,
       fullInfo: userWithFullInfo.fullInfo,
     },
   });
-
-  return userWithFullInfo;
 }
 
 export async function fetchCommonChats(id: string, accessHash?: string, maxId?: string) {
@@ -153,7 +136,7 @@ export async function fetchContactList() {
   return {
     users,
     userStatusesById,
-    chats: result.users.map((user) => buildApiChatFromPreview(user)).filter(Boolean),
+    chats: result.users.map((user) => buildApiChatFromPreview(user)).filter<ApiChat>(Boolean as any),
   };
 }
 
@@ -266,8 +249,7 @@ export async function fetchProfilePhotos(user?: ApiUser, chat?: ApiChat) {
     return {
       photos: result.photos
         .filter((photo): photo is GramJs.Photo => photo instanceof GramJs.Photo)
-        .map((photo) => buildApiPhoto(photo)),
-      users: result.users.map(buildApiUser).filter(Boolean),
+        .map(buildApiPhoto),
     };
   }
 
@@ -284,7 +266,7 @@ export async function fetchProfilePhotos(user?: ApiUser, chat?: ApiChat) {
   const { messages, users } = result;
 
   return {
-    photos: messages.map((message) => message.content.action!.photo).filter(Boolean),
+    photos: messages.map((message) => message.content.action!.photo).filter<ApiPhoto>(Boolean as any),
     users,
   };
 }
@@ -297,12 +279,6 @@ export function reportSpam(userOrChat: ApiUser | ApiChat) {
   }), true);
 }
 
-export function updateEmojiStatus(emojiStatus: ApiSticker, expires?: number) {
-  return invokeRequest(new GramJs.account.UpdateEmojiStatus({
-    emojiStatus: buildInputEmojiStatus(emojiStatus, expires),
-  }), true);
-}
-
 function updateLocalDb(result: (GramJs.photos.Photos | GramJs.photos.PhotosSlice | GramJs.messages.Chats)) {
   if ('chats' in result) {
     addEntitiesWithPhotosToLocalDb(result.chats);
@@ -310,9 +286,5 @@ function updateLocalDb(result: (GramJs.photos.Photos | GramJs.photos.PhotosSlice
 
   if ('photos' in result) {
     result.photos.forEach(addPhotoToLocalDb);
-  }
-
-  if ('users' in result) {
-    addEntitiesWithPhotosToLocalDb(result.users);
   }
 }

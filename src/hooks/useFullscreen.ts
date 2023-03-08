@@ -1,8 +1,8 @@
-import { useLayoutEffect, useState, useEffect } from '../lib/teact/teact';
-import { IS_IOS } from '../util/environment';
+import { useLayoutEffect, useState } from '../lib/teact/teact';
+import { PLATFORM_ENV } from '../util/environment';
 
 type RefType = {
-  current: HTMLVideoElement | null;
+  current: HTMLElement | null;
 };
 
 type ReturnType = [boolean, () => void, () => void] | [false];
@@ -10,14 +10,24 @@ type CallbackType = (isPlayed: boolean) => void;
 
 const prop = getBrowserFullscreenElementProp();
 
-export default function useFullscreen(elRef: RefType, setIsPlayed: CallbackType): ReturnType {
+export default function useFullscreenStatus(elRef: RefType, setIsPlayed: CallbackType): ReturnType {
   const [isFullscreen, setIsFullscreen] = useState(Boolean(prop && document[prop]));
 
   const setFullscreen = () => {
-    if (!elRef.current || !(prop || IS_IOS)) {
+    if (!elRef.current || !(prop || PLATFORM_ENV === 'iOS')) {
       return;
     }
-    safeRequestFullscreen(elRef.current);
+
+    if (elRef.current.requestFullscreen) {
+      elRef.current.requestFullscreen();
+    } else if (elRef.current.webkitRequestFullscreen) {
+      elRef.current.webkitRequestFullscreen();
+    } else if (elRef.current.webkitEnterFullscreen) {
+      elRef.current.webkitEnterFullscreen();
+    } else if (elRef.current.mozRequestFullScreen) {
+      elRef.current.mozRequestFullScreen();
+    }
+
     setIsFullscreen(true);
   };
 
@@ -25,23 +35,28 @@ export default function useFullscreen(elRef: RefType, setIsPlayed: CallbackType)
     if (!elRef.current) {
       return;
     }
-    safeExitFullscreen();
+
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+      document.mozCancelFullScreen();
+    } else if (document.webkitCancelFullScreen) {
+      document.webkitCancelFullScreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+
     setIsFullscreen(false);
   };
 
   useLayoutEffect(() => {
-    const video = elRef.current;
-    const listener = () => {
-      const isEnabled = Boolean(prop && document[prop]);
-      setIsFullscreen(isEnabled);
-      // In Firefox fullscreen video controls are not visible by default, so we force them manually
-      video!.controls = isEnabled;
-    };
+    const listener = () => { setIsFullscreen(Boolean(prop && document[prop])); };
     const listenerEnter = () => { setIsFullscreen(true); };
     const listenerExit = () => {
       setIsFullscreen(false);
       setIsPlayed(false);
     };
+    const video = elRef.current;
 
     document.addEventListener('fullscreenchange', listener, false);
     document.addEventListener('webkitfullscreenchange', listener, false);
@@ -64,34 +79,12 @@ export default function useFullscreen(elRef: RefType, setIsPlayed: CallbackType)
     // eslint-disable-next-line
   }, []);
 
-  if (!prop && !IS_IOS) {
+  if (!prop && PLATFORM_ENV !== 'iOS') {
     return [false];
   }
 
   return [isFullscreen, setFullscreen, exitFullscreen];
 }
-
-export const useFullscreenStatus = () => {
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  useEffect(() => {
-    const listener = () => {
-      setIsFullscreen(checkIfFullscreen());
-    };
-
-    document.addEventListener('fullscreenchange', listener, false);
-    document.addEventListener('webkitfullscreenchange', listener, false);
-    document.addEventListener('mozfullscreenchange', listener, false);
-
-    return () => {
-      document.removeEventListener('fullscreenchange', listener, false);
-      document.removeEventListener('webkitfullscreenchange', listener, false);
-      document.removeEventListener('mozfullscreenchange', listener, false);
-    };
-  }, []);
-
-  return isFullscreen;
-};
 
 function getBrowserFullscreenElementProp() {
   if (typeof document.fullscreenElement !== 'undefined') {
@@ -101,34 +94,6 @@ function getBrowserFullscreenElementProp() {
   } else if (typeof document.webkitFullscreenElement !== 'undefined') {
     return 'webkitFullscreenElement';
   }
+
   return '';
-}
-
-export function checkIfFullscreen() {
-  const fullscreenProp = getBrowserFullscreenElementProp();
-  return Boolean(fullscreenProp && document[fullscreenProp]);
-}
-
-export function safeRequestFullscreen(video: HTMLVideoElement) {
-  if (video.requestFullscreen) {
-    video.requestFullscreen();
-  } else if (video.webkitRequestFullscreen) {
-    video.webkitRequestFullscreen();
-  } else if (video.webkitEnterFullscreen) {
-    video.webkitEnterFullscreen();
-  } else if (video.mozRequestFullScreen) {
-    video.mozRequestFullScreen();
-  }
-}
-
-export function safeExitFullscreen() {
-  if (document.exitFullscreen) {
-    document.exitFullscreen();
-  } else if (document.mozCancelFullScreen) {
-    document.mozCancelFullScreen();
-  } else if (document.webkitCancelFullScreen) {
-    document.webkitCancelFullScreen();
-  } else if (document.webkitExitFullscreen) {
-    document.webkitExitFullscreen();
-  }
 }

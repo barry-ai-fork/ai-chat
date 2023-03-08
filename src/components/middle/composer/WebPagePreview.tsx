@@ -1,22 +1,19 @@
-import type { Signal } from '../../../util/signals';
 import type { FC } from '../../../lib/teact/teact';
 import React, { memo, useCallback, useEffect } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
-import type { ApiMessage, ApiMessageEntityTextUrl, ApiWebPage } from '../../../api/types';
+import type { ApiMessage, ApiWebPage } from '../../../api/types';
 import { ApiMessageEntityTypes } from '../../../api/types';
 import type { ISettings } from '../../../types';
 
 import { RE_LINK_TEMPLATE } from '../../../config';
-import { selectTabState, selectNoWebPage, selectTheme } from '../../../global/selectors';
-import buildClassName from '../../../util/buildClassName';
+import { selectNoWebPage, selectTheme } from '../../../global/selectors';
 import parseMessageInput from '../../../util/parseMessageInput';
-import useSyncEffect from '../../../hooks/useSyncEffect';
+import useOnChange from '../../../hooks/useOnChange';
 import useShowTransition from '../../../hooks/useShowTransition';
 import useCurrentOrPrev from '../../../hooks/useCurrentOrPrev';
-import useDerivedState from '../../../hooks/useDerivedState';
-import useDerivedSignal from '../../../hooks/useDerivedSignal';
-import { useDebouncedResolver } from '../../../hooks/useAsyncResolvers';
+import useDebouncedMemo from '../../../hooks/useDebouncedMemo';
+import buildClassName from '../../../util/buildClassName';
 
 import WebPage from '../message/WebPage';
 import Button from '../../ui/Button';
@@ -26,8 +23,8 @@ import './WebPagePreview.scss';
 type OwnProps = {
   chatId: string;
   threadId: number;
-  getHtml: Signal<string>;
-  isDisabled?: boolean;
+  messageText: string;
+  disabled?: boolean;
 };
 
 type StateProps = {
@@ -42,8 +39,8 @@ const RE_LINK = new RegExp(RE_LINK_TEMPLATE, 'i');
 const WebPagePreview: FC<OwnProps & StateProps> = ({
   chatId,
   threadId,
-  getHtml,
-  isDisabled,
+  messageText,
+  disabled,
   webPagePreview,
   noWebPage,
   theme,
@@ -54,36 +51,37 @@ const WebPagePreview: FC<OwnProps & StateProps> = ({
     toggleMessageWebPage,
   } = getActions();
 
-  const detectLinkDebounced = useDebouncedResolver(() => {
-    const { text, entities } = parseMessageInput(getHtml());
-    const linkEntity = entities?.find((entity): entity is ApiMessageEntityTextUrl => (
-      entity.type === ApiMessageEntityTypes.TextUrl
-    ));
+  const link = useDebouncedMemo(() => {
+    const { text, entities } = parseMessageInput(messageText);
 
-    return linkEntity?.url || text.match(RE_LINK)?.[0];
-  }, [getHtml], DEBOUNCE_MS, true);
+    const linkEntity = entities && entities.find(({ type }) => type === ApiMessageEntityTypes.TextUrl);
+    if (linkEntity) {
+      return linkEntity.url;
+    }
 
-  const getLink = useDerivedSignal(detectLinkDebounced, [detectLinkDebounced, getHtml], true);
+    const textMatch = text.match(RE_LINK);
+    if (textMatch) {
+      return textMatch[0];
+    }
+
+    return undefined;
+  }, DEBOUNCE_MS, [messageText]);
 
   useEffect(() => {
-    const link = getLink();
-
     if (link) {
       loadWebPagePreview({ text: link });
     } else {
       clearWebPagePreview();
       toggleMessageWebPage({ chatId, threadId });
     }
-  }, [getLink, chatId, threadId, clearWebPagePreview, loadWebPagePreview, toggleMessageWebPage]);
+  }, [chatId, toggleMessageWebPage, clearWebPagePreview, link, loadWebPagePreview, threadId]);
 
-  useSyncEffect(() => {
+  useOnChange(() => {
     clearWebPagePreview();
     toggleMessageWebPage({ chatId, threadId });
-  }, [chatId, clearWebPagePreview, threadId, toggleMessageWebPage]);
+  }, [chatId]);
 
-  const isShown = useDerivedState(() => {
-    return Boolean(webPagePreview && getHtml() && !noWebPage && !isDisabled);
-  }, [isDisabled, getHtml, noWebPage, webPagePreview]);
+  const isShown = Boolean(webPagePreview && messageText.length && !noWebPage && !disabled);
   const { shouldRender, transitionClassNames } = useShowTransition(isShown);
 
   const renderingWebPage = useCurrentOrPrev(webPagePreview, true);
@@ -107,20 +105,10 @@ const WebPagePreview: FC<OwnProps & StateProps> = ({
   return (
     <div className={buildClassName('WebPagePreview', transitionClassNames)}>
       <div>
-        <div className="WebPagePreview-left-icon">
-          <i className="icon-link" />
-        </div>
-        <WebPage message={messageStub} inPreview theme={theme} />
-        <Button
-          className="WebPagePreview-clear"
-          round
-          faded
-          color="translucent"
-          ariaLabel="Clear Webpage Preview"
-          onClick={handleClearWebpagePreview}
-        >
+        <Button round faded color="translucent" ariaLabel="Clear Webpage Preview" onClick={handleClearWebpagePreview}>
           <i className="icon-close" />
         </Button>
+        <WebPage message={messageStub} inPreview theme={theme} />
       </div>
     </div>
   );
@@ -131,7 +119,7 @@ export default memo(withGlobal<OwnProps>(
     const noWebPage = selectNoWebPage(global, chatId, threadId);
     return {
       theme: selectTheme(global),
-      webPagePreview: selectTabState(global).webPagePreview,
+      webPagePreview: global.webPagePreview,
       noWebPage,
     };
   },

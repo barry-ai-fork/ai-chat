@@ -1,7 +1,6 @@
 // Not sure what they are for.
 const RAW_TYPES = new Set(['Bool', 'X'])
-
-const FLAG_REGEX = /flags\d*/;
+const FLAGS = ['flags', 'flags2'];
 
 module.exports = ({ types, constructors, functions }) => {
     function groupByKey(collection, key) {
@@ -16,10 +15,6 @@ module.exports = ({ types, constructors, functions }) => {
 
             return byKey
         }, {})
-    }
-
-    function isFlagArg(argName) {
-        return argName.match(FLAG_REGEX);
     }
 
     function renderTypes(types, indent) {
@@ -38,7 +33,7 @@ module.exports = ({ types, constructors, functions }) => {
                 return `export class ${upperFirst(name)} extends VirtualClass<void> {};`
             }
 
-            let hasRequiredArgs = argKeys.some((argName) => !isFlagArg(argName) && !argsConfig[argName].isFlag)
+            let hasRequiredArgs = argKeys.some((argName) => !FLAGS.includes(argName) && !argsConfig[argName].isFlag)
 
             return `
       export class ${upperFirst(name)} extends VirtualClass<{
@@ -67,7 +62,7 @@ ${indent}};`.trim()
                 return `export class ${upperFirst(name)} extends Request<void, ${renderedResult}> {};`
             }
 
-            let hasRequiredArgs = argKeys.some((argName) => !isFlagArg(argName) && !argsConfig[argName].isFlag)
+            let hasRequiredArgs = argKeys.some((argName) => !FLAGS.includes(argName) && !argsConfig[argName].isFlag)
 
             return `
       export class ${upperFirst(name)} extends Request<Partial<{
@@ -101,7 +96,7 @@ ${indent}};`.trim()
 
         const valueType = renderValueType(type, isVector, !skipConstructorId)
 
-        return `${isFlagArg(argName) ? '// ' : ''}${argName}${isFlag ? '?' : ''}: ${valueType}`
+        return `${FLAGS.includes(argName) ? '// ' : ''}${argName}${isFlag ? '?' : ''}: ${valueType}`
     }
 
     function renderValueType(type, isVector, isTlType) {

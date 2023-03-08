@@ -12,7 +12,7 @@ import buildClassName from '../../util/buildClassName';
 import renderText from '../common/helpers/renderText';
 import useLang from '../../hooks/useLang';
 import { isoToEmoji } from '../../util/emoji';
-import useSyncEffect from '../../hooks/useSyncEffect';
+import useOnChange from '../../hooks/useOnChange';
 
 import DropdownMenu from '../ui/DropdownMenu';
 import MenuItem from '../ui/MenuItem';
@@ -53,11 +53,11 @@ const CountryCodeInput: FC<OwnProps & StateProps> = ({
     setFilteredList(getFilteredList(phoneCodeList, filterValue));
   }, [phoneCodeList]);
 
-  useSyncEffect(([prevPhoneCodeList]) => {
-    if (!prevPhoneCodeList?.length && phoneCodeList.length) {
-      setFilteredList(getFilteredList(phoneCodeList, filter));
+  useOnChange(([prevPhoneCodeList]) => {
+    if (prevPhoneCodeList?.length === 0 && phoneCodeList.length > 0) {
+      updateFilter(filter);
     }
-  }, [phoneCodeList, filter]);
+  }, [phoneCodeList, updateFilter]);
 
   const handleChange = useCallback((country: ApiCountryCode) => {
     onChange(country);

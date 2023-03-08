@@ -4,7 +4,6 @@ import { getActions, withGlobal } from '../../global';
 
 import type { ApiNotification } from '../../api/types';
 
-import { selectTabState } from '../../global/selectors';
 import { pick } from '../../util/iteratees';
 import renderText from '../common/helpers/renderText';
 
@@ -27,11 +26,11 @@ const Notifications: FC<StateProps> = ({ notifications }) => {
         message, className, localId, action, actionText, title,
       }) => (
         <Notification
-          title={title ? renderText(title, ['simple_markdown', 'emoji', 'br', 'links']) : undefined}
+          title={title ? renderText(title, ['emoji', 'br', 'links', 'simple_markdown']) : undefined}
           action={action}
           actionText={actionText}
           className={className}
-          message={renderText(message, ['simple_markdown', 'emoji', 'br', 'links'])}
+          message={renderText(message, ['emoji', 'br', 'links', 'simple_markdown'])}
           // eslint-disable-next-line react/jsx-no-bind
           onDismiss={() => dismissNotification({ localId })}
         />
@@ -41,5 +40,5 @@ const Notifications: FC<StateProps> = ({ notifications }) => {
 };
 
 export default memo(withGlobal(
-  (global): StateProps => pick(selectTabState(global), ['notifications']),
+  (global): StateProps => pick(global, ['notifications']),
 )(Notifications));

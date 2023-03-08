@@ -28,14 +28,13 @@ export interface ApiPhoto {
   sizes: ApiPhotoSize[];
   videoSizes?: ApiVideoSize[];
   blobUrl?: string;
-  isSpoiler?: boolean;
 }
 
 export interface ApiSticker {
   id: string;
-  stickerSetInfo: ApiStickerSetInfo;
+  stickerSetId: string;
+  stickerSetAccessHash?: string;
   emoji?: string;
-  isCustomEmoji?: boolean;
   isLottie: boolean;
   isVideo: boolean;
   width?: number;
@@ -43,15 +42,12 @@ export interface ApiSticker {
   thumbnail?: ApiThumbnail;
   isPreloadedGlobally?: boolean;
   hasEffect?: boolean;
-  isFree?: boolean;
-  shouldUseTextColor?: boolean;
 }
 
 export interface ApiStickerSet {
-  isArchived?: true;
+  archived?: true;
   isLottie?: true;
   isVideos?: true;
-  isEmoji?: true;
   installedDate?: number;
   id: string;
   accessHash: string;
@@ -64,21 +60,6 @@ export interface ApiStickerSet {
   shortName: string;
 }
 
-type ApiStickerSetInfoShortName = {
-  shortName: string;
-};
-
-type ApiStickerSetInfoId = {
-  id: string;
-  accessHash: string;
-};
-
-type ApiStickerSetInfoMissing = {
-  isMissing: true;
-};
-
-export type ApiStickerSetInfo = ApiStickerSetInfoShortName | ApiStickerSetInfoId | ApiStickerSetInfoMissing;
-
 export interface ApiVideo {
   id: string;
   mimeType: string;
@@ -89,10 +70,8 @@ export interface ApiVideo {
   supportsStreaming?: boolean;
   isRound?: boolean;
   isGif?: boolean;
-  isSpoiler?: boolean;
   thumbnail?: ApiThumbnail;
   blobUrl?: string;
-  previewBlobUrl?: string;
   size: number;
 }
 
@@ -170,7 +149,6 @@ export interface ApiPoll {
 export type ApiInputInvoice = {
   chatId: string;
   messageId: number;
-  isExtendedMedia?: boolean;
 } | {
   slug: string;
 };
@@ -192,21 +170,6 @@ export interface ApiInvoice {
   isTest?: boolean;
   isRecurring?: boolean;
   recurringTermsUrl?: string;
-  extendedMedia?: ApiMessageExtendedMediaPreview;
-  maxTipAmount?: number;
-  suggestedTipAmounts?: number[];
-}
-
-export interface ApiMessageExtendedMediaPreview {
-  width?: number;
-  height?: number;
-  thumbnail?: ApiThumbnail;
-  duration?: number;
-}
-
-export interface ApiPaymentCredentials {
-  id: string;
-  title: string;
 }
 
 interface ApiGeoPoint {
@@ -263,7 +226,7 @@ export interface ApiAction {
   text: string;
   targetUserIds?: string[];
   targetChatId?: string;
-  type: 'historyClear' | 'contactSignUp' | 'chatCreate' | 'topicCreate' | 'suggestProfilePhoto' | 'other';
+  type: 'historyClear' | 'contactSignUp' | 'chatCreate' | 'other';
   photo?: ApiPhoto;
   amount?: number;
   currency?: string;
@@ -271,9 +234,6 @@ export interface ApiAction {
   call?: Partial<ApiGroupCall>;
   phoneCall?: PhoneCallAction;
   score?: number;
-  months?: number;
-  topicEmojiIconId?: string;
-  isTopicAction?: boolean;
 }
 
 export interface ApiWebPage {
@@ -292,7 +252,6 @@ export interface ApiWebPage {
 
 export interface ApiMessageForwardInfo {
   date: number;
-  isImported?: boolean;
   isChannelPost: boolean;
   channelPostId?: number;
   isLinkedChannelPost?: boolean;
@@ -300,49 +259,17 @@ export interface ApiMessageForwardInfo {
   senderUserId?: string;
   fromMessageId?: number;
   hiddenUserName?: string;
-  postAuthorTitle?: string;
+  adminTitle?: string;
 }
 
-export type ApiMessageEntityDefault = {
-  type: Exclude<
-  `${ApiMessageEntityTypes}`,
-  `${ApiMessageEntityTypes.Pre}` | `${ApiMessageEntityTypes.TextUrl}` | `${ApiMessageEntityTypes.MentionName}` |
-  `${ApiMessageEntityTypes.CustomEmoji}`
-  >;
+export interface ApiMessageEntity {
+  type: string;
   offset: number;
   length: number;
-};
-
-export type ApiMessageEntityPre = {
-  type: ApiMessageEntityTypes.Pre;
-  offset: number;
-  length: number;
+  userId?: string;
+  url?: string;
   language?: string;
-};
-
-export type ApiMessageEntityTextUrl = {
-  type: ApiMessageEntityTypes.TextUrl;
-  offset: number;
-  length: number;
-  url: string;
-};
-
-export type ApiMessageEntityMentionName = {
-  type: ApiMessageEntityTypes.MentionName;
-  offset: number;
-  length: number;
-  userId: string;
-};
-
-export type ApiMessageEntityCustomEmoji = {
-  type: ApiMessageEntityTypes.CustomEmoji;
-  offset: number;
-  length: number;
-  documentId: string;
-};
-
-export type ApiMessageEntity = ApiMessageEntityDefault | ApiMessageEntityPre | ApiMessageEntityTextUrl |
-ApiMessageEntityMentionName | ApiMessageEntityCustomEmoji;
+}
 
 export enum ApiMessageEntityTypes {
   Bold = 'MessageEntityBold',
@@ -362,7 +289,6 @@ export enum ApiMessageEntityTypes {
   Url = 'MessageEntityUrl',
   Underline = 'MessageEntityUnderline',
   Spoiler = 'MessageEntitySpoiler',
-  CustomEmoji = 'MessageEntityCustomEmoji',
   Unknown = 'MessageEntityUnknown',
 }
 
@@ -396,7 +322,6 @@ export interface ApiMessage {
   replyToChatId?: string;
   replyToMessageId?: number;
   replyToTopMessageId?: number;
-  isTopicReply?: true;
   sendingState?: 'messageSendingStatePending' | 'messageSendingStateFailed';
   forwardInfo?: ApiMessageForwardInfo;
   isDeleting?: boolean;
@@ -414,21 +339,16 @@ export interface ApiMessage {
   keyboardButtons?: ApiKeyboardButtons;
   keyboardPlaceholder?: string;
   isKeyboardSingleUse?: boolean;
-  isKeyboardSelective?: boolean;
   viaBotId?: string;
-  repliesThreadInfo?: ApiThreadInfo;
-  postAuthorTitle?: string;
+  threadInfo?: ApiThreadInfo;
+  adminTitle?: string;
   isScheduled?: boolean;
   shouldHideKeyboardButtons?: boolean;
-  isHideKeyboardSelective?: boolean;
   isFromScheduled?: boolean;
-  isSilent?: boolean;
   seenByUserIds?: string[];
   isProtected?: boolean;
-  isForwardingAllowed?: boolean;
   transcriptionId?: string;
   isTranscriptionError?: boolean;
-  emojiOnlyCount?: number;
   reactors?: {
     nextOffset?: string;
     count: number;
@@ -445,15 +365,15 @@ export interface ApiReactions {
 
 export interface ApiUserReaction {
   userId: string;
-  reaction: ApiReaction;
+  reaction: string;
   isBig?: boolean;
   isUnread?: boolean;
 }
 
 export interface ApiReactionCount {
-  chosenOrder?: number;
+  isChosen?: boolean;
   count: number;
-  reaction: ApiReaction;
+  reaction: string;
 }
 
 export interface ApiAvailableReaction {
@@ -463,36 +383,13 @@ export interface ApiAvailableReaction {
   staticIcon?: ApiDocument;
   centerIcon?: ApiDocument;
   aroundAnimation?: ApiDocument;
-  reaction: ApiReactionEmoji;
+  reaction: string;
   title: string;
   isInactive?: boolean;
   isPremium?: boolean;
 }
 
-type ApiChatReactionsAll = {
-  type: 'all';
-  areCustomAllowed?: true;
-};
-
-type ApiChatReactionsSome = {
-  type: 'some';
-  allowed: ApiReaction[];
-};
-
-export type ApiChatReactions = ApiChatReactionsAll | ApiChatReactionsSome;
-
-export type ApiReactionEmoji = {
-  emoticon: string;
-};
-
-export type ApiReactionCustomEmoji = {
-  documentId: string;
-};
-
-export type ApiReaction = ApiReactionEmoji | ApiReactionCustomEmoji;
-
 export interface ApiThreadInfo {
-  isComments?: boolean;
   threadId: number;
   chatId: string;
   topMessageId?: number;
@@ -604,7 +501,6 @@ export type ApiKeyboardButtons = ApiKeyboardButton[][];
 export type ApiReplyKeyboard = {
   keyboardPlaceholder?: string;
   isKeyboardSingleUse?: boolean;
-  isKeyboardSelective?: boolean;
 } & {
   [K in 'inlineButtons' | 'keyboardButtons']?: ApiKeyboardButtons;
 };

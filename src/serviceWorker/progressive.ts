@@ -100,7 +100,7 @@ export async function respondForProgressive(e: FetchEvent) {
   const partSize = Math.min(end - start + 1, arrayBuffer.byteLength);
   end = start + partSize - 1;
   const arrayBufferPart = arrayBuffer.slice(0, partSize);
-  const headers: [string, string][] = [
+  const headers = [
     ['Content-Range', `bytes ${start}-${end}/${fullSize}`],
     ['Accept-Ranges', 'bytes'],
     ['Content-Length', String(partSize)],
@@ -137,14 +137,16 @@ async function saveToCache(cacheKey: string, arrayBuffer: ArrayBuffer, headers: 
   ]);
 }
 
-export async function requestPart(
+async function requestPart(
   e: FetchEvent,
   params: { url: string; start: number; end: number },
 ): Promise<PartInfo | undefined> {
-  const isDownload = params.url.includes('/download/');
-  const client = isDownload ? (await self.clients.matchAll())
-    .find((c) => c.type === 'window' && c.frameType === 'top-level')
-    : await (self.clients.get(e.clientId));
+  if (!e.clientId) {
+    return undefined;
+  }
+
+  // eslint-disable-next-line no-restricted-globals
+  const client = await self.clients.get(e.clientId);
   if (!client) {
     return undefined;
   }
@@ -152,9 +154,8 @@ export async function requestPart(
   const messageId = generateIdFor(requestStates);
   const requestState = {} as RequestStates;
 
-  let isResolved = false;
   const promise = Promise.race([
-    pause(PART_TIMEOUT).then(() => (isResolved ? undefined : Promise.reject(new Error('ERROR_PART_TIMEOUT')))),
+    pause(PART_TIMEOUT).then(() => Promise.reject(new Error('ERROR_PART_TIMEOUT'))),
     new Promise<PartInfo>((resolve, reject) => {
       Object.assign(requestState, { resolve, reject });
     }),
@@ -165,7 +166,6 @@ export async function requestPart(
     .catch(() => undefined)
     .finally(() => {
       requestStates.delete(messageId);
-      isResolved = true;
     });
 
   client.postMessage({

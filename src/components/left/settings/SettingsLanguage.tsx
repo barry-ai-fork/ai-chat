@@ -1,61 +1,44 @@
+import type { FC } from '../../../lib/teact/teact';
 import React, {
   memo, useCallback, useEffect, useMemo, useState,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
-import type { FC } from '../../../lib/teact/teact';
-import { SettingsScreens } from '../../../types';
 import type { ISettings, LangCode } from '../../../types';
 import type { ApiLanguage } from '../../../api/types';
 
 import { setLanguage } from '../../../util/langProvider';
-import { unique } from '../../../util/iteratees';
-
-import useFlag from '../../../hooks/useFlag';
-import useHistoryBack from '../../../hooks/useHistoryBack';
-import useLang from '../../../hooks/useLang';
 
 import RadioGroup from '../../ui/RadioGroup';
 import Loading from '../../ui/Loading';
-import Checkbox from '../../ui/Checkbox';
-import ListItem from '../../ui/ListItem';
+import useFlag from '../../../hooks/useFlag';
+import useHistoryBack from '../../../hooks/useHistoryBack';
 
 type OwnProps = {
   isActive?: boolean;
   onReset: () => void;
-  onScreenSelect: (screen: SettingsScreens) => void;
 };
 
-type StateProps = {
-  lastSyncTime?: number;
-} & Pick<ISettings, 'languages' | 'language' | 'canTranslate' | 'doNotTranslate'>;
+type StateProps = Pick<ISettings, 'languages' | 'language'>;
 
 const SettingsLanguage: FC<OwnProps & StateProps> = ({
   isActive,
+  onReset,
   languages,
   language,
-  canTranslate,
-  doNotTranslate,
-  lastSyncTime,
-  onScreenSelect,
-  onReset,
 }) => {
   const {
     loadLanguages,
-    loadAttachBots,
     setSettingOption,
   } = getActions();
 
   const [selectedLanguage, setSelectedLanguage] = useState<string>(language);
   const [isLoading, markIsLoading, unmarkIsLoading] = useFlag();
 
-  const lang = useLang();
-
+  // TODO Throttle
   useEffect(() => {
-    if (lastSyncTime && !languages?.length) {
-      loadLanguages();
-    }
-  }, [languages, lastSyncTime, loadLanguages]);
+    loadLanguages();
+  }, [loadLanguages]);
 
   const handleChange = useCallback((langCode: string) => {
     setSelectedLanguage(langCode);
@@ -64,75 +47,31 @@ const SettingsLanguage: FC<OwnProps & StateProps> = ({
     void setLanguage(langCode as LangCode, () => {
       unmarkIsLoading();
 
-      setSettingOption({ language: langCode as LangCode });
-
-      loadAttachBots(); // Should be refetched every language change
+      setSettingOption({ language: langCode });
     });
-  }, [markIsLoading, unmarkIsLoading, setSettingOption, loadAttachBots]);
+  }, [markIsLoading, unmarkIsLoading, setSettingOption]);
 
   const options = useMemo(() => {
     return languages ? buildOptions(languages) : undefined;
   }, [languages]);
 
-  const handleShouldTranslateChange = useCallback((newValue: boolean) => {
-    setSettingOption({ canTranslate: newValue });
-  }, [setSettingOption]);
-
-  const doNotTranslateText = useMemo(() => {
-    const allDoNotTranslateLanguages = unique([...doNotTranslate, language]);
-    // Do not translate current language
-    if (allDoNotTranslateLanguages.length === 1) {
-      if (!languages) {
-        return lang('Loading');
-      }
-      return languages.find(({ langCode }) => langCode === language)?.nativeName;
-    }
-
-    return lang('Languages', allDoNotTranslateLanguages.length);
-  }, [doNotTranslate, lang, language, languages]);
-
-  const handleDoNotSelectOpen = useCallback(() => {
-    onScreenSelect(SettingsScreens.DoNotTranslate);
-  }, [onScreenSelect]);
-
   useHistoryBack({
     isActive,
     onBack: onReset,
   });
-
   return (
-    <div className="settings-content settings-language custom-scroll">
-      <div className="settings-item">
-        <Checkbox
-          label={lang('ShowTranslateButton')}
-          checked={canTranslate}
-          onCheck={handleShouldTranslateChange}
+    <div className="settings-content settings-item settings-language custom-scroll settings-item--first">
+      {options ? (
+        <RadioGroup
+          name="keyboard-send-settings"
+          options={options}
+          selected={selectedLanguage}
+          loadingOption={isLoading ? selectedLanguage : undefined}
+          onChange={handleChange}
         />
-        {canTranslate && (
-          <ListItem
-            onClick={handleDoNotSelectOpen}
-          >
-            {lang('DoNotTranslate')}
-            <span className="settings-item__current-value">{doNotTranslateText}</span>
-          </ListItem>
-        )}
-        <p className="settings-item-description mb-0 mt-1">
-          {lang('lng_translate_settings_about')}
-        </p>
-      </div>
-      <div className="settings-item">
-        {options ? (
-          <RadioGroup
-            name="language-settings"
-            options={options}
-            selected={selectedLanguage}
-            loadingOption={isLoading ? selectedLanguage : undefined}
-            onChange={handleChange}
-          />
-        ) : (
-          <Loading />
-        )}
-      </div>
+      ) : (
+        <Loading />
+      )}
     </div>
   );
 };
@@ -140,7 +79,6 @@ const SettingsLanguage: FC<OwnProps & StateProps> = ({
 function buildOptions(languages: ApiLanguage[]) {
   const currentLangCode = (window.navigator.language || 'en').toLowerCase();
   const shortLangCode = currentLangCode.substr(0, 2);
-
   return languages.map(({ langCode, nativeName, name }) => ({
     value: langCode,
     label: nativeName,
@@ -152,16 +90,19 @@ function buildOptions(languages: ApiLanguage[]) {
 
 export default memo(withGlobal<OwnProps>(
   (global): StateProps => {
-    const {
-      language, languages, canTranslate, doNotTranslate,
-    } = global.settings.byKey;
-
+    let languages = global.settings.byKey.languages;
+    languages = [];
+    languages.push({
+      langCode: "en", name: "English", nativeName: "English", pluralCode: "en",
+      stringsCount: 0, translatedCount: 0, translationsUrl: ""
+    })
+    languages.push({
+      langCode: "zh-rCN", name: "简体中文", nativeName: "简体中文", pluralCode: "zh-rcn",
+      stringsCount: 0, translatedCount: 0, translationsUrl: ""
+    })
     return {
-      lastSyncTime: global.lastSyncTime,
-      languages,
-      language,
-      canTranslate,
-      doNotTranslate,
+      languages ,
+      language: global.settings.byKey.language,
     };
   },
 )(SettingsLanguage));

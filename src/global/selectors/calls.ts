@@ -3,24 +3,22 @@ import { selectChat } from './chats';
 import { isChatBasicGroup } from '../helpers';
 import { selectUser } from './users';
 
-export function selectChatGroupCall<T extends GlobalState>(global: T, chatId: string) {
+export function selectChatGroupCall(global: GlobalState, chatId: string) {
   const chat = selectChat(global, chatId);
   if (!chat || !chat.fullInfo || !chat.fullInfo.groupCallId) return undefined;
 
   return selectGroupCall(global, chat.fullInfo.groupCallId);
 }
 
-export function selectGroupCall<T extends GlobalState>(global: T, groupCallId: string) {
+export function selectGroupCall(global: GlobalState, groupCallId: string) {
   return global.groupCalls.byId[groupCallId];
 }
 
-export function selectGroupCallParticipant<T extends GlobalState>(
-  global: T, groupCallId: string, participantId: string,
-) {
+export function selectGroupCallParticipant(global: GlobalState, groupCallId: string, participantId: string) {
   return selectGroupCall(global, groupCallId)?.participants[participantId];
 }
 
-export function selectIsAdminInActiveGroupCall<T extends GlobalState>(global: T): boolean {
+export function selectIsAdminInActiveGroupCall(global: GlobalState): boolean {
   const chatId = selectActiveGroupCall(global)?.chatId;
 
   if (!chatId) return false;
@@ -31,7 +29,7 @@ export function selectIsAdminInActiveGroupCall<T extends GlobalState>(global: T)
   return (isChatBasicGroup(chat) && chat.isCreator) || Boolean(chat.adminRights?.manageCall);
 }
 
-export function selectActiveGroupCall<T extends GlobalState>(global: T) {
+export function selectActiveGroupCall(global: GlobalState) {
   const { groupCalls: { activeGroupCallId } } = global;
   if (!activeGroupCallId) {
     return undefined;
@@ -40,7 +38,7 @@ export function selectActiveGroupCall<T extends GlobalState>(global: T) {
   return selectGroupCall(global, activeGroupCallId);
 }
 
-export function selectPhoneCallUser<T extends GlobalState>(global: T) {
+export function selectPhoneCallUser(global: GlobalState) {
   const { phoneCall, currentUserId } = global;
   if (!phoneCall || !phoneCall.participantId || !phoneCall.adminId) {
     return undefined;

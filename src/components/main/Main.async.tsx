@@ -2,15 +2,12 @@ import type { FC } from '../../lib/teact/teact';
 import React, { memo } from '../../lib/teact/teact';
 import { Bundles } from '../../util/moduleLoader';
 
-import type { OwnProps } from './Main';
-
 import useModuleLoader from '../../hooks/useModuleLoader';
 
-const MainAsync: FC<OwnProps> = (props) => {
+const MainAsync: FC = () => {
   const Main = useModuleLoader(Bundles.Main, 'Main');
 
-  // eslint-disable-next-line react/jsx-props-no-spreading
-  return Main ? <Main {...props} /> : undefined;
+  return Main ? <Main /> : undefined;
 };
 
 export default memo(MainAsync);

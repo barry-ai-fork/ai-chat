@@ -21,16 +21,13 @@ export type FormState = {
   saveInfo: boolean;
   saveCredentials: boolean;
   formErrors: Record<string, string>;
-  tipAmount: number;
-  savedCredentialId: string;
 };
 
 export type FormActions = (
   'changeAddress1' | 'changeAddress2' | 'changeCity' | 'changeState' | 'changeCountry' |
   'changePostCode' | 'changeFullName' | 'changeEmail' | 'changePhone' | 'changeShipping' | 'updateUserInfo' |
   'changeCardNumber' | 'changeCardholder' | 'changeExpiryDate' | 'changeCvvCode' | 'changeBillingCountry' |
-  'changeBillingZip' | 'changeSaveInfo' | 'changeSaveCredentials' | 'setFormErrors' | 'resetState' | 'setTipAmount' |
-  'changeSavedCredentialId'
+  'changeBillingZip' | 'changeSaveInfo' | 'changeSaveCredentials' | 'setFormErrors' | 'resetState'
 );
 export type FormEditDispatch = Dispatch<FormActions>;
 
@@ -54,8 +51,6 @@ const INITIAL_STATE: FormState = {
   saveInfo: true,
   saveCredentials: false,
   formErrors: {},
-  tipAmount: 0,
-  savedCredentialId: '',
 };
 
 const reducer: StateReducer<FormState, FormActions> = (state, action) => {
@@ -218,16 +213,6 @@ const reducer: StateReducer<FormState, FormActions> = (state, action) => {
           ...state.formErrors,
           ...action.payload,
         },
-      };
-    case 'setTipAmount':
-      return {
-        ...state,
-        tipAmount: action.payload,
-      };
-    case 'changeSavedCredentialId':
-      return {
-        ...state,
-        savedCredentialId: action.payload,
       };
     case 'resetState':
       return {

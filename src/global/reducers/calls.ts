@@ -6,18 +6,18 @@ import { omit } from '../../util/iteratees';
 import { updateChat } from './chats';
 import { selectChat } from '../selectors';
 
-export function updateGroupCall<T extends GlobalState>(
-  global: T,
+export function updateGroupCall(
+  global: GlobalState,
   groupCallId: string,
   groupCallUpdate: Partial<ApiGroupCall>,
   addToParticipantCount?: number,
   resetParticipantCount?: number,
-): T {
+): GlobalState {
   const unfiltered = Object.values({
     ...global.groupCalls.byId[groupCallId]?.participants,
     ...groupCallUpdate.participants,
   });
-  const filtered = unfiltered.filter(({ isLeft }) => !isLeft);
+  const filtered = unfiltered.filter((l) => !l.isLeft);
   const participants = filtered.reduce((acc: Record<string, GroupCallParticipant>, el) => {
     acc[el.id] = el;
     return acc;
@@ -45,10 +45,10 @@ export function updateGroupCall<T extends GlobalState>(
   };
 }
 
-export function removeGroupCall<T extends GlobalState>(
-  global: T,
+export function removeGroupCall(
+  global: GlobalState,
   groupCallId: string,
-): T {
+): GlobalState {
   const groupCall = selectGroupCall(global, groupCallId);
   if (groupCall && groupCall.chatId) {
     const chat = selectChat(global, groupCall.chatId);
@@ -73,11 +73,11 @@ export function removeGroupCall<T extends GlobalState>(
   };
 }
 
-export function updateActiveGroupCall<T extends GlobalState>(
-  global: T,
+export function updateActiveGroupCall(
+  global: GlobalState,
   groupCallUpdate: Partial<ApiGroupCall>,
   resetParticipantCount?: number,
-): T {
+): GlobalState {
   if (!global.groupCalls.activeGroupCallId) {
     return global;
   }
@@ -89,13 +89,13 @@ export function updateActiveGroupCall<T extends GlobalState>(
     resetParticipantCount);
 }
 
-export function updateGroupCallParticipant<T extends GlobalState>(
-  global: T,
+export function updateGroupCallParticipant(
+  global: GlobalState,
   groupCallId: string,
   userId: string,
   participantUpdate: Partial<GroupCallParticipant>,
   noUpdateCount = false,
-): T {
+) {
   const groupCall = selectGroupCall(global, groupCallId);
   if (!groupCall) {
     return global;

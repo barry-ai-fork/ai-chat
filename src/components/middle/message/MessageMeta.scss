@@ -13,12 +13,15 @@
   max-width: 100%;
   user-select: none;
 
+  .ReactionAnimatedEmoji {
+    width: 1rem;
+    height: 1rem;
+    margin-right: 0.25rem;
+  }
+
   .message-time,
-  .message-imported,
   .message-signature,
-  .message-views,
-  .message-replies,
-  .message-translated {
+  .message-views {
     font-size: 0.75rem;
     white-space: nowrap;
   }
@@ -37,20 +40,10 @@
     margin-inline-start: 0.1875rem;
   }
 
-  .message-translated {
-    margin-inline-end: 0.25rem;
-  }
-
-  .message-imported,
   .message-signature {
     overflow: hidden;
     text-overflow: ellipsis;
     margin-right: 0.375rem;
-
-    .emoji-small {
-      width: 1rem !important;
-      height: 1rem !important;
-    }
   }
 
   .icon-channelviews {
@@ -61,12 +54,6 @@
     top: -0.0625rem;
   }
 
-  .icon-reply-filled {
-    margin-left: 0.125rem;
-    margin-right: 0.375rem;
-    font-size: 0.75rem;
-  }
-
   .has-solid-background & {
     color: rgba(var(--color-text-meta-rgb), 0.75);
     background: none;
@@ -75,6 +62,7 @@
   .media:not(.text) &,
   .Message .custom-shape &,
   .Message .invoice & {
+    background: rgba(0, 0, 0, 0.2);
     --color-accent-own: white;
     --color-accent: white;
     color: white !important;
@@ -88,15 +76,6 @@
     .MessageOutgoingStatus i {
       background: transparent;
     }
-  }
-
-  .media:not(.text) &,
-  .Message .invoice & {
-    background: rgba(0, 0, 0, 0.2);
-  }
-
-  .Message .custom-shape & {
-    background: var(--pattern-color);
   }
 
   .voice &[dir="rtl"] {
@@ -122,6 +101,10 @@
   .is-forwarded.media:not(.text) & {
     bottom: 0.9375rem;
     right: 0.8125rem;
+  }
+
+  .emoji-only & {
+    right: 0;
   }
 
   .Message.own .has-solid-background & {
@@ -157,9 +140,21 @@
 }
 
 .Message:not(.own) {
-  .custom-shape .with-subheader + .MessageMeta {
+  .custom-shape .reply-message + .MessageMeta {
     right: auto;
     left: 13.25rem;
     bottom: 0.25rem;
+  }
+
+  .emoji-only-1 .reply-message + .MessageMeta {
+    left: 2.5rem;
+  }
+
+  .emoji-only-2 .reply-message + .MessageMeta {
+    left: 5.5rem;
+  }
+
+  .emoji-only-3 .reply-message + .MessageMeta {
+    left: 6.5rem;
   }
 }

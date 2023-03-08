@@ -1,13 +1,11 @@
-export default function generateIdFor(store: AnyLiteral, withAutoUpdate = false) {
+const generateIdFor = (store: AnyLiteral) => {
   let id;
 
   do {
     id = String(Math.random()).replace('0.', 'id');
-  } while (store[id]);
-
-  if (withAutoUpdate) {
-    store[id] = true;
-  }
+  } while (store.hasOwnProperty(id));
 
   return id;
-}
+};
+
+export default generateIdFor;

@@ -13,7 +13,6 @@ import './AvatarEditable.scss';
 interface OwnProps {
   title?: string;
   disabled?: boolean;
-  isForForum?: boolean;
   currentAvatarBlobUrl?: string;
   onChange: (file: File) => void;
 }
@@ -21,7 +20,6 @@ interface OwnProps {
 const AvatarEditable: FC<OwnProps> = ({
   title = 'Change your profile picture',
   disabled,
-  isForForum,
   currentAvatarBlobUrl,
   onChange,
 }) => {
@@ -34,8 +32,7 @@ const AvatarEditable: FC<OwnProps> = ({
 
   function handleSelectFile(event: ChangeEvent<HTMLInputElement>) {
     const target = event.target as HTMLInputElement;
-
-    if (!target?.files?.[0]) {
+    if (!target || !target.files || !target.files[0]) {
       return;
     }
 
@@ -47,11 +44,11 @@ const AvatarEditable: FC<OwnProps> = ({
     setSelectedFile(undefined);
     onChange(croppedImg);
 
-    if (croppedBlobUrl && croppedBlobUrl !== currentAvatarBlobUrl) {
+    if (croppedBlobUrl) {
       URL.revokeObjectURL(croppedBlobUrl);
     }
     setCroppedBlobUrl(URL.createObjectURL(croppedImg));
-  }, [croppedBlobUrl, currentAvatarBlobUrl, onChange]);
+  }, [croppedBlobUrl, onChange]);
 
   const handleModalClose = useCallback(() => {
     setSelectedFile(undefined);
@@ -60,7 +57,6 @@ const AvatarEditable: FC<OwnProps> = ({
   const labelClassName = buildClassName(
     croppedBlobUrl && 'filled',
     disabled && 'disabled',
-    isForForum && 'rounded-square',
   );
 
   return (

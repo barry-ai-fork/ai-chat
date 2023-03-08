@@ -47,7 +47,7 @@ const ReportModal: FC<OwnProps> = ({
   const handleReport = useCallback(() => {
     switch (subject) {
       case 'messages':
-        reportMessages({ messageIds: messageIds!, reason: selectedReason, description });
+        reportMessages({ messageIds, reason: selectedReason, description });
         exitMessageSelectMode();
         break;
       case 'peer':
@@ -113,7 +113,7 @@ const ReportModal: FC<OwnProps> = ({
       onClose={onClose}
       onEnter={isOpen ? handleReport : undefined}
       onCloseAnimationEnd={onCloseAnimationEnd}
-      className="narrow"
+      className="report"
       title={title}
     >
       <RadioGroup
@@ -127,12 +127,10 @@ const ReportModal: FC<OwnProps> = ({
         value={description}
         onChange={handleDescriptionChange}
       />
-      <div className="dialog-buttons">
-        <Button color="danger" className="confirm-dialog-button" isText onClick={handleReport}>
-          {lang('lng_report_button')}
-        </Button>
-        <Button className="confirm-dialog-button" isText onClick={onClose}>{lang('Cancel')}</Button>
-      </div>
+      <Button color="danger" className="confirm-dialog-button" isText onClick={handleReport}>
+        {lang('lng_report_button')}
+      </Button>
+      <Button className="confirm-dialog-button" isText onClick={onClose}>{lang('Cancel')}</Button>
     </Modal>
   );
 };

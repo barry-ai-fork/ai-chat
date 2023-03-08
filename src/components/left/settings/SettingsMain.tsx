@@ -68,7 +68,6 @@ const SettingsMain: FC<OwnProps & StateProps> = ({
         {currentUser && (
           <ProfileInfo
             userId={currentUser.id}
-            canPlayVideo={Boolean(isActive)}
             forceShowSelf
           />
         )}
@@ -113,6 +112,16 @@ const SettingsMain: FC<OwnProps & StateProps> = ({
         >
           {lang('Filters')}
         </ListItem>
+        {canBuyPremium && (
+          <ListItem
+            leftElement={<PremiumIcon withGradient big />}
+            className="settings-main-menu-premium"
+            // eslint-disable-next-line react/jsx-no-bind
+            onClick={() => openPremiumModal()}
+          >
+            {lang('TelegramPremium')}
+          </ListItem>
+        )}
         <ListItem
           icon="active-sessions"
           // eslint-disable-next-line react/jsx-no-bind
@@ -129,23 +138,6 @@ const SettingsMain: FC<OwnProps & StateProps> = ({
           {lang('Language')}
           <span className="settings-item__current-value">{lang.langName}</span>
         </ListItem>
-        <ListItem
-          icon="stickers"
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => onScreenSelect(SettingsScreens.Stickers)}
-        >
-          {lang('StickersName')}
-        </ListItem>
-        {canBuyPremium && (
-          <ListItem
-            leftElement={<PremiumIcon withGradient big />}
-            className="settings-main-menu-premium"
-            // eslint-disable-next-line react/jsx-no-bind
-            onClick={() => openPremiumModal()}
-          >
-            {lang('TelegramPremium')}
-          </ListItem>
-        )}
       </div>
     </div>
   );

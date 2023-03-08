@@ -2,13 +2,13 @@ import type { ApiThemeParameters } from '../api/types';
 
 export function extractCurrentThemeParams(): ApiThemeParameters {
   const style = getComputedStyle(document.documentElement);
-  const backgroundColor = getPropertyHexColor(style, '--color-background')!;
-  const textColor = getPropertyHexColor(style, '--color-text')!;
-  const buttonColor = getPropertyHexColor(style, '--color-primary')!;
-  const buttonTextColor = getPropertyHexColor(style, '--color-white')!;
-  const linkColor = getPropertyHexColor(style, '--color-links')!;
-  const hintColor = getPropertyHexColor(style, '--color-text-secondary')!;
-  const secondaryBgColor = getPropertyHexColor(style, '--color-background-secondary')!;
+  const backgroundColor = getPropertyWrapped(style, '--color-background');
+  const textColor = getPropertyWrapped(style, '--color-text');
+  const buttonColor = getPropertyWrapped(style, '--color-primary');
+  const buttonTextColor = getPropertyWrapped(style, '--color-white');
+  const linkColor = getPropertyWrapped(style, '--color-links');
+  const hintColor = getPropertyWrapped(style, '--color-text-secondary');
+  const secondaryBgColor = getPropertyWrapped(style, '--color-background-secondary');
   return {
     bg_color: backgroundColor,
     text_color: textColor,
@@ -24,13 +24,12 @@ export function validateHexColor(color: string) {
   return /^#[0-9A-F]{6}$/i.test(color);
 }
 
-export function getPropertyHexColor(style: CSSStyleDeclaration, property: string) {
+function getPropertyWrapped(style: CSSStyleDeclaration, property: string) {
   const value = style.getPropertyValue(property);
-  if (!value) return undefined;
-  return prepareHexColor(value.trim());
+  return wrapColor(value.trim());
 }
 
-function prepareHexColor(color: string) {
+function wrapColor(color: string) {
   if (validateHexColor(color)) return color;
   return `#${color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d+\.{0,1}\d*))?\)$/)!
     .slice(1)

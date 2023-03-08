@@ -4,7 +4,6 @@ import React, {
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
-import type { Signal } from '../../../util/signals';
 import type { ApiBotCommand, ApiUser } from '../../../api/types';
 
 import buildClassName from '../../../util/buildClassName';
@@ -21,7 +20,6 @@ export type OwnProps = {
   isOpen: boolean;
   withUsername?: boolean;
   botCommands?: ApiBotCommand[];
-  getHtml: Signal<string>;
   onClick: NoneToVoidFunction;
   onClose: NoneToVoidFunction;
 };
@@ -35,7 +33,6 @@ const BotCommandTooltip: FC<OwnProps & StateProps> = ({
   isOpen,
   withUsername,
   botCommands,
-  getHtml,
   onClick,
   onClose,
 }) => {
@@ -48,25 +45,16 @@ const BotCommandTooltip: FC<OwnProps & StateProps> = ({
   const handleSendCommand = useCallback(({ botId, command }: ApiBotCommand) => {
     const bot = usersById[botId];
     sendBotCommand({
-      command: `/${command}${withUsername && bot ? `@${bot.usernames![0].username}` : ''}`,
+      command: `/${command}${withUsername && bot ? `@${bot.username}` : ''}`,
+      botId,
     });
     onClick();
   }, [onClick, sendBotCommand, usersById, withUsername]);
 
-  const handleSelect = useCallback((botCommand: ApiBotCommand) => {
-    // We need an additional check because tooltip is updated with throttling
-    if (!botCommand.command.startsWith(getHtml().slice(1))) {
-      return false;
-    }
-
-    handleSendCommand(botCommand);
-    return true;
-  }, [getHtml, handleSendCommand]);
-
   const selectedCommandIndex = useKeyboardNavigation({
     isActive: isOpen,
     items: botCommands,
-    onSelect: handleSelect,
+    onSelect: handleSendCommand,
     onClose,
   });
 

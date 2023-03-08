@@ -2,10 +2,9 @@ import type { RefObject } from 'react';
 import type { FC, TeactNode } from '../../lib/teact/teact';
 import React, { useRef, useCallback } from '../../lib/teact/teact';
 
-import { IS_TOUCH_ENV, MouseButton } from '../../util/environment';
+import { IS_TOUCH_ENV } from '../../util/environment';
 import { fastRaf } from '../../util/schedulers';
 import buildClassName from '../../util/buildClassName';
-
 import useContextMenuHandlers from '../../hooks/useContextMenuHandlers';
 import useContextMenuPosition from '../../hooks/useContextMenuPosition';
 import useFlag from '../../hooks/useFlag';
@@ -14,38 +13,28 @@ import useLang from '../../hooks/useLang';
 import RippleEffect from './RippleEffect';
 import Menu from './Menu';
 import MenuItem from './MenuItem';
-import MenuSeparator from './MenuSeparator';
 import Button from './Button';
 
 import './ListItem.scss';
 
-type MenuItemContextActionItem = {
+interface MenuItemContextAction {
   title: string;
   icon: string;
   destructive?: boolean;
   handler?: () => void;
-};
-
-type MenuItemContextActionSeparator = {
-  isSeparator: true;
-  key?: string;
-};
-
-export type MenuItemContextAction = MenuItemContextActionItem | MenuItemContextActionSeparator;
+}
 
 interface OwnProps {
   ref?: RefObject<HTMLDivElement>;
-  buttonRef?: RefObject<HTMLDivElement | HTMLAnchorElement>;
+  buttonRef?: RefObject<HTMLDivElement>;
   icon?: string;
   leftElement?: TeactNode;
   secondaryIcon?: string;
-  rightElement?: TeactNode;
   buttonClassName?: string;
   className?: string;
   style?: string;
   children: React.ReactNode;
   disabled?: boolean;
-  allowDisabledClick?: boolean;
   ripple?: boolean;
   narrow?: boolean;
   inactive?: boolean;
@@ -54,14 +43,11 @@ interface OwnProps {
   multiline?: boolean;
   isStatic?: boolean;
   contextActions?: MenuItemContextAction[];
-  withPortalForMenu?: boolean;
-  href?: string;
   onMouseDown?: (e: React.MouseEvent<HTMLDivElement>) => void;
-  onClick?: (e: React.MouseEvent<HTMLElement>, arg?: any) => void;
-  clickArg?: any;
+  onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
   onSecondaryIconClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  onDragEnter?: (e: React.DragEvent<HTMLDivElement>) => void;
 }
+
 const ListItem: FC<OwnProps> = ({
   ref,
   buttonRef,
@@ -69,12 +55,10 @@ const ListItem: FC<OwnProps> = ({
   leftElement,
   buttonClassName,
   secondaryIcon,
-  rightElement,
   className,
   style,
   children,
   disabled,
-  allowDisabledClick,
   ripple,
   narrow,
   inactive,
@@ -83,13 +67,9 @@ const ListItem: FC<OwnProps> = ({
   multiline,
   isStatic,
   contextActions,
-  withPortalForMenu,
-  href,
   onMouseDown,
   onClick,
-  clickArg,
   onSecondaryIconClick,
-  onDragEnter,
 }) => {
   // eslint-disable-next-line no-null/no-null
   let containerRef = useRef<HTMLDivElement>(null);
@@ -112,14 +92,8 @@ const ListItem: FC<OwnProps> = ({
   );
 
   const getMenuElement = useCallback(
-    () => (withPortalForMenu ? document.querySelector('#portals') : containerRef.current)!
-      .querySelector('.ListItem-context-menu .bubble'),
-    [withPortalForMenu],
-  );
-
-  const getLayout = useCallback(
-    () => ({ withPortal: withPortalForMenu }),
-    [withPortalForMenu],
+    () => containerRef.current!.querySelector('.ListItem-context-menu .bubble'),
+    [],
   );
 
   const {
@@ -129,41 +103,22 @@ const ListItem: FC<OwnProps> = ({
     getTriggerElement,
     getRootElement,
     getMenuElement,
-    getLayout,
   );
 
-  const handleClickEvent = useCallback((e: React.MouseEvent<HTMLElement, MouseEvent>) => {
-    const hasModifierKey = e.ctrlKey || e.metaKey || e.shiftKey;
-    if (!hasModifierKey && e.button === MouseButton.Main) {
-      e.preventDefault();
-    }
-  }, []);
-
-  const handleClick = useCallback((e: React.MouseEvent<HTMLElement, MouseEvent>) => {
-    if ((disabled && !allowDisabledClick) || !onClick) {
+  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+    if (disabled || !onClick) {
       return;
     }
-
-    if (href) {
-      // Allow default behavior for opening links in new tab
-      const hasModifierKey = e.ctrlKey || e.metaKey || e.shiftKey;
-      if ((hasModifierKey && e.button === MouseButton.Main) || e.button === MouseButton.Auxiliary) {
-        return;
-      }
-
-      e.preventDefault();
-    }
-
-    onClick(e, clickArg);
+    onClick(e);
 
     if (IS_TOUCH_ENV && !ripple) {
       markIsTouched();
       fastRaf(unmarkIsTouched);
     }
-  }, [allowDisabledClick, clickArg, disabled, markIsTouched, onClick, ripple, unmarkIsTouched, href]);
+  }, [disabled, markIsTouched, onClick, ripple, unmarkIsTouched]);
 
   const handleSecondaryIconClick = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    if ((disabled && !allowDisabledClick) || e.button !== 0 || (!onSecondaryIconClick && !contextActions)) return;
+    if (disabled || e.button !== 0 || (!onSecondaryIconClick && !contextActions)) return;
     e.stopPropagation();
     if (onSecondaryIconClick) {
       onSecondaryIconClick(e);
@@ -172,14 +127,14 @@ const ListItem: FC<OwnProps> = ({
     }
   };
 
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLElement, MouseEvent>) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     if (inactive || IS_TOUCH_ENV) {
       return;
     }
-    if (contextActions && (e.button === MouseButton.Secondary || !onClick)) {
+    if (contextActions && (e.button === 2 || !onClick)) {
       handleBeforeContextMenu(e);
     }
-    if (e.button === MouseButton.Main) {
+    if (e.button === 0) {
       if (!onClick) {
         handleContextMenu(e);
       } else {
@@ -197,7 +152,6 @@ const ListItem: FC<OwnProps> = ({
     ripple && 'has-ripple',
     narrow && 'narrow',
     disabled && 'disabled',
-    allowDisabledClick && 'click-allowed',
     inactive && 'inactive',
     contextMenuPosition && 'has-menu-open',
     focus && 'focus',
@@ -206,8 +160,6 @@ const ListItem: FC<OwnProps> = ({
     isStatic && 'is-static',
   );
 
-  const ButtonElementTag = href ? 'a' : 'div';
-
   return (
     <div
       ref={containerRef}
@@ -215,15 +167,13 @@ const ListItem: FC<OwnProps> = ({
       dir={lang.isRtl ? 'rtl' : undefined}
       style={style}
       onMouseDown={onMouseDown}
-      onDragEnter={onDragEnter}
     >
-      <ButtonElementTag
+      <div
         className={buildClassName('ListItem-button', isTouched && 'active', buttonClassName)}
         role={!isStatic ? 'button' : undefined}
-        href={href}
-        ref={buttonRef as any /* TS requires specific types for refs */}
+        ref={buttonRef}
         tabIndex={!isStatic ? 0 : undefined}
-        onClick={(!inactive && IS_TOUCH_ENV) ? handleClick : handleClickEvent}
+        onClick={(!inactive && IS_TOUCH_ENV) ? handleClick : undefined}
         onMouseDown={handleMouseDown}
         onContextMenu={(!inactive && contextActions) ? handleContextMenu : undefined}
       >
@@ -248,8 +198,7 @@ const ListItem: FC<OwnProps> = ({
             <i className={`icon-${secondaryIcon}`} />
           </Button>
         )}
-        {rightElement}
-      </ButtonElementTag>
+      </div>
       {contextActions && contextMenuPosition !== undefined && (
         <Menu
           isOpen={isContextMenuOpen}
@@ -262,22 +211,17 @@ const ListItem: FC<OwnProps> = ({
           autoClose
           onClose={handleContextMenuClose}
           onCloseAnimationEnd={handleContextMenuHide}
-          withPortal={withPortalForMenu}
         >
           {contextActions.map((action) => (
-            ('isSeparator' in action) ? (
-              <MenuSeparator key={action.key || 'separator'} />
-            ) : (
-              <MenuItem
-                key={action.title}
-                icon={action.icon}
-                destructive={action.destructive}
-                disabled={!action.handler}
-                onClick={action.handler}
-              >
-                {action.title}
-              </MenuItem>
-            )
+            <MenuItem
+              key={action.title}
+              icon={action.icon}
+              destructive={action.destructive}
+              disabled={!action.handler}
+              onClick={action.handler}
+            >
+              {action.title}
+            </MenuItem>
           ))}
         </Menu>
       )}

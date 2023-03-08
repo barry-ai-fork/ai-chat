@@ -1,6 +1,6 @@
 import type { FC } from '../../../lib/teact/teact';
 import React, { memo, useEffect, useRef } from '../../../lib/teact/teact';
-import { withGlobal } from '../../../global';
+import { getActions, withGlobal } from '../../../global';
 
 import type { ApiSticker } from '../../../api/types';
 
@@ -23,7 +23,6 @@ export type OwnProps = {
   threadId?: number;
   isOpen: boolean;
   onStickerSelect: (sticker: ApiSticker, isSilent?: boolean, shouldSchedule?: boolean) => void;
-  onClose: NoneToVoidFunction;
 };
 
 type StateProps = {
@@ -38,12 +37,13 @@ const StickerTooltip: FC<OwnProps & StateProps> = ({
   chatId,
   threadId,
   isOpen,
-  onStickerSelect,
-  onClose,
   stickers,
   isSavedMessages,
+  onStickerSelect,
   isCurrentUserPremium,
 }) => {
+  const { clearStickersForEmoji } = getActions();
+
   // eslint-disable-next-line no-null/no-null
   const containerRef = useRef<HTMLDivElement>(null);
   const { shouldRender, transitionClassNames } = useShowTransition(isOpen, undefined, undefined, false);
@@ -55,7 +55,7 @@ const StickerTooltip: FC<OwnProps & StateProps> = ({
     observe: observeIntersection,
   } = useIntersectionObserver({ rootRef: containerRef, throttleMs: INTERSECTION_THROTTLE });
 
-  useEffect(() => (isOpen ? captureEscKeyListener(onClose) : undefined), [isOpen, onClose]);
+  useEffect(() => (isOpen ? captureEscKeyListener(clearStickersForEmoji) : undefined), [isOpen, clearStickersForEmoji]);
 
   const handleMouseMove = () => {
     sendMessageAction({ type: 'chooseSticker' });
@@ -80,7 +80,7 @@ const StickerTooltip: FC<OwnProps & StateProps> = ({
             sticker={sticker}
             size={STICKER_SIZE_PICKER}
             observeIntersection={observeIntersection}
-            onClick={isOpen ? onStickerSelect : undefined}
+            onClick={onStickerSelect}
             clickArg={sticker}
             isSavedMessages={isSavedMessages}
             canViewSet

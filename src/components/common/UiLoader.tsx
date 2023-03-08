@@ -1,18 +1,16 @@
-import React from '../../lib/teact/teact';
+import type { FC } from '../../lib/teact/teact';
+import React, { useEffect } from '../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../global';
 
 import { ApiMediaFormat } from '../../api/types';
-import type { TabState } from '../../global/types';
+import type { GlobalState } from '../../global/types';
 import type { ThemeKey } from '../../types';
-import type { FC } from '../../lib/teact/teact';
 
 import { getChatAvatarHash } from '../../global/helpers/chats'; // Direct import for better module splitting
-import {
-  selectIsRightColumnShown,
-  selectTheme,
-  selectTabState,
-} from '../../global/selectors';
+import { selectIsRightColumnShown, selectTheme, selectIsCurrentUserPremium } from '../../global/selectors';
 import { DARK_THEME_BG_COLOR, LIGHT_THEME_BG_COLOR } from '../../config';
+import useFlag from '../../hooks/useFlag';
+import useShowTransition from '../../hooks/useShowTransition';
 import { pause } from '../../util/schedulers';
 import { preloadImage } from '../../util/files';
 import preloadFonts from '../../util/fonts';
@@ -20,22 +18,17 @@ import * as mediaLoader from '../../util/mediaLoader';
 import { Bundles, loadModule } from '../../util/moduleLoader';
 import buildClassName from '../../util/buildClassName';
 
-import useFlag from '../../hooks/useFlag';
-import useShowTransition from '../../hooks/useShowTransition';
-import useEffectOnce from '../../hooks/useEffectOnce';
-
 import styles from './UiLoader.module.scss';
 
 import telegramLogoPath from '../../assets/telegram-logo.svg';
 import reactionThumbsPath from '../../assets/reaction-thumbs.png';
+import premiumReactionThumbsPath from '../../assets/reaction-thumbs-premium.png';
 import lockPreviewPath from '../../assets/lock.png';
 import monkeyPath from '../../assets/monkey.svg';
-import spoilerMaskPath from '../../assets/spoilers/mask.svg';
 
 export type UiLoaderPage =
   'main'
   | 'lock'
-  | 'inactive'
   | 'authCode'
   | 'authPassword'
   | 'authPhoneNumber'
@@ -44,13 +37,13 @@ export type UiLoaderPage =
 type OwnProps = {
   page?: UiLoaderPage;
   children: React.ReactNode;
-  isMobile?: boolean;
 };
 
-type StateProps = Pick<TabState, 'uiReadyState' | 'shouldSkipHistoryAnimations'> & {
+type StateProps = Pick<GlobalState, 'uiReadyState' | 'shouldSkipHistoryAnimations'> & {
   isRightColumnShown?: boolean;
   leftColumnWidth?: number;
   theme: ThemeKey;
+  isCurrentUserPremium?: boolean;
 };
 
 const MAX_PRELOAD_DELAY = 700;
@@ -79,12 +72,11 @@ function preloadAvatars() {
 }
 
 const preloadTasks = {
-  main: () => Promise.all([
-    loadModule(Bundles.Main)
+  main: (isCurrentUserPremium: boolean) => Promise.all([
+    loadModule(Bundles.Main, 'Main')
       .then(preloadFonts),
     preloadAvatars(),
-    preloadImage(reactionThumbsPath),
-    preloadImage(spoilerMaskPath),
+    preloadImage(isCurrentUserPremium ? premiumReactionThumbsPath : reactionThumbsPath),
   ]),
   authPhoneNumber: () => Promise.all([
     preloadFonts(),
@@ -97,8 +89,6 @@ const preloadTasks = {
     preloadFonts(),
     preloadImage(lockPreviewPath),
   ]),
-  inactive: () => {
-  },
 };
 
 const UiLoader: FC<OwnProps & StateProps> = ({
@@ -108,6 +98,7 @@ const UiLoader: FC<OwnProps & StateProps> = ({
   shouldSkipHistoryAnimations,
   leftColumnWidth,
   theme,
+  isCurrentUserPremium,
 }) => {
   const { setIsUiReady } = getActions();
 
@@ -116,12 +107,12 @@ const UiLoader: FC<OwnProps & StateProps> = ({
     shouldRender: shouldRenderMask, transitionClassNames,
   } = useShowTransition(!isReady, undefined, true);
 
-  useEffectOnce(() => {
+  useEffect(() => {
     let timeout: number | undefined;
 
     const safePreload = async () => {
       try {
-        await preloadTasks[page!]();
+        await preloadTasks[page!](isCurrentUserPremium!);
       } catch (err) {
         // Do nothing
       }
@@ -147,28 +138,27 @@ const UiLoader: FC<OwnProps & StateProps> = ({
 
       setIsUiReady({ uiReadyState: 0 });
     };
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
       id="UiLoader"
-      className={styles.bg}
+      className={styles.root}
       style={`--theme-background-color: ${theme === 'dark' ? DARK_THEME_BG_COLOR : LIGHT_THEME_BG_COLOR}`}
     >
       {children}
       {shouldRenderMask && !shouldSkipHistoryAnimations && Boolean(page) && (
         <div className={buildClassName(styles.mask, transitionClassNames)}>
           {page === 'main' ? (
-            <div className={styles.main}>
+            <>
               <div
                 className={styles.left}
                 style={leftColumnWidth ? `width: ${leftColumnWidth}px` : undefined}
               />
-              <div className={buildClassName(styles.middle, styles.bg)} />
+              <div className={buildClassName(styles.middle, transitionClassNames)} />
               {isRightColumnShown && <div className={styles.right} />}
-            </div>
-          ) : (page === 'inactive' || page === 'lock') ? (
-            <div className={buildClassName(styles.blank, styles.bg)} />
+            </>
           ) : (
             <div className={styles.blank} />
           )}
@@ -179,16 +169,16 @@ const UiLoader: FC<OwnProps & StateProps> = ({
 };
 
 export default withGlobal<OwnProps>(
-  (global, { isMobile }): StateProps => {
+  (global): StateProps => {
     const theme = selectTheme(global);
-    const tabState = selectTabState(global);
 
     return {
-      shouldSkipHistoryAnimations: tabState.shouldSkipHistoryAnimations,
-      uiReadyState: tabState.uiReadyState,
-      isRightColumnShown: selectIsRightColumnShown(global, isMobile),
+      shouldSkipHistoryAnimations: global.shouldSkipHistoryAnimations,
+      uiReadyState: global.uiReadyState,
+      isRightColumnShown: selectIsRightColumnShown(global),
       leftColumnWidth: global.leftColumnWidth,
       theme,
+      isCurrentUserPremium: selectIsCurrentUserPremium(global),
     };
   },
 )(UiLoader);

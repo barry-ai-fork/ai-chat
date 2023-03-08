@@ -2,11 +2,10 @@ import { Api as GramJs } from '../../../lib/gramjs';
 import { strippedPhotoToJpg } from '../../../lib/gramjs/Utils';
 
 import type {
-  ApiPhoto, ApiPhotoSize, ApiThumbnail, ApiVideoSize, ApiUsername,
+  ApiPhoto, ApiPhotoSize, ApiThumbnail, ApiVideoSize,
 } from '../../types';
 import { bytesToDataUri } from './helpers';
 import { pathBytesToSvg } from './pathBytesToSvg';
-import { compact } from '../../../util/iteratees';
 
 const DEFAULT_THUMB_SIZE = { w: 100, h: 100 };
 
@@ -63,7 +62,7 @@ export function buildApiThumbnailFromPath(
   };
 }
 
-export function buildApiPhoto(photo: GramJs.Photo, isSpoiler?: boolean): ApiPhoto {
+export function buildApiPhoto(photo: GramJs.Photo): ApiPhoto {
   const sizes = photo.sizes
     .filter((s: any): s is GramJs.PhotoSize => {
       return s instanceof GramJs.PhotoSize || s instanceof GramJs.PhotoSizeProgressive;
@@ -74,14 +73,11 @@ export function buildApiPhoto(photo: GramJs.Photo, isSpoiler?: boolean): ApiPhot
     id: String(photo.id),
     thumbnail: buildApiThumbnailFromStripped(photo.sizes),
     sizes,
-    isSpoiler,
-    ...(photo.videoSizes && { videoSizes: compact(photo.videoSizes.map(buildApiVideoSize)), isVideo: true }),
+    ...(photo.videoSizes && { videoSizes: photo.videoSizes.map(buildApiVideoSize), isVideo: true }),
   };
 }
 
-export function buildApiVideoSize(videoSize: GramJs.TypeVideoSize): ApiVideoSize | undefined {
-  if (!(videoSize instanceof GramJs.VideoSize)) return undefined;
-
+export function buildApiVideoSize(videoSize: GramJs.VideoSize): ApiVideoSize {
   const {
     videoStartTs, size, h, w, type,
   } = videoSize;
@@ -103,32 +99,4 @@ export function buildApiPhotoSize(photoSize: GramJs.PhotoSize): ApiPhotoSize {
     height: h,
     type: type as ('m' | 'x' | 'y'),
   };
-}
-
-export function buildApiUsernames(mtpPeer: GramJs.User | GramJs.Channel | GramJs.UpdateUserName) {
-  if (!mtpPeer.usernames && !('username' in mtpPeer && mtpPeer.username)) {
-    return undefined;
-  }
-
-  const usernames: ApiUsername[] = [];
-
-  if ('username' in mtpPeer && mtpPeer.username) {
-    usernames.push({
-      username: mtpPeer.username,
-      isActive: true,
-      isEditable: true,
-    });
-  }
-
-  if (mtpPeer.usernames) {
-    mtpPeer.usernames.forEach(({ username, active, editable }) => {
-      usernames.push({
-        username,
-        ...(active && { isActive: true }),
-        ...(editable && { isEditable: true }),
-      });
-    });
-  }
-
-  return usernames;
 }

@@ -3,18 +3,17 @@ import React, { useCallback } from '../../lib/teact/teact';
 
 import buildClassName from '../../util/buildClassName';
 
-import styles from './Link.module.scss';
+import './Link.scss';
 
 type OwnProps = {
   children: React.ReactNode;
   className?: string;
   isRtl?: boolean;
-  isPrimary?: boolean;
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 };
 
 const Link: FC<OwnProps> = ({
-  children, isPrimary, className, isRtl, onClick,
+  children, className, isRtl, onClick,
 }) => {
   const handleClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
@@ -24,7 +23,7 @@ const Link: FC<OwnProps> = ({
   return (
     <a
       href="#"
-      className={buildClassName(styles.link, className, isPrimary && styles.isPrimary)}
+      className={buildClassName('Link', className)}
       dir={isRtl ? 'rtl' : 'auto'}
       onClick={onClick ? handleClick : undefined}
     >

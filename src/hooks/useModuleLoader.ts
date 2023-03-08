@@ -21,7 +21,7 @@ const useModuleLoader = <B extends Bundles, M extends BundleModules<B>>(
 
   useEffect(() => {
     if (!noLoad && !module) {
-      loadModule(bundleName).then(forceUpdate);
+      loadModule(bundleName, moduleName).then(forceUpdate);
     }
   }, [bundleName, forceUpdate, module, moduleName, noLoad]);
 

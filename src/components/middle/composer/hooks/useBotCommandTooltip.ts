@@ -1,56 +1,68 @@
-import { useEffect, useState } from '../../../../lib/teact/teact';
+import {
+  useCallback, useEffect, useState,
+} from '../../../../lib/teact/teact';
 
 import type { ApiBotCommand } from '../../../../api/types';
-import type { Signal } from '../../../../util/signals';
 
 import { prepareForRegExp } from '../helpers/prepareForRegExp';
+import { throttle } from '../../../../util/schedulers';
 import useFlag from '../../../../hooks/useFlag';
-import useDerivedSignal from '../../../../hooks/useDerivedSignal';
-import { useThrottledResolver } from '../../../../hooks/useAsyncResolvers';
 
-const RE_COMMAND = /^\/([\w@]{1,32})?$/i;
-
-const THROTTLE = 300;
+const runThrottled = throttle((cb) => cb(), 500, true);
+const RE_COMMAND = /^[\w@]{1,32}\s?/i;
 
 export default function useBotCommandTooltip(
-  isEnabled: boolean,
-  getHtml: Signal<string>,
+  isAllowed: boolean,
+  html: string,
   botCommands?: ApiBotCommand[] | false,
   chatBotCommands?: ApiBotCommand[],
 ) {
+  const [isOpen, markIsOpen, unmarkIsOpen] = useFlag();
   const [filteredBotCommands, setFilteredBotCommands] = useState<ApiBotCommand[] | undefined>();
-  const [isManuallyClosed, markManuallyClosed, unmarkManuallyClosed] = useFlag(false);
 
-  const detectCommandThrottled = useThrottledResolver(() => {
-    const html = getHtml();
-    return isEnabled && html.startsWith('/') ? prepareForRegExp(html).match(RE_COMMAND)?.[0].trim() : undefined;
-  }, [getHtml, isEnabled], THROTTLE);
+  const getFilteredCommands = useCallback((filter) => {
+    if (!botCommands && !chatBotCommands) {
+      setFilteredBotCommands(undefined);
 
-  const getCommand = useDerivedSignal(
-    detectCommandThrottled, [detectCommandThrottled, getHtml], true,
-  );
+      return;
+    }
+
+    runThrottled(() => {
+      const nextFilteredBotCommands = (botCommands || chatBotCommands || [])
+        .filter(({ command }) => !filter || command.includes(filter));
+      setFilteredBotCommands(
+        nextFilteredBotCommands && nextFilteredBotCommands.length ? nextFilteredBotCommands : undefined,
+      );
+    });
+  }, [botCommands, chatBotCommands]);
 
   useEffect(() => {
-    const command = getCommand();
-    const commands = botCommands || chatBotCommands;
-    if (!command || !commands) {
+    if (!isAllowed || !html.length) {
       setFilteredBotCommands(undefined);
       return;
     }
 
-    const filter = command.substring(1);
-    const nextFilteredBotCommands = commands.filter((c) => !filter || c.command.startsWith(filter));
+    const shouldShowCommands = html.startsWith('/');
 
-    setFilteredBotCommands(
-      nextFilteredBotCommands?.length ? nextFilteredBotCommands : undefined,
-    );
-  }, [getCommand, botCommands, chatBotCommands]);
+    if (shouldShowCommands) {
+      const filter = prepareForRegExp(html.substr(1)).match(RE_COMMAND);
+      getFilteredCommands(filter ? filter[0] : '');
+    } else {
+      setFilteredBotCommands(undefined);
+    }
+  }, [getFilteredCommands, html, isAllowed, unmarkIsOpen]);
 
-  useEffect(unmarkManuallyClosed, [unmarkManuallyClosed, getHtml]);
+  useEffect(() => {
+    if (filteredBotCommands && filteredBotCommands.length && html.length > 0) {
+      markIsOpen();
+    } else {
+      unmarkIsOpen();
+    }
+  }, [filteredBotCommands, html.length, markIsOpen, unmarkIsOpen]);
 
   return {
-    isOpen: Boolean(filteredBotCommands?.length && !isManuallyClosed),
-    close: markManuallyClosed,
+    isOpen,
+    close: unmarkIsOpen,
     filteredBotCommands,
   };
 }

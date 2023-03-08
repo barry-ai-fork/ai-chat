@@ -14,7 +14,9 @@
 
   scrollbar-width: none;
   scrollbar-color: rgba(0, 0, 0, 0);
-
+  &.border-top{
+    border-top: 1px var(--color-borders) solid;
+  }
   &.big {
     font-size: 1rem;
     --border-radius-messages-small: 0;

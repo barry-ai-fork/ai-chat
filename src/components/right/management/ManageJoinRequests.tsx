@@ -27,6 +27,7 @@ type OwnProps = {
 type StateProps = {
   chat?: ApiChat;
   isChannel?: boolean;
+  serverTimeOffset: number;
 };
 
 const ManageJoinRequests: FC<OwnProps & StateProps> = ({
@@ -128,6 +129,7 @@ export default memo(withGlobal<OwnProps>(
 
     return {
       chat,
+      serverTimeOffset: global.serverTimeOffset,
       isChannel: chat && isChatChannel(chat),
     };
   },

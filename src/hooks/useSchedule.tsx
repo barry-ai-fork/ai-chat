@@ -1,26 +1,26 @@
 import React, { useCallback, useState } from '../lib/teact/teact';
+import { getGlobal } from '../lib/teact/teactn';
 
 import { SCHEDULED_WHEN_ONLINE } from '../config';
 import { getDayStartAt } from '../util/dateFormat';
 import useLang from './useLang';
 
 import CalendarModal from '../components/common/CalendarModal.async';
-import { getServerTimeOffset } from '../util/serverTime';
 
 type OnScheduledCallback = (scheduledAt: number) => void;
 
 const useSchedule = (
   canScheduleUntilOnline?: boolean,
   onCancel?: () => void,
-  openAt?: number,
 ) => {
   const lang = useLang();
   const [onScheduled, setOnScheduled] = useState<OnScheduledCallback | undefined>();
 
   const handleMessageSchedule = useCallback((date: Date, isWhenOnline = false) => {
+    const { serverTimeOffset } = getGlobal();
     // Scheduled time can not be less than 10 seconds in future
     const scheduledAt = Math.round(Math.max(date.getTime(), Date.now() + 60 * 1000) / 1000)
-      + (isWhenOnline ? 0 : getServerTimeOffset());
+      + (isWhenOnline ? 0 : serverTimeOffset);
     onScheduled?.(scheduledAt);
     setOnScheduled(undefined);
   }, [onScheduled]);
@@ -38,7 +38,7 @@ const useSchedule = (
     setOnScheduled(() => whenScheduled);
   }, []);
 
-  const scheduledDefaultDate = openAt ? new Date(openAt * 1000) : new Date();
+  const scheduledDefaultDate = new Date();
   scheduledDefaultDate.setSeconds(0);
   scheduledDefaultDate.setMilliseconds(0);
 

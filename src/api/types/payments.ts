@@ -1,6 +1,4 @@
-import type { ApiDocument, ApiMessageEntity, ApiPaymentCredentials } from './messages';
-import type { ApiWebDocument } from './bots';
-import type { ApiInvoiceContainer } from '../../types';
+import type { ApiDocument, ApiMessageEntity } from './messages';
 
 export interface ApiShippingAddress {
   streetLine1: string;
@@ -20,13 +18,22 @@ export interface ApiPaymentSavedInfo {
 
 export interface ApiPaymentForm {
   canSaveCredentials?: boolean;
-  isPasswordMissing?: boolean;
-  formId: string;
+  passwordMissing?: boolean;
   providerId: string;
   nativeProvider?: string;
-  savedInfo?: ApiPaymentSavedInfo;
-  savedCredentials?: ApiPaymentCredentials[];
-  invoiceContainer: ApiInvoiceContainer;
+  savedInfo: any;
+  invoice: {
+    test?: boolean;
+    nameRequested?: boolean;
+    phoneRequested?: boolean;
+    emailRequested?: boolean;
+    shippingAddressRequested?: boolean;
+    flexible?: boolean;
+    phoneToProvider?: boolean;
+    emailToProvider?: boolean;
+    currency?: string;
+    prices?: ApiLabeledPrice[];
+  };
   nativeParams: ApiPaymentFormNativeParams;
 }
 
@@ -44,9 +51,6 @@ export interface ApiLabeledPrice {
 }
 
 export interface ApiReceipt {
-  photo?: ApiWebDocument;
-  text?: string;
-  title?: string;
   currency: string;
   prices: ApiLabeledPrice[];
   info?: {
@@ -54,7 +58,6 @@ export interface ApiReceipt {
     phone?: string;
     name?: string;
   };
-  tipAmount: number;
   totalAmount: number;
   credentialsTitle: string;
   shippingPrices?: ApiLabeledPrice[];
@@ -62,18 +65,10 @@ export interface ApiReceipt {
 }
 
 export interface ApiPremiumPromo {
+  currency: string;
+  monthlyAmount: string;
   videoSections: string[];
   videos: ApiDocument[];
   statusText: string;
   statusEntities: ApiMessageEntity[];
-  options: ApiPremiumSubscriptionOption[];
-}
-
-export interface ApiPremiumSubscriptionOption {
-  isCurrent?: boolean;
-  canPurchaseUpgrade?: boolean;
-  months: number;
-  currency: string;
-  amount: string;
-  botUrl: string;
 }

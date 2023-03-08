@@ -17,16 +17,16 @@ import { formatCurrency } from '../../../util/formatCurrency';
 import Button from '../../ui/Button';
 import PremiumLimitPreview from './common/PremiumLimitPreview';
 import PremiumFeaturePreviewVideo from './previews/PremiumFeaturePreviewVideo';
+import PremiumFeaturePreviewReactions from './previews/PremiumFeaturePreviewReactions';
 import SliderDots from '../../common/SliderDots';
 import PremiumFeaturePreviewStickers from './previews/PremiumFeaturePreviewStickers';
 
 import styles from './PremiumFeatureModal.module.scss';
 
 export const PREMIUM_FEATURE_TITLES: Record<string, string> = {
-  double_limits: 'PremiumPreviewLimits',
-  infinite_reactions: 'PremiumPreviewReactions2',
-  premium_stickers: 'PremiumPreviewStickers',
-  animated_emoji: 'PremiumPreviewEmoji',
+  limits: 'PremiumPreviewLimits',
+  reactions: 'PremiumPreviewReactions',
+  stickers: 'PremiumPreviewStickers',
   no_ads: 'PremiumPreviewNoAds',
   voice_to_text: 'PremiumPreviewVoiceToText',
   profile_badge: 'PremiumPreviewProfileBadge',
@@ -34,46 +34,41 @@ export const PREMIUM_FEATURE_TITLES: Record<string, string> = {
   more_upload: 'PremiumPreviewUploads',
   advanced_chat_management: 'PremiumPreviewAdvancedChatManagement',
   animated_userpics: 'PremiumPreviewAnimatedProfiles',
-  emoji_status: 'PremiumPreviewEmojiStatus',
 };
 
 export const PREMIUM_FEATURE_DESCRIPTIONS: Record<string, string> = {
-  double_limits: 'PremiumPreviewLimitsDescription',
-  infinite_reactions: 'PremiumPreviewReactions2Description',
-  premium_stickers: 'PremiumPreviewStickersDescription',
+  limits: 'PremiumPreviewLimitsDescription',
+  reactions: 'PremiumPreviewReactionsDescription',
+  stickers: 'PremiumPreviewStickersDescription',
   no_ads: 'PremiumPreviewNoAdsDescription',
-  animated_emoji: 'PremiumPreviewEmojiDescription',
   voice_to_text: 'PremiumPreviewVoiceToTextDescription',
   profile_badge: 'PremiumPreviewProfileBadgeDescription',
   faster_download: 'PremiumPreviewDownloadSpeedDescription',
   more_upload: 'PremiumPreviewUploadsDescription',
   advanced_chat_management: 'PremiumPreviewAdvancedChatManagementDescription',
   animated_userpics: 'PremiumPreviewAnimatedProfilesDescription',
-  emoji_status: 'PremiumPreviewEmojiStatusDescription',
 };
 
 export const PREMIUM_FEATURE_SECTIONS = [
-  'double_limits',
+  'limits',
   'more_upload',
   'faster_download',
   'voice_to_text',
   'no_ads',
-  'infinite_reactions',
-  'premium_stickers',
-  'animated_emoji',
+  'reactions',
+  'stickers',
   'advanced_chat_management',
   'profile_badge',
   'animated_userpics',
-  'emoji_status',
 ];
 
 const PREMIUM_BOTTOM_VIDEOS: string[] = [
   'faster_download',
   'voice_to_text',
+  'no_ads',
   'advanced_chat_management',
   'profile_badge',
   'animated_userpics',
-  'emoji_status',
 ];
 
 type ApiLimitTypeWithoutUpload = Exclude<ApiLimitType, 'uploadMaxFileparts'>;
@@ -200,9 +195,6 @@ const PremiumFeatureModal: FC<OwnProps> = ({
     stopScrolling();
   }, [startScrolling, stopScrolling]);
 
-  // TODO Support all subscription options
-  const month = promo.options.find((option) => option.months === 1)!;
-
   return (
     <div className={styles.root}>
       <Button
@@ -221,11 +213,11 @@ const PremiumFeatureModal: FC<OwnProps> = ({
       <div className={buildClassName(styles.content, 'no-scrollbar')} onScroll={handleScroll} ref={scrollContainerRef}>
 
         {PREMIUM_FEATURE_SECTIONS.map((section, index) => {
-          if (section === 'double_limits') {
+          if (section === 'limits') {
             return (
               <div className={buildClassName(styles.slide, styles.limits)}>
                 <h2 className={buildClassName(styles.header, isScrolledToTop && styles.noHeaderBorder)}>
-                  {lang(PREMIUM_FEATURE_TITLES.double_limits)}
+                  {lang(PREMIUM_FEATURE_TITLES.limits)}
                 </h2>
                 <div className={buildClassName(styles.limitsContent, 'custom-scroll')} onScroll={handleLimitsScroll}>
                   {LIMITS_ORDER.map((limit, i) => {
@@ -245,18 +237,33 @@ const PremiumFeatureModal: FC<OwnProps> = ({
               </div>
             );
           }
-
-          if (section === 'premium_stickers') {
+          if (section === 'reactions') {
             return (
               <div className={styles.slide}>
                 <div className={styles.frame}>
-                  <PremiumFeaturePreviewStickers isActive={currentSlideIndex === index} />
+                  <PremiumFeaturePreviewReactions />
                 </div>
                 <h1 className={styles.title}>
-                  {lang(PREMIUM_FEATURE_TITLES.premium_stickers)}
+                  {lang(PREMIUM_FEATURE_TITLES.reactions)}
                 </h1>
                 <div className={styles.description}>
-                  {renderText(lang(PREMIUM_FEATURE_DESCRIPTIONS.premium_stickers), ['br'])}
+                  {renderText(lang(PREMIUM_FEATURE_DESCRIPTIONS.reactions), ['br'])}
+                </div>
+              </div>
+            );
+          }
+
+          if (section === 'stickers') {
+            return (
+              <div className={styles.slide}>
+                <div className={styles.frame}>
+                  <PremiumFeaturePreviewStickers />
+                </div>
+                <h1 className={styles.title}>
+                  {lang(PREMIUM_FEATURE_TITLES.stickers)}
+                </h1>
+                <div className={styles.description}>
+                  {renderText(lang(PREMIUM_FEATURE_DESCRIPTIONS.stickers), ['br'])}
                 </div>
               </div>
             );
@@ -268,7 +275,6 @@ const PremiumFeatureModal: FC<OwnProps> = ({
             <div className={styles.slide}>
               <div className={styles.frame}>
                 <PremiumFeaturePreviewVideo
-                  isActive={currentSlideIndex === index}
                   videoId={promo.videos[i].id!}
                   videoThumbnail={promo.videos[i].thumbnail!}
                   isDown={PREMIUM_BOTTOM_VIDEOS.includes(section)}
@@ -300,14 +306,13 @@ const PremiumFeatureModal: FC<OwnProps> = ({
           onSelectSlide={handleSelectSlide}
         />
         <Button
-          className={buildClassName(styles.button)}
+          className={buildClassName(styles.button, !isPremium && styles.buttonPremium)}
           isShiny={!isPremium}
-          withPremiumGradient={!isPremium}
           onClick={isPremium ? onBack : handleClick}
         >
           {isPremium
             ? lang('OK')
-            : lang('SubscribeToPremium', formatCurrency(Number(month.amount), month.currency, lang.code))}
+            : lang('SubscribeToPremium', formatCurrency(Number(promo.monthlyAmount), promo.currency, lang.code))}
         </Button>
       </div>
     </div>

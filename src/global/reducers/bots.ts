@@ -1,33 +1,27 @@
-import type { GlobalState, TabArgs } from '../types';
+import type { GlobalState } from '../types';
 import type { InlineBotSettings } from '../../types';
-import { updateTabState } from './tabs';
-import { selectTabState } from '../selectors';
-import { getCurrentTabId } from '../../util/establishMultitabRole';
 
-export function replaceInlineBotSettings<T extends GlobalState>(
-  global: T, username: string, inlineBotSettings: InlineBotSettings | false,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  const tabState = selectTabState(global, tabId);
-  return updateTabState(global, {
+export function replaceInlineBotSettings(
+  global: GlobalState, username: string, inlineBotSettings: InlineBotSettings | false,
+): GlobalState {
+  return {
+    ...global,
     inlineBots: {
-      ...tabState.inlineBots,
+      ...global.inlineBots,
       byUsername: {
-        ...tabState.inlineBots.byUsername,
+        ...global.inlineBots.byUsername,
         [username]: inlineBotSettings,
       },
     },
-  }, tabId);
+  };
 }
 
-export function replaceInlineBotsIsLoading<T extends GlobalState>(
-  global: T, isLoading: boolean,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  return updateTabState(global, {
+export function replaceInlineBotsIsLoading(global: GlobalState, isLoading: boolean): GlobalState {
+  return {
+    ...global,
     inlineBots: {
-      ...selectTabState(global, tabId).inlineBots,
+      ...global.inlineBots,
       isLoading,
     },
-  }, tabId);
+  };
 }

@@ -5,7 +5,6 @@ import type { ApiUserStatus } from '../../../api/types';
 import { deleteContact, replaceUserStatuses, updateUser } from '../../reducers';
 import { throttle } from '../../../util/schedulers';
 import { selectIsCurrentUserPremium, selectUser } from '../../selectors';
-import type { ActionReturnType, RequiredGlobalState } from '../../types';
 
 const STATUS_UPDATE_THROTTLE = 3000;
 
@@ -19,50 +18,27 @@ function scheduleStatusUpdate(userId: string, statusUpdate: ApiUserStatus) {
 }
 
 function flushStatusUpdates() {
-  // eslint-disable-next-line eslint-multitab-tt/no-immediate-global
-  let global = getGlobal() as RequiredGlobalState;
+  const global = getGlobal();
 
-  global = replaceUserStatuses(global, {
+  setGlobal(replaceUserStatuses(global, {
     ...global.users.statusesById,
     ...pendingStatusUpdates,
-  });
-  setGlobal(global);
+  }));
 
   pendingStatusUpdates = {};
 }
 
-addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
+addActionHandler('apiUpdate', (global, actions, update) => {
   switch (update['@type']) {
     case 'deleteContact': {
       return deleteContact(global, update.id);
     }
 
     case 'updateUser': {
-      Object.values(global.byTabId).forEach(({ id: tabId }) => {
-        if (update.id === global.currentUserId && update.user.isPremium !== selectIsCurrentUserPremium(global)) {
-          // TODO Do not display modal if premium is bought from another device
-          if (update.user.isPremium) actions.openPremiumModal({ isSuccess: true, tabId });
-
-          // Reset translation cache cause premium provides additional formatting
-          global = {
-            ...global,
-            translations: {
-              byChatId: {},
-            },
-          };
-        }
-      });
-
+      if (update.id === global.currentUserId && update.user.isPremium && !selectIsCurrentUserPremium(global)) {
+        actions.openPremiumModal({ isSuccess: true });
+      }
       return updateUser(global, update.id, update.user);
-    }
-
-    case 'updateRequestUserUpdate': {
-      actions.loadFullUser({ userId: update.id });
-      break;
-    }
-
-    case 'updateUserEmojiStatus': {
-      return updateUser(global, update.userId, { emojiStatus: update.emojiStatus });
     }
 
     case 'updateUserStatus': {

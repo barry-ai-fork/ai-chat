@@ -1,13 +1,9 @@
+import type { FC } from '../../lib/teact/teact';
 import React, { memo, useCallback, useEffect } from '../../lib/teact/teact';
 import { getActions } from '../../lib/teact/teactn';
+import type { GlobalState } from '../../global/types';
 
-import type { FC } from '../../lib/teact/teact';
-import type { TabState } from '../../global/types';
-import { MAIN_THREAD_ID } from '../../api/types';
-
-import { withGlobal } from '../../global';
-import { selectChat } from '../../global/selectors';
-import { getCanPostInChat } from '../../global/helpers';
+import windowSize from '../../util/windowSize';
 
 import useLang from '../../hooks/useLang';
 import useSendMessageAction from '../../hooks/useSendMessageAction';
@@ -22,16 +18,12 @@ type GameEvents = { eventType: 'share_score' | 'share_game' };
 const PLAY_GAME_ACTION_INTERVAL = 5000;
 
 type OwnProps = {
-  openedGame?: TabState['openedGame'];
+  openedGame?: GlobalState['openedGame'];
   gameTitle?: string;
 };
 
-type StateProps = {
-  canPost?: boolean;
-};
-
-const GameModal: FC<OwnProps & StateProps> = ({ openedGame, gameTitle, canPost }) => {
-  const { closeGame, openForwardMenu } = getActions();
+const GameModal: FC<OwnProps> = ({ openedGame, gameTitle }) => {
+  const { closeGame, showNotification, openForwardMenu } = getActions();
   const lang = useLang();
   const { url, chatId, messageId } = openedGame || {};
   const isOpen = Boolean(url);
@@ -39,7 +31,7 @@ const GameModal: FC<OwnProps & StateProps> = ({ openedGame, gameTitle, canPost }
   const sendMessageAction = useSendMessageAction(chatId);
   useInterval(() => {
     sendMessageAction({ type: 'playingGame' });
-  }, isOpen && canPost ? PLAY_GAME_ACTION_INTERVAL : undefined);
+  }, isOpen ? PLAY_GAME_ACTION_INTERVAL : undefined);
 
   const handleMessage = useCallback((event: MessageEvent<string>) => {
     try {
@@ -50,13 +42,12 @@ const GameModal: FC<OwnProps & StateProps> = ({ openedGame, gameTitle, canPost }
       }
 
       if (data.eventType === 'share_game') {
-        openForwardMenu({ fromChatId: chatId, messageIds: [messageId] });
-        closeGame();
+        showNotification({ message: 'Unsupported game action' });
       }
     } catch (e) {
-      // Ignore other messages
+      // Ignore messages from other origins
     }
-  }, [chatId, closeGame, messageId, openForwardMenu]);
+  }, [chatId, closeGame, messageId, openForwardMenu, showNotification]);
 
   const handleLoad = useCallback((event: React.SyntheticEvent<HTMLIFrameElement>) => {
     event.currentTarget.focus();
@@ -66,6 +57,17 @@ const GameModal: FC<OwnProps & StateProps> = ({ openedGame, gameTitle, canPost }
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [handleMessage]);
+
+  // Prevent refresh when rotating device
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    windowSize.disableRefresh();
+
+    return () => {
+      windowSize.enableRefresh();
+    };
+  }, [isOpen]);
 
   return (
     <Modal
@@ -89,14 +91,4 @@ const GameModal: FC<OwnProps & StateProps> = ({ openedGame, gameTitle, canPost }
   );
 };
 
-export default memo(withGlobal<OwnProps>(
-  (global, { openedGame }): StateProps => {
-    const { chatId } = openedGame || {};
-    const chat = chatId && selectChat(global, chatId);
-    const canPost = Boolean(chat) && getCanPostInChat(chat, MAIN_THREAD_ID);
-
-    return {
-      canPost,
-    };
-  },
-)(GameModal));
+export default memo(GameModal);

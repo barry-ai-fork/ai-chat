@@ -33,6 +33,7 @@ const runThrottled = throttle((cb) => cb(), 500, true);
 
 const MediaResults: FC<OwnProps & StateProps> = ({
   searchQuery,
+  searchChatId,
   isLoading,
   globalMessagesByChatId,
   foundIds,
@@ -59,11 +60,12 @@ const MediaResults: FC<OwnProps & StateProps> = ({
       runThrottled(() => {
         searchMessagesGlobal({
           type: CURRENT_TYPE,
+          query: searchQuery,
+          chatId: searchChatId,
         });
       });
     }
-  // eslint-disable-next-line react-hooks-static-deps/exhaustive-deps -- `searchQuery` is required to prevent infinite message loading
-  }, [lastSyncTime, searchMessagesGlobal, searchQuery]);
+  }, [lastSyncTime, searchMessagesGlobal, searchQuery, searchChatId]);
 
   const foundMessages = useMemo(() => {
     if (!foundIds || !globalMessagesByChatId) {
@@ -77,10 +79,10 @@ const MediaResults: FC<OwnProps & StateProps> = ({
     }).filter(Boolean);
   }, [globalMessagesByChatId, foundIds]);
 
-  const handleSelectMedia = useCallback((id: number, chatId: string) => {
+  const handleSelectMedia = useCallback((messageId: number, chatId: string) => {
     openMediaViewer({
       chatId,
-      mediaId: id,
+      messageId,
       origin: MediaViewerOrigin.SearchResult,
     });
   }, [openMediaViewer]);
@@ -90,7 +92,7 @@ const MediaResults: FC<OwnProps & StateProps> = ({
       <div className="media-list" dir={lang.isRtl ? 'rtl' : undefined}>
         {foundMessages.map((message) => (
           <Media
-            key={`${message.chatId}-${message.id}`}
+            key={message.id}
             idPrefix="search-media"
             message={message}
             isProtected={isChatProtected || message.isProtected}

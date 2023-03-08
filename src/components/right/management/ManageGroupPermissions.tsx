@@ -1,19 +1,15 @@
 import type { FC } from '../../../lib/teact/teact';
 import React, {
-  memo, useCallback, useMemo, useState,
+  memo, useCallback, useEffect, useMemo, useState,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import { ManagementScreens } from '../../../types';
 import type { ApiChat, ApiChatBannedRights, ApiChatMember } from '../../../api/types';
 
-import stopEvent from '../../../util/stopEvent';
-import buildClassName from '../../../util/buildClassName';
-import { isChatPublic } from '../../../global/helpers';
 import useLang from '../../../hooks/useLang';
 import { selectChat } from '../../../global/selectors';
 import useHistoryBack from '../../../hooks/useHistoryBack';
-import useManagePermissions from '../hooks/useManagePermissions';
 
 import ListItem from '../../ui/ListItem';
 import Checkbox from '../../ui/Checkbox';
@@ -32,14 +28,11 @@ type OwnProps = {
 type StateProps = {
   chat?: ApiChat;
   currentUserId?: string;
-  hasLinkedChat?: boolean;
 };
 
-const ITEM_HEIGHT = 24 + 32;
-const BEFORE_ITEMS_COUNT = 2;
-const ITEMS_COUNT = 9;
+const FLOATING_BUTTON_ANIMATION_TIMEOUT_MS = 250;
 
-function getLangKeyForBannedRightKey(key: keyof ApiChatBannedRights) {
+function getLangKeyForBannedRightKey(key: string) {
   switch (key) {
     case 'sendMessages':
       return 'UserRestrictionsNoSend';
@@ -57,22 +50,6 @@ function getLangKeyForBannedRightKey(key: keyof ApiChatBannedRights) {
       return 'UserRestrictionsInviteUsers';
     case 'pinMessages':
       return 'UserRestrictionsPinMessages';
-    case 'manageTopics':
-      return 'GroupPermission.NoManageTopics';
-    case 'sendPlain':
-      return 'UserRestrictionsNoSendText';
-    case 'sendDocs':
-      return 'UserRestrictionsNoSendDocs';
-    case 'sendRoundvideos':
-      return 'UserRestrictionsNoSendRound';
-    case 'sendVoices':
-      return 'UserRestrictionsNoSendVoice';
-    case 'sendAudios':
-      return 'UserRestrictionsNoSendMusic';
-    case 'sendVideos':
-      return 'UserRestrictionsNoSendVideos';
-    case 'sendPhotos':
-      return 'UserRestrictionsNoSendPhotos';
     default:
       return undefined;
   }
@@ -83,19 +60,15 @@ const ManageGroupPermissions: FC<OwnProps & StateProps> = ({
   onChatMemberSelect,
   chat,
   currentUserId,
-  hasLinkedChat,
   onClose,
   isActive,
 }) => {
-  const { updateChatDefaultBannedRights, showNotification } = getActions();
+  const { updateChatDefaultBannedRights } = getActions();
 
-  const {
-    permissions, havePermissionChanged, isLoading, handlePermissionChange, setIsLoading,
-  } = useManagePermissions(chat?.defaultBannedRights);
+  const [permissions, setPermissions] = useState<ApiChatBannedRights>({});
+  const [havePermissionChanged, setHavePermissionChanged] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const lang = useLang();
-  const { isForum } = chat || {};
-  const isPublic = useMemo(() => chat && isChatPublic(chat), [chat]);
-  const shouldDisablePermissionForPublicGroup = hasLinkedChat || isPublic;
 
   useHistoryBack({
     isActive,
@@ -115,15 +88,30 @@ const ManageGroupPermissions: FC<OwnProps & StateProps> = ({
     onScreenSelect(ManagementScreens.GroupUserPermissions);
   }, [currentUserId, onChatMemberSelect, onScreenSelect]);
 
-  const [isMediaDropdownOpen, setIsMediaDropdownOpen] = useState(false);
-  const handleOpenMediaDropdown = useCallback((e: React.MouseEvent) => {
-    stopEvent(e);
-    setIsMediaDropdownOpen(!isMediaDropdownOpen);
-  }, [isMediaDropdownOpen]);
+  useEffect(() => {
+    setPermissions((chat?.defaultBannedRights) || {});
+    setHavePermissionChanged(false);
+    setTimeout(() => {
+      setIsLoading(false);
+    }, FLOATING_BUTTON_ANIMATION_TIMEOUT_MS);
+  }, [chat]);
 
-  const handleDisabledClick = useCallback(() => {
-    showNotification({ message: lang('lng_rights_permission_unavailable') });
-  }, [lang, showNotification]);
+  const handlePermissionChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name } = e.target;
+
+    function getUpdatedPermissionValue(value: true | undefined) {
+      return value ? undefined : true;
+    }
+
+    setPermissions((p) => ({
+      ...p,
+      [name]: getUpdatedPermissionValue(p[name as Exclude<keyof ApiChatBannedRights, 'untilDate'>]),
+      ...(name === 'sendStickers' && {
+        sendGifs: getUpdatedPermissionValue(p[name]),
+      }),
+    }));
+    setHavePermissionChanged(true);
+  }, []);
 
   const handleSavePermissions = useCallback(() => {
     if (!chat) {
@@ -132,7 +120,7 @@ const ManageGroupPermissions: FC<OwnProps & StateProps> = ({
 
     setIsLoading(true);
     updateChatDefaultBannedRights({ chatId: chat.id, bannedRights: permissions });
-  }, [chat, permissions, setIsLoading, updateChatDefaultBannedRights]);
+  }, [chat, permissions, updateChatDefaultBannedRights]);
 
   const removedUsersCount = useMemo(() => {
     if (!chat || !chat.fullInfo || !chat.fullInfo.kickedMembers) {
@@ -158,11 +146,10 @@ const ManageGroupPermissions: FC<OwnProps & StateProps> = ({
 
     const { defaultBannedRights } = chat;
 
-    return Object.keys(bannedRights).reduce((result, k) => {
-      const key = k as keyof ApiChatBannedRights;
+    return Object.keys(bannedRights).reduce((result, key) => {
       if (
-        !bannedRights[key]
-        || (defaultBannedRights?.[key])
+        !bannedRights[key as keyof ApiChatBannedRights]
+        || (defaultBannedRights?.[key as keyof ApiChatBannedRights])
         || key === 'sendInline' || key === 'viewMessages' || key === 'sendGames'
       ) {
         return result;
@@ -181,190 +168,86 @@ const ManageGroupPermissions: FC<OwnProps & StateProps> = ({
   }, [chat, lang]);
 
   return (
-    <div
-      className="Management with-shifted-dropdown"
-      style={`--shift-height: ${ITEMS_COUNT * ITEM_HEIGHT}px;`
-        + `--before-shift-height: ${BEFORE_ITEMS_COUNT * ITEM_HEIGHT}px;`}
-    >
+    <div className="Management">
       <div className="custom-scroll">
-        <div className="section without-bottom-shadow">
+        <div className="section">
           <h3 className="section-heading" dir="auto">{lang('ChannelPermissionsHeader')}</h3>
 
-          <div className="ListItem no-selection with-checkbox">
+          <div className="ListItem no-selection">
             <Checkbox
-              name="sendPlain"
-              checked={!permissions.sendPlain}
+              name="sendMessages"
+              checked={!permissions.sendMessages}
               label={lang('UserRestrictionsSend')}
               blocking
               onChange={handlePermissionChange}
             />
           </div>
-          <div className="ListItem no-selection with-checkbox">
+          <div className="ListItem no-selection">
             <Checkbox
               name="sendMedia"
               checked={!permissions.sendMedia}
               label={lang('UserRestrictionsSendMedia')}
               blocking
-              rightIcon={isMediaDropdownOpen ? 'up' : 'down'}
               onChange={handlePermissionChange}
-              onClickLabel={handleOpenMediaDropdown}
             />
           </div>
-          <div className="DropdownListTrap">
-            <div
-              className={buildClassName(
-                'DropdownList',
-                isMediaDropdownOpen && 'DropdownList--open',
-              )}
-            >
-              <div className="ListItem no-selection with-checkbox">
-                <Checkbox
-                  name="sendPhotos"
-                  checked={!permissions.sendPhotos}
-                  label={lang('UserRestrictionsSendPhotos')}
-                  blocking
-                  onChange={handlePermissionChange}
-                />
-              </div>
-
-              <div className="ListItem no-selection with-checkbox">
-                <Checkbox
-                  name="sendVideos"
-                  checked={!permissions.sendVideos}
-                  label={lang('UserRestrictionsSendVideos')}
-                  blocking
-                  onChange={handlePermissionChange}
-                />
-              </div>
-
-              <div className="ListItem no-selection with-checkbox">
-                <Checkbox
-                  name="sendStickers"
-                  checked={!permissions.sendStickers && !permissions.sendGifs}
-                  label={lang('UserRestrictionsSendStickers')}
-                  blocking
-                  onChange={handlePermissionChange}
-                />
-              </div>
-
-              <div className="ListItem no-selection with-checkbox">
-                <Checkbox
-                  name="sendAudios"
-                  checked={!permissions.sendAudios}
-                  label={lang('UserRestrictionsSendMusic')}
-                  blocking
-                  onChange={handlePermissionChange}
-                />
-              </div>
-
-              <div className="ListItem no-selection with-checkbox">
-                <Checkbox
-                  name="sendDocs"
-                  checked={!permissions.sendDocs}
-                  label={lang('UserRestrictionsSendFiles')}
-                  blocking
-                  onChange={handlePermissionChange}
-                />
-              </div>
-
-              <div className="ListItem no-selection with-checkbox">
-                <Checkbox
-                  name="sendVoices"
-                  checked={!permissions.sendVoices}
-                  label={lang('UserRestrictionsSendVoices')}
-                  blocking
-                  onChange={handlePermissionChange}
-                />
-              </div>
-
-              <div className="ListItem no-selection with-checkbox">
-                <Checkbox
-                  name="sendRoundvideos"
-                  checked={!permissions.sendRoundvideos}
-                  label={lang('UserRestrictionsSendRound')}
-                  blocking
-                  onChange={handlePermissionChange}
-                />
-              </div>
-
-              <div className="ListItem no-selection with-checkbox">
-                <Checkbox
-                  name="embedLinks"
-                  checked={!permissions.embedLinks}
-                  label={lang('UserRestrictionsEmbedLinks')}
-                  blocking
-                  onChange={handlePermissionChange}
-                />
-              </div>
-
-              <div className="ListItem no-selection with-checkbox">
-                <Checkbox
-                  name="sendPolls"
-                  checked={!permissions.sendPolls}
-                  label={lang('UserRestrictionsSendPolls')}
-                  blocking
-                  onChange={handlePermissionChange}
-                />
-              </div>
-            </div>
+          <div className="ListItem no-selection">
+            <Checkbox
+              name="sendStickers"
+              checked={!permissions.sendStickers && !permissions.sendGifs}
+              label={lang('UserRestrictionsSendStickers')}
+              blocking
+              onChange={handlePermissionChange}
+            />
           </div>
-
-          <div className={buildClassName('part', isMediaDropdownOpen && 'shifted')}>
-            <div className="ListItem no-selection with-checkbox">
-              <Checkbox
-                name="inviteUsers"
-                checked={!permissions.inviteUsers}
-                label={lang('UserRestrictionsInviteUsers')}
-                blocking
-                onChange={handlePermissionChange}
-              />
-            </div>
-            <div
-              className="ListItem no-selection with-checkbox"
-              onClick={shouldDisablePermissionForPublicGroup ? handleDisabledClick : undefined}
-            >
-              <Checkbox
-                name="pinMessages"
-                checked={!permissions.pinMessages}
-                label={lang('UserRestrictionsPinMessages')}
-                disabled={shouldDisablePermissionForPublicGroup}
-                blocking
-                onChange={handlePermissionChange}
-              />
-            </div>
-            <div
-              className="ListItem no-selection with-checkbox"
-              onClick={shouldDisablePermissionForPublicGroup ? handleDisabledClick : undefined}
-            >
-              <Checkbox
-                name="changeInfo"
-                checked={!permissions.changeInfo}
-                label={lang('UserRestrictionsChangeInfo')}
-                blocking
-                disabled={shouldDisablePermissionForPublicGroup}
-                onChange={handlePermissionChange}
-              />
-            </div>
-            {isForum && (
-              <div className="ListItem no-selection with-checkbox">
-                <Checkbox
-                  name="manageTopics"
-                  checked={!permissions.manageTopics}
-                  label={lang('CreateTopicsPermission')}
-                  blocking
-                  onChange={handlePermissionChange}
-                />
-              </div>
-            )}
+          <div className="ListItem no-selection">
+            <Checkbox
+              name="sendPolls"
+              checked={!permissions.sendPolls}
+              label={lang('UserRestrictionsSendPolls')}
+              blocking
+              onChange={handlePermissionChange}
+            />
+          </div>
+          <div className="ListItem no-selection">
+            <Checkbox
+              name="embedLinks"
+              checked={!permissions.embedLinks}
+              label={lang('UserRestrictionsEmbedLinks')}
+              blocking
+              onChange={handlePermissionChange}
+            />
+          </div>
+          <div className="ListItem no-selection">
+            <Checkbox
+              name="inviteUsers"
+              checked={!permissions.inviteUsers}
+              label={lang('UserRestrictionsInviteUsers')}
+              blocking
+              onChange={handlePermissionChange}
+            />
+          </div>
+          <div className="ListItem no-selection">
+            <Checkbox
+              name="pinMessages"
+              checked={!permissions.pinMessages}
+              label={lang('UserRestrictionsPinMessages')}
+              blocking
+              onChange={handlePermissionChange}
+            />
+          </div>
+          <div className="ListItem no-selection">
+            <Checkbox
+              name="changeInfo"
+              checked={!permissions.changeInfo}
+              label={lang('UserRestrictionsChangeInfo')}
+              blocking
+              onChange={handlePermissionChange}
+            />
           </div>
         </div>
 
-        <div
-          className={buildClassName(
-            'section',
-            isMediaDropdownOpen && 'shifted',
-          )}
-        >
+        <div className="section">
           <ListItem
             icon="delete-user"
             multiline
@@ -376,12 +259,7 @@ const ManageGroupPermissions: FC<OwnProps & StateProps> = ({
           </ListItem>
         </div>
 
-        <div
-          className={buildClassName(
-            'section',
-            isMediaDropdownOpen && 'shifted',
-          )}
-        >
+        <div className="section">
           <h3 className="section-heading" dir="auto">{lang('PrivacyExceptions')}</h3>
 
           <ListItem
@@ -401,7 +279,6 @@ const ManageGroupPermissions: FC<OwnProps & StateProps> = ({
               <PrivateChatInfo
                 userId={member.userId}
                 status={getMemberExceptions(member)}
-                forceShowSelf
               />
             </ListItem>
           ))}
@@ -427,8 +304,7 @@ const ManageGroupPermissions: FC<OwnProps & StateProps> = ({
 export default memo(withGlobal<OwnProps>(
   (global, { chatId }): StateProps => {
     const chat = selectChat(global, chatId);
-    const hasLinkedChat = Boolean(chat?.fullInfo?.linkedChatId);
 
-    return { chat, currentUserId: global.currentUserId, hasLinkedChat };
+    return { chat, currentUserId: global.currentUserId };
   },
 )(ManageGroupPermissions));

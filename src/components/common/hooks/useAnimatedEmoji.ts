@@ -1,17 +1,13 @@
 import {
   useCallback, useEffect, useRef,
 } from '../../../lib/teact/teact';
-import { getActions } from '../../../global';
-
-import type { ActiveEmojiInteraction } from '../../../global/types';
-
 import safePlay from '../../../util/safePlay';
-import buildStyle from '../../../util/buildStyle';
-import { REM } from '../helpers/mediaDimensions';
-
+import { getActions } from '../../../global';
 import useMedia from '../../../hooks/useMedia';
+import type { ActiveEmojiInteraction } from '../../../global/types';
+import { selectLocalAnimatedEmojiEffectByName } from '../../../global/selectors';
 
-const SIZE = 7 * REM;
+const SIZE = 104;
 const INTERACTION_BUNCH_TIME = 1000;
 const MS_DIVIDER = 1000;
 const TIME_DEFAULT = 0;
@@ -22,12 +18,14 @@ export default function useAnimatedEmoji(
   soundId?: string,
   activeEmojiInteractions?: ActiveEmojiInteraction[],
   isOwn?: boolean,
+  localEffect?: string,
   emoji?: string,
-  preferredSize?: number,
 ) {
   const {
     interactWithAnimatedEmoji, sendEmojiInteraction, sendWatchingEmojiInteraction,
   } = getActions();
+
+  const hasEffect = localEffect || emoji;
 
   // eslint-disable-next-line no-null/no-null
   const ref = useRef<HTMLDivElement>(null);
@@ -37,8 +35,7 @@ export default function useAnimatedEmoji(
 
   const soundMediaData = useMedia(soundId ? `document${soundId}` : undefined, !soundId);
 
-  const size = preferredSize || SIZE;
-  const style = buildStyle(`width: ${size}px`, `height: ${size}px`, emoji && 'cursor: pointer');
+  const style = `width: ${SIZE}px; height: ${SIZE}px;`;
 
   const interactions = useRef<number[] | undefined>(undefined);
   const startedInteractions = useRef<number | undefined>(undefined);
@@ -48,14 +45,15 @@ export default function useAnimatedEmoji(
     if (!container) return;
 
     sendEmojiInteraction({
-      chatId: chatId!,
-      messageId: messageId!,
-      emoji: emoji!,
-      interactions: interactions.current!,
+      chatId,
+      messageId,
+      localEffect,
+      emoji,
+      interactions: interactions.current,
     });
     startedInteractions.current = undefined;
     interactions.current = undefined;
-  }, [sendEmojiInteraction, chatId, messageId, emoji]);
+  }, [sendEmojiInteraction, chatId, messageId, localEffect, emoji]);
 
   const play = useCallback(() => {
     const audio = audioRef.current;
@@ -78,17 +76,18 @@ export default function useAnimatedEmoji(
 
     const container = ref.current;
 
-    if (!emoji || !container || !messageId || !chatId) {
+    if (!hasEffect || !container || !messageId || !chatId) {
       return;
     }
 
     const { x, y } = container.getBoundingClientRect();
 
     interactWithAnimatedEmoji({
-      emoji: emoji!,
+      localEffect,
+      emoji,
       x,
       y,
-      startSize: size,
+      startSize: SIZE,
       isReversed: !isOwn,
     });
 
@@ -101,7 +100,10 @@ export default function useAnimatedEmoji(
     interactions.current.push(startedInteractions.current
       ? (performance.now() - startedInteractions.current) / MS_DIVIDER
       : TIME_DEFAULT);
-  }, [chatId, emoji, interactWithAnimatedEmoji, isOwn, messageId, play, sendInteractionBunch, size]);
+  }, [
+    chatId, emoji, hasEffect, interactWithAnimatedEmoji, isOwn,
+    localEffect, messageId, play, sendInteractionBunch,
+  ]);
 
   // Set an end anchor for remote activated interaction
   useEffect(() => {
@@ -122,20 +124,22 @@ export default function useAnimatedEmoji(
 
       sendWatchingEmojiInteraction({
         id,
-        chatId: chatId!,
-        emoticon: emoji!,
-        startSize: size,
+        chatId,
+        emoticon: localEffect ? selectLocalAnimatedEmojiEffectByName(localEffect) : emoji,
+        startSize: SIZE,
         x,
         y,
         isReversed: !isOwn,
       });
       play();
     });
-  }, [activeEmojiInteractions, chatId, emoji, isOwn, messageId, play, sendWatchingEmojiInteraction, size]);
+  }, [
+    activeEmojiInteractions, chatId, emoji, isOwn, localEffect, messageId, play, sendWatchingEmojiInteraction,
+  ]);
 
   return {
     ref,
-    size,
+    size: SIZE,
     style,
     handleClick,
   };

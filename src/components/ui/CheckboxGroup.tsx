@@ -4,10 +4,9 @@ import React, { useCallback, memo, useState } from '../../lib/teact/teact';
 
 import Checkbox from './Checkbox';
 
-export type IRadioOption = {
+type IRadioOption = {
   label: string;
   subLabel?: string;
-  disabled?: boolean;
   value: string;
 };
 
@@ -53,7 +52,7 @@ const CheckboxGroup: FC<OwnProps> = ({
           subLabel={option.subLabel}
           value={option.value}
           checked={selected.indexOf(option.value) !== -1}
-          disabled={option.disabled || disabled}
+          disabled={disabled}
           round={round}
           isLoading={loadingOptions ? loadingOptions.indexOf(option.value) !== -1 : undefined}
           onChange={handleChange}

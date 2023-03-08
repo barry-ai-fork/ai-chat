@@ -19,10 +19,6 @@ export function getPrivacyKey(screen: SettingsScreens): ApiPrivacyKey | undefine
     case SettingsScreens.PrivacyForwardingAllowedContacts:
     case SettingsScreens.PrivacyForwardingDeniedContacts:
       return 'forwards';
-    case SettingsScreens.PrivacyVoiceMessages:
-    case SettingsScreens.PrivacyVoiceMessagesAllowedContacts:
-    case SettingsScreens.PrivacyVoiceMessagesDeniedContacts:
-      return 'voiceMessages';
     case SettingsScreens.PrivacyGroupChats:
     case SettingsScreens.PrivacyGroupChatsAllowedContacts:
     case SettingsScreens.PrivacyGroupChatsDeniedContacts:

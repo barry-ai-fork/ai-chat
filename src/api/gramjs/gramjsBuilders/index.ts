@@ -20,9 +20,6 @@ import type {
   ApiThemeParameters,
   ApiPoll,
   ApiRequestInputInvoice,
-  ApiChatReactions,
-  ApiReaction,
-  ApiFormattedText,
 } from '../../types';
 import {
   ApiMessageEntityTypes,
@@ -30,7 +27,6 @@ import {
 import localDb from '../localDb';
 import { pick } from '../../../util/iteratees';
 import { deserializeBytes } from '../helpers';
-import { DEFAULT_STATUS_ICON_ID } from '../../../config';
 
 const CHANNEL_ID_MIN_LENGTH = 11; // Example: -1000000000
 
@@ -241,15 +237,15 @@ export function buildFilterFromApiFolder(folder: ApiChatFolder): GramJs.DialogFi
   } = folder;
 
   const pinnedPeers = pinnedChatIds
-    ? pinnedChatIds.map(buildInputPeerFromLocalDb).filter(Boolean)
+    ? pinnedChatIds.map(buildInputPeerFromLocalDb).filter<GramJs.TypeInputPeer>(Boolean as any)
     : [];
 
   const includePeers = includedChatIds
-    ? includedChatIds.map(buildInputPeerFromLocalDb).filter(Boolean)
+    ? includedChatIds.map(buildInputPeerFromLocalDb).filter<GramJs.TypeInputPeer>(Boolean as any)
     : [];
 
   const excludePeers = excludedChatIds
-    ? excludedChatIds.map(buildInputPeerFromLocalDb).filter(Boolean)
+    ? excludedChatIds.map(buildInputPeerFromLocalDb).filter<GramJs.TypeInputPeer>(Boolean as any)
     : [];
 
   return new GramJs.DialogFilter({
@@ -294,10 +290,10 @@ export function buildMessageFromUpdate(
 
 export function buildMtpMessageEntity(entity: ApiMessageEntity): GramJs.TypeMessageEntity {
   const {
-    type, offset, length,
+    type, offset, length, url, userId, language,
   } = entity;
 
-  const user = 'userId' in entity ? localDb.users[entity.userId] : undefined;
+  const user = userId ? localDb.users[userId] : undefined;
 
   switch (type) {
     case ApiMessageEntityTypes.Bold:
@@ -311,11 +307,11 @@ export function buildMtpMessageEntity(entity: ApiMessageEntity): GramJs.TypeMess
     case ApiMessageEntityTypes.Code:
       return new GramJs.MessageEntityCode({ offset, length });
     case ApiMessageEntityTypes.Pre:
-      return new GramJs.MessageEntityPre({ offset, length, language: entity.language || '' });
+      return new GramJs.MessageEntityPre({ offset, length, language: language || '' });
     case ApiMessageEntityTypes.Blockquote:
       return new GramJs.MessageEntityBlockquote({ offset, length });
     case ApiMessageEntityTypes.TextUrl:
-      return new GramJs.MessageEntityTextUrl({ offset, length, url: entity.url });
+      return new GramJs.MessageEntityTextUrl({ offset, length, url: url! });
     case ApiMessageEntityTypes.Url:
       return new GramJs.MessageEntityUrl({ offset, length });
     case ApiMessageEntityTypes.Hashtag:
@@ -324,12 +320,10 @@ export function buildMtpMessageEntity(entity: ApiMessageEntity): GramJs.TypeMess
       return new GramJs.InputMessageEntityMentionName({
         offset,
         length,
-        userId: new GramJs.InputUser({ userId: BigInt(user!.id), accessHash: user!.accessHash! }),
+        userId: new GramJs.InputUser({ userId: BigInt(userId!), accessHash: user!.accessHash! }),
       });
     case ApiMessageEntityTypes.Spoiler:
       return new GramJs.MessageEntitySpoiler({ offset, length });
-    case ApiMessageEntityTypes.CustomEmoji:
-      return new GramJs.MessageEntityCustomEmoji({ offset, length, documentId: BigInt(entity.documentId) });
     default:
       return new GramJs.MessageEntityUnknown({ offset, length });
   }
@@ -357,7 +351,7 @@ export function isMessageWithMedia(message: GramJs.Message | GramJs.UpdateServic
       media instanceof GramJs.MessageMediaGame
       && (media.game.document instanceof GramJs.Document || media.game.photo instanceof GramJs.Photo)
     ) || (
-      media instanceof GramJs.MessageMediaInvoice && (media.photo || media.extendedMedia)
+      media instanceof GramJs.MessageMediaInvoice && media.photo
     )
   );
 }
@@ -458,9 +452,6 @@ export function buildInputPrivacyKey(privacyKey: ApiPrivacyKey) {
 
     case 'phoneP2P':
       return new GramJs.InputPrivacyKeyPhoneP2P();
-
-    case 'voiceMessages':
-      return new GramJs.InputPrivacyKeyVoiceMessages();
   }
 
   return undefined;
@@ -549,60 +540,4 @@ export function buildInputInvoice(invoice: ApiRequestInputInvoice) {
       msgId: invoice.messageId,
     });
   }
-}
-
-export function buildInputReaction(reaction?: ApiReaction) {
-  if (reaction && 'emoticon' in reaction) {
-    return new GramJs.ReactionEmoji({
-      emoticon: reaction.emoticon,
-    });
-  }
-
-  if (reaction && 'documentId' in reaction) {
-    return new GramJs.ReactionCustomEmoji({
-      documentId: BigInt(reaction.documentId),
-    });
-  }
-
-  return new GramJs.ReactionEmpty();
-}
-
-export function buildInputChatReactions(chatReactions?: ApiChatReactions) {
-  if (chatReactions?.type === 'all') {
-    return new GramJs.ChatReactionsAll({
-      allowCustom: chatReactions.areCustomAllowed,
-    });
-  }
-
-  if (chatReactions?.type === 'some') {
-    return new GramJs.ChatReactionsSome({
-      reactions: chatReactions.allowed.map(buildInputReaction),
-    });
-  }
-
-  return new GramJs.ChatReactionsNone();
-}
-
-export function buildInputEmojiStatus(emojiStatus: ApiSticker, expires?: number) {
-  if (emojiStatus.id === DEFAULT_STATUS_ICON_ID) {
-    return new GramJs.EmojiStatusEmpty();
-  }
-
-  if (expires) {
-    return new GramJs.EmojiStatusUntil({
-      documentId: BigInt(emojiStatus.id),
-      until: expires,
-    });
-  }
-
-  return new GramJs.EmojiStatus({
-    documentId: BigInt(emojiStatus.id),
-  });
-}
-
-export function buildInputTextWithEntities(formatted: ApiFormattedText) {
-  return new GramJs.TextWithEntities({
-    text: formatted.text,
-    entities: formatted.entities?.map(buildMtpMessageEntity) || [],
-  });
 }

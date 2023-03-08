@@ -6,7 +6,6 @@ import { getActions, withGlobal } from '../../../global';
 
 import { ChatCreationProgress } from '../../../types';
 
-import { selectTabState } from '../../../global/selectors';
 import useLang from '../../../hooks/useLang';
 import useHistoryBack from '../../../hooks/useHistoryBack';
 
@@ -28,17 +27,18 @@ export type OwnProps = {
 type StateProps = {
   creationProgress?: ChatCreationProgress;
   creationError?: string;
-  maxGroupSize?: number;
 };
+
+// TODO @implement
+const MAX_USERS_FOR_LEGACY_CHAT = 199; // Accounting for current user
 
 const NewChatStep2: FC<OwnProps & StateProps > = ({
   isChannel,
   isActive,
   memberIds,
-  maxGroupSize,
+  onReset,
   creationProgress,
   creationError,
-  onReset,
 }) => {
   const {
     createGroupChat,
@@ -84,7 +84,7 @@ const NewChatStep2: FC<OwnProps & StateProps > = ({
       return;
     }
 
-    if (maxGroupSize && memberIds.length >= maxGroupSize) {
+    if (memberIds.length > MAX_USERS_FOR_LEGACY_CHAT) {
       setError(chatTooManyUsersError);
       return;
     }
@@ -94,7 +94,7 @@ const NewChatStep2: FC<OwnProps & StateProps > = ({
       photo,
       memberIds,
     });
-  }, [title, memberIds, maxGroupSize, createGroupChat, photo]);
+  }, [title, memberIds, createGroupChat, photo, chatTitleEmptyError, chatTooManyUsersError]);
 
   const handleCreateChannel = useCallback(() => {
     if (!title.length) {
@@ -199,12 +199,11 @@ export default memo(withGlobal<OwnProps>(
     const {
       progress: creationProgress,
       error: creationError,
-    } = selectTabState(global).chatCreation || {};
+    } = global.chatCreation || {};
 
     return {
       creationProgress,
       creationError,
-      maxGroupSize: global.config?.maxGroupSize,
     };
   },
 )(NewChatStep2));

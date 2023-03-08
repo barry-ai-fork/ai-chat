@@ -27,10 +27,10 @@ const GroupCallParticipantStreams: FC<OwnProps & StateProps> = ({
 }) => {
   const [selectedVideo, setSelectedVideo] = useState<SelectedVideo | undefined>(undefined);
   const presentationParticipants = useMemo(() => {
-    return Object.values(participants || {}).filter((participant) => participant.hasPresentationStream);
+    return Object.values(participants || {}).filter((l) => l.hasPresentationStream);
   }, [participants]);
   const videoParticipants = useMemo(() => {
-    return Object.values(participants || {}).filter((participant) => participant.hasVideoStream);
+    return Object.values(participants || {}).filter((l) => l.hasVideoStream);
   }, [participants]);
 
   const totalVideoCount = videoParticipants.length + presentationParticipants.length;

@@ -12,7 +12,6 @@ type OwnProps = {
   width?: number;
   height?: number;
   forceAspectRatio?: boolean;
-  inline?: boolean;
   className?: string;
 };
 
@@ -22,15 +21,14 @@ const Skeleton: FC<OwnProps> = ({
   width,
   height,
   forceAspectRatio,
-  inline,
   className,
 }) => {
-  const classNames = buildClassName('Skeleton', variant, animation, className, inline && 'inline');
+  const classNames = buildClassName('Skeleton', variant, animation, className);
   const aspectRatio = (width && height) ? `aspect-ratio: ${width}/${height}` : undefined;
   const style = forceAspectRatio ? aspectRatio
     : buildStyle(Boolean(width) && `width: ${width}px`, Boolean(height) && `height: ${height}px`);
   return (
-    <div className={classNames} style={style}>{inline && '\u00A0'}</div>
+    <div className={classNames} style={style} />
   );
 };
 

@@ -1,5 +1,5 @@
 export {
-  destroy, disconnect, downloadMedia, fetchCurrentUser, repairFileReference,
+  destroy, disconnect, downloadMedia, fetchCurrentUser, repairFileReference,switchAccount
 } from './client';
 
 export {
@@ -12,38 +12,37 @@ export {
 
 export {
   fetchChats, fetchFullChat, searchChats, requestChatUpdate, fetchChatSettings,
-  saveDraft, clearDraft, fetchChat, updateChatMutedState, updateTopicMutedState,
+  saveDraft, clearDraft, fetchChat, updateChatMutedState,
   createChannel, joinChannel, deleteChatUser, deleteChat, leaveChannel, deleteChannel, createGroupChat, editChatPhoto,
   toggleChatPinned, toggleChatArchived, toggleDialogUnread, setChatEnabledReactions,
-  fetchChatFolders, editChatFolder, deleteChatFolder, sortChatFolders, fetchRecommendedChatFolders,
+  fetchChatFolders, editChatFolder, deleteChatFolder, fetchRecommendedChatFolders,
   getChatByUsername, togglePreHistoryHidden, updateChatDefaultBannedRights, updateChatMemberBannedRights,
   updateChatTitle, updateChatAbout, toggleSignatures, updateChatAdmin, fetchGroupsForDiscussion, setDiscussionGroup,
   migrateChat, openChatByInvite, fetchMembers, importChatInvite, addChatMembers, deleteChatMember, toggleIsProtected,
-  getChatByPhoneNumber, toggleJoinToSend, toggleJoinRequest, fetchTopics, deleteTopic, togglePinnedTopic,
-  editTopic, toggleForum, fetchTopicById, createTopic, toggleParticipantsHidden,
+  getChatByPhoneNumber, toggleJoinToSend, toggleJoinRequest,
 } from './chats';
 
 export {
+  updateMessageState,
   fetchMessages, fetchMessage, sendMessage, pinMessage, unpinAllMessages, deleteMessages, deleteHistory,
   markMessageListRead, markMessagesRead, requestThreadInfoUpdate, searchMessagesLocal, searchMessagesGlobal,
   fetchWebPagePreview, editMessage, forwardMessages, loadPollOptionResults, sendPollVote, findFirstMessageIdAfterDate,
   fetchPinnedMessages, fetchScheduledHistory, sendScheduledMessages, rescheduleMessage, deleteScheduledMessages,
   reportMessages, sendMessageAction, fetchSeenBy, fetchSponsoredMessages, viewSponsoredMessage, fetchSendAs,
   saveDefaultSendAs, fetchUnreadReactions, readAllReactions, fetchUnreadMentions, readAllMentions, transcribeAudio,
-  closePoll, fetchExtendedMedia, translateText, fetchMessageViews,
+  closePoll,
 } from './messages';
 
 export {
   fetchFullUser, fetchNearestCountry, fetchTopUsers, fetchContactList, fetchUsers,
-  updateContact, importContact, deleteContact, fetchProfilePhotos, fetchCommonChats, reportSpam, updateEmojiStatus,
+  updateContact, importContact, deleteContact, fetchProfilePhotos, fetchCommonChats, reportSpam,
 } from './users';
 
 export {
-  fetchStickerSets, fetchRecentStickers, fetchFavoriteStickers, fetchFeaturedStickers, fetchRecentEmojiStatuses,
+  fetchStickerSets, fetchRecentStickers, fetchFavoriteStickers, fetchFeaturedStickers,
   faveSticker, fetchStickers, fetchSavedGifs, saveGif, searchStickers, installStickerSet, uninstallStickerSet,
   searchGifs, fetchAnimatedEmojis, fetchStickersForEmoji, fetchEmojiKeywords, fetchAnimatedEmojiEffects,
-  removeRecentSticker, clearRecentStickers, fetchCustomEmoji, fetchPremiumGifts, fetchCustomEmojiSets,
-  fetchFeaturedEmojiStickers, fetchGenericEmojiEffects, fetchDefaultTopicIcons, fetchDefaultStatusEmojis,
+  removeRecentSticker, clearRecentStickers,
 } from './symbols';
 
 export {
@@ -55,14 +54,13 @@ export {
 
 export {
   updateProfile, checkUsername, updateUsername, fetchBlockedContacts, blockContact, unblockContact,
-  updateProfilePhoto, uploadProfilePhoto, deleteProfilePhotos, fetchWallpapers, uploadWallpaper,
+  updateProfilePhoto, uploadProfilePhoto, fetchWallpapers, uploadWallpaper,
   fetchAuthorizations, terminateAuthorization, terminateAllAuthorizations,
   fetchWebAuthorizations, terminateWebAuthorization, terminateAllWebAuthorizations,
   fetchNotificationExceptions, fetchNotificationSettings, updateContactSignUpNotification, updateNotificationSettings,
   fetchLanguages, fetchLangPack, fetchPrivacySettings, setPrivacySettings, registerDevice, unregisterDevice,
   updateIsOnline, fetchContentSettings, updateContentSettings, fetchLangStrings, fetchCountryList, fetchAppConfig,
-  fetchGlobalPrivacySettings, updateGlobalPrivacySettings, toggleUsername, reorderUsernames, fetchConfig,
-  uploadContactProfilePhoto,
+  fetchGlobalPrivacySettings, updateGlobalPrivacySettings,
 } from './settings';
 
 export {
@@ -71,12 +69,12 @@ export {
 
 export {
   answerCallbackButton, fetchTopInlineBots, fetchInlineBot, fetchInlineBotResults, sendInlineBotResult, startBot,
-  requestWebView, requestSimpleWebView, sendWebViewData, prolongWebView, loadAttachBots, toggleAttachBot,
-  requestBotUrlAuth, requestLinkUrlAuth, acceptBotUrlAuth, acceptLinkUrlAuth, loadAttachBot,
+  requestWebView, requestSimpleWebView, sendWebViewData, prolongWebView, loadAttachMenuBots, toggleBotInAttachMenu,
+  requestBotUrlAuth, requestLinkUrlAuth, acceptBotUrlAuth, acceptLinkUrlAuth,
 } from './bots';
 
 export {
-  validateRequestedInfo, sendPaymentForm, getPaymentForm, getReceipt, fetchPremiumPromo, fetchTemporaryPaymentPassword,
+  validateRequestedInfo, sendPaymentForm, getPaymentForm, getReceipt, fetchPremiumPromo,
 } from './payments';
 
 export {
@@ -100,7 +98,3 @@ export {
   acceptPhoneCall, confirmPhoneCall, requestPhoneCall, decodePhoneCallData, createPhoneCallState,
   destroyPhoneCallState, encodePhoneCallData,
 } from './phoneCallState';
-
-export {
-  broadcastLocalDbUpdateFull,
-} from '../localDb';

@@ -1,5 +1,6 @@
-const PROVIDER = 'https://maps.google.com/maps';
+const PROVIDER = 'http://maps.google.com/maps';
 
+// eslint-disable-next-line max-len
 // https://github.com/TelegramMessenger/Telegram-iOS/blob/2a32c871882c4e1b1ccdecd34fccd301723b30d9/submodules/LocationResources/Sources/VenueIconResources.swift#L82
 const VENUE_COLORS = new Map(Object.entries({
   'building/medical': '#43b3f4',
@@ -41,6 +42,7 @@ export function getVenueIconUrl(type?: string) {
   return `https://ss3.4sqi.net/img/categories_v2/${type}_88.png`;
 }
 
+// eslint-disable-next-line max-len
 // https://github.com/TelegramMessenger/Telegram-iOS/blob/2a32c871882c4e1b1ccdecd34fccd301723b30d9/submodules/LocationResources/Sources/VenueIconResources.swift#L104
 export function getVenueColor(type?: string) {
   if (!type) return '#008df2';

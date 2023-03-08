@@ -1,12 +1,9 @@
-import { useCallback, useRef } from '../lib/teact/teact';
-import { getActions } from '../lib/teact/teactn';
-
+import useOnChange from './useOnChange';
+import { useEffect, useRef } from '../lib/teact/teact';
 import { IS_TEST } from '../config';
 import { fastRaf } from '../util/schedulers';
 import { IS_IOS } from '../util/environment';
-
-import useSyncEffect from './useSyncEffect';
-import useEffectOnce from './useEffectOnce';
+import { getActions } from '../lib/teact/teactn';
 
 export const LOCATION_HASH = window.location.hash;
 const PATH_BASE = `${window.location.pathname}${window.location.search}`;
@@ -122,7 +119,7 @@ function resetHistory() {
     onBack: () => window.history.back(),
   }];
 
-  window.history.replaceState({ index: 0, historyUniqueSessionId }, '', PATH_BASE);
+  window.history.replaceState({ index: 0, historyUniqueSessionId }, PATH_BASE);
 }
 
 resetHistory();
@@ -145,15 +142,12 @@ function cleanupClosed(alreadyClosedCount = 1) {
 
 function cleanupTrashedState() {
   // Navigation to previous page reload, state of which was trashed by reload
-  let isAnimationDisabled = false;
   for (let i = historyState.length - 1; i > 0; i--) {
     if (historyState[i].isClosed) {
       continue;
     }
-    // TODO[history]: probably we should not call this inside the loop
-    if (!isAnimationDisabled && isSafariGestureAnimation) {
+    if (isSafariGestureAnimation) {
       getActions().disableHistoryAnimations();
-      isAnimationDisabled = true;
     }
     historyState[i].onBack?.();
   }
@@ -194,16 +188,13 @@ window.addEventListener('popstate', ({ state }: PopStateEvent) => {
   if (index < historyCursor) {
     // Navigating back
     let alreadyClosedCount = 0;
-    let isAnimationDisabled = false;
     for (let i = historyCursor; i > index - alreadyClosedCount; i--) {
       if (historyState[i].isClosed) {
         alreadyClosedCount++;
         continue;
       }
-      // TODO[history]: probably we should not call this inside the loop
-      if (!isAnimationDisabled && isSafariGestureAnimation) {
+      if (isSafariGestureAnimation) {
         getActions().disableHistoryAnimations();
-        isAnimationDisabled = true;
       }
       historyState[i].onBack?.();
     }
@@ -244,7 +235,7 @@ export default function useHistoryBack({
 
   const isFirstRender = useRef(true);
 
-  const pushState = useCallback((forceReplace = false) => {
+  const pushState = (forceReplace = false) => {
     // Check if the old state should be replaced
     const shouldReplace = forceReplace || historyState[historyCursor].shouldBeReplaced;
     indexRef.current = shouldReplace ? historyCursor : ++historyCursor;
@@ -279,9 +270,9 @@ export default function useHistoryBack({
       },
       hash: hash ? `#${hash}` : undefined,
     });
-  }, [hash, onBack, shouldBeReplaced]);
+  };
 
-  const processBack = useCallback(() => {
+  const processBack = () => {
     // Only process back on open records
     if (indexRef.current && historyState[indexRef.current] && !wasReplaced.current) {
       historyState[indexRef.current].isClosed = true;
@@ -290,19 +281,19 @@ export default function useHistoryBack({
         historyCursor -= cleanupClosed();
       }
     }
-  }, [shouldBeReplaced]);
+  };
 
   // Process back navigation when element is unmounted
-  useEffectOnce(() => {
+  useEffect(() => {
     isFirstRender.current = false;
     return () => {
       if (!isActive || wasReplaced.current) return;
       processBack();
     };
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  useSyncEffect(([prevIsActive]) => {
-    if (prevIsActive === isActive) return;
+  useOnChange(() => {
     if (isFirstRender.current && !isActive) return;
 
     if (isActive) {
@@ -310,5 +301,5 @@ export default function useHistoryBack({
     } else {
       processBack();
     }
-  }, [isActive, processBack, pushState]);
+  }, [isActive]);
 }

@@ -1,36 +1,28 @@
-import type { GlobalState, TabArgs } from '../types';
+import type { GlobalState } from '../types';
 import type { ManagementProgress, ManagementState } from '../../types';
-import { updateTabState } from './tabs';
-import { selectTabState } from '../selectors';
-import { getCurrentTabId } from '../../util/establishMultitabRole';
 
-export function updateManagementProgress<T extends GlobalState>(
-  global: T, progress: ManagementProgress,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  return updateTabState(global, {
+export function updateManagementProgress(global: GlobalState, progress: ManagementProgress): GlobalState {
+  return {
+    ...global,
     management: {
-      ...selectTabState(global, tabId).management,
+      ...global.management,
       progress,
     },
-  }, tabId);
+  };
 }
 
-export function updateManagement<T extends GlobalState>(
-  global: T, chatId: string, update: Partial<ManagementState>,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  const { management } = selectTabState(global, tabId);
-  return updateTabState(global, {
+export function updateManagement(global: GlobalState, chatId: string, update: Partial<ManagementState>): GlobalState {
+  return {
+    ...global,
     management: {
-      ...management,
+      ...global.management,
       byChatId: {
-        ...management.byChatId,
+        ...global.management.byChatId,
         [chatId]: {
-          ...(management.byChatId[chatId] || {}),
+          ...(global.management.byChatId[chatId] || {}),
           ...update,
         },
       },
     },
-  }, tabId);
+  };
 }

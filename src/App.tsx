@@ -5,18 +5,14 @@ import { getActions, withGlobal } from './global';
 import type { GlobalState } from './global/types';
 import type { UiLoaderPage } from './components/common/UiLoader';
 
-import { IS_INSTALL_PROMPT_SUPPORTED, IS_MULTITAB_SUPPORTED, PLATFORM_ENV } from './util/environment';
 import { INACTIVE_MARKER, PAGE_TITLE } from './config';
-import { selectTabState } from './global/selectors';
+import { PLATFORM_ENV } from './util/environment';
 import { updateSizes } from './util/windowSize';
 import { addActiveTabChangeListener } from './util/activeTabMonitor';
 import { hasStoredSession } from './util/sessions';
-import { setupBeforeInstallPrompt } from './util/installPrompt';
 import buildClassName from './util/buildClassName';
-import { parseInitialLocationHash } from './util/routing';
 import useFlag from './hooks/useFlag';
 import usePrevious from './hooks/usePrevious';
-import useAppLayout from './hooks/useAppLayout';
 
 import Auth from './components/auth/Auth';
 import Main from './components/main/Main.async';
@@ -30,8 +26,6 @@ type StateProps = {
   authState: GlobalState['authState'];
   isScreenLocked?: boolean;
   hasPasscode?: boolean;
-  isInactiveAuth?: boolean;
-  hasWebAuthTokenFailed?: boolean;
 };
 
 enum AppScreens {
@@ -41,52 +35,25 @@ enum AppScreens {
   inactive,
 }
 
-const INACTIVE_PAGE_TITLE = `${PAGE_TITLE} ${INACTIVE_MARKER}`;
-
 const App: FC<StateProps> = ({
-  authState,
-  isScreenLocked,
-  hasPasscode,
-  hasWebAuthTokenFailed,
-  isInactiveAuth,
-}) => {
+                               authState,
+                               isScreenLocked,
+                               hasPasscode,
+                             }) => {
   const { disconnect } = getActions();
 
-  const [isInactive, markInactive, unmarkInactive] = useFlag(false);
-  const { isMobile } = useAppLayout();
-  const isMobileOs = PLATFORM_ENV === 'iOS' || PLATFORM_ENV === 'Android';
+  const [isInactive, markInactive] = useFlag(false);
+  const isMobile = PLATFORM_ENV === 'iOS' || PLATFORM_ENV === 'Android';
 
   useEffect(() => {
-    if (IS_INSTALL_PROMPT_SUPPORTED) {
-      setupBeforeInstallPrompt();
-    }
-  }, []);
+    updateSizes();
+    addActiveTabChangeListener(() => {
+      disconnect();
+      document.title = `${PAGE_TITLE}${INACTIVE_MARKER}`;
 
-  // Prevent drop on elements that do not accept it
-  useEffect(() => {
-    const body = document.body;
-    const handleDrag = (e: DragEvent) => {
-      e.preventDefault();
-      if (!e.dataTransfer) return;
-      if (!(e.target as HTMLElement).dataset.dropzone) {
-        e.dataTransfer.dropEffect = 'none';
-      } else {
-        e.dataTransfer.dropEffect = 'copy';
-      }
-    };
-    const handleDrop = (e: DragEvent) => {
-      e.preventDefault();
-    };
-    body.addEventListener('drop', handleDrop);
-    body.addEventListener('dragover', handleDrag);
-    body.addEventListener('dragenter', handleDrag);
-
-    return () => {
-      body.removeEventListener('drop', handleDrop);
-      body.removeEventListener('dragover', handleDrag);
-      body.removeEventListener('dragenter', handleDrag);
-    };
-  }, []);
+      markInactive();
+    });
+  }, [disconnect, markInactive]);
 
   // return <Test />;
 
@@ -133,50 +100,20 @@ const App: FC<StateProps> = ({
   } else if (hasPasscode) {
     activeKey = AppScreens.lock;
   } else {
-    page = isMobileOs ? 'authPhoneNumber' : 'authQrCode';
+    page = isMobile ? 'authPhoneNumber' : 'authQrCode';
     activeKey = AppScreens.auth;
   }
-
-  if (activeKey !== AppScreens.lock
-    && activeKey !== AppScreens.inactive
-    && activeKey !== AppScreens.main
-    && parseInitialLocationHash()?.tgWebAuthToken
-    && !hasWebAuthTokenFailed) {
-    page = 'main';
-    activeKey = AppScreens.main;
-  }
-
-  useEffect(() => {
-    updateSizes();
-
-    if (IS_MULTITAB_SUPPORTED) return;
-
-    addActiveTabChangeListener(() => {
-      disconnect();
-      document.title = INACTIVE_PAGE_TITLE;
-
-      markInactive();
-    });
-  }, [activeKey, disconnect, markInactive]);
-
-  useEffect(() => {
-    if (isInactiveAuth) {
-      document.title = INACTIVE_PAGE_TITLE;
-      markInactive();
-    } else {
-      unmarkInactive();
-    }
-  }, [isInactiveAuth, markInactive, unmarkInactive]);
 
   const prevActiveKey = usePrevious(activeKey);
 
   // eslint-disable-next-line consistent-return
-  function renderContent() {
+  function renderContent(isActive: boolean) {
+    return <Main />;
     switch (activeKey) {
       case AppScreens.auth:
-        return <Auth />;
+        return <Auth isActive={isActive} />;
       case AppScreens.main:
-        return <Main isMobile={isMobile} />;
+        return <Main />;
       case AppScreens.lock:
         return <LockScreen isLocked={isScreenLocked} />;
       case AppScreens.inactive:
@@ -185,7 +122,7 @@ const App: FC<StateProps> = ({
   }
 
   return (
-    <UiLoader key="Loader" page={page} isMobile={isMobile}>
+    <UiLoader key="Loader" page={page}>
       <Transition
         name="fade"
         activeKey={activeKey}
@@ -207,8 +144,6 @@ export default withGlobal(
       authState: global.authState,
       isScreenLocked: global.passcode?.isScreenLocked,
       hasPasscode: global.passcode?.hasPasscode,
-      isInactiveAuth: selectTabState(global).isInactive,
-      hasWebAuthTokenFailed: global.hasWebAuthTokenFailed || global.hasWebAuthTokenPasswordRequired,
     };
   },
 )(App);

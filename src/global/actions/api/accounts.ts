@@ -1,17 +1,13 @@
 import { addActionHandler, getGlobal, setGlobal } from '../../index';
 import { selectChat } from '../../selectors';
 import { callApi } from '../../../api/gramjs';
-import { translate } from '../../../util/langProvider';
-import { addUsers } from '../../reducers';
-import { buildCollectionByKey } from '../../../util/iteratees';
-import { getCurrentTabId } from '../../../util/establishMultitabRole';
+import { getTranslation } from '../../../util/langProvider';
 
-addActionHandler('reportPeer', async (global, actions, payload): Promise<void> => {
+addActionHandler('reportPeer', async (global, actions, payload) => {
   const {
     chatId,
     reason,
     description,
-    tabId = getCurrentTabId(),
   } = payload;
   if (!chatId) {
     return;
@@ -30,19 +26,17 @@ addActionHandler('reportPeer', async (global, actions, payload): Promise<void> =
 
   actions.showNotification({
     message: result
-      ? translate('ReportPeer.AlertSuccess')
+      ? getTranslation('ReportPeer.AlertSuccess')
       : 'An error occurred while submitting your report. Please, try again later.',
-    tabId,
   });
 });
 
-addActionHandler('reportProfilePhoto', async (global, actions, payload): Promise<void> => {
+addActionHandler('reportProfilePhoto', async (global, actions, payload) => {
   const {
     chatId,
     reason,
     description,
     photo,
-    tabId = getCurrentTabId(),
   } = payload;
   if (!chatId) {
     return;
@@ -62,31 +56,28 @@ addActionHandler('reportProfilePhoto', async (global, actions, payload): Promise
 
   actions.showNotification({
     message: result
-      ? translate('ReportPeer.AlertSuccess')
+      ? getTranslation('ReportPeer.AlertSuccess')
       : 'An error occurred while submitting your report. Please, try again later.',
-    tabId,
   });
 });
 
-addActionHandler('loadAuthorizations', async (global): Promise<void> => {
+addActionHandler('loadAuthorizations', async () => {
   const result = await callApi('fetchAuthorizations');
   if (!result) {
     return;
   }
 
-  global = getGlobal();
-  global = {
-    ...global,
+  setGlobal({
+    ...getGlobal(),
     activeSessions: {
       byHash: result.authorizations,
       orderedHashes: Object.keys(result.authorizations),
       ttlDays: result.ttlDays,
     },
-  };
-  setGlobal(global);
+  });
 });
 
-addActionHandler('terminateAuthorization', async (global, actions, payload): Promise<void> => {
+addActionHandler('terminateAuthorization', async (global, actions, payload) => {
   const { hash } = payload!;
 
   const result = await callApi('terminateAuthorization', hash);
@@ -98,17 +89,16 @@ addActionHandler('terminateAuthorization', async (global, actions, payload): Pro
 
   const { [hash]: removedSessions, ...newSessions } = global.activeSessions.byHash;
 
-  global = {
+  setGlobal({
     ...global,
     activeSessions: {
       byHash: newSessions,
       orderedHashes: global.activeSessions.orderedHashes.filter((el) => el !== hash),
     },
-  };
-  setGlobal(global);
+  });
 });
 
-addActionHandler('terminateAllAuthorizations', async (global): Promise<void> => {
+addActionHandler('terminateAllAuthorizations', async (global) => {
   const result = await callApi('terminateAllAuthorizations');
   if (!result) {
     return;
@@ -122,7 +112,7 @@ addActionHandler('terminateAllAuthorizations', async (global): Promise<void> => 
   }
   const currentSession = global.activeSessions.byHash[currentSessionHash];
 
-  global = {
+  setGlobal({
     ...global,
     activeSessions: {
       byHash: {
@@ -130,11 +120,10 @@ addActionHandler('terminateAllAuthorizations', async (global): Promise<void> => 
       },
       orderedHashes: [currentSessionHash],
     },
-  };
-  setGlobal(global);
+  });
 });
 
-addActionHandler('changeSessionSettings', async (global, actions, payload): Promise<void> => {
+addActionHandler('changeSessionSettings', async (global, actions, payload) => {
   const { hash, areCallsEnabled, areSecretChatsEnabled } = payload;
   const result = await callApi('changeSessionSettings', {
     hash,
@@ -147,7 +136,7 @@ addActionHandler('changeSessionSettings', async (global, actions, payload): Prom
   }
 
   global = getGlobal();
-  global = {
+  setGlobal({
     ...global,
     activeSessions: {
       ...global.activeSessions,
@@ -160,11 +149,10 @@ addActionHandler('changeSessionSettings', async (global, actions, payload): Prom
         },
       },
     },
-  };
-  setGlobal(global);
+  });
 });
 
-addActionHandler('changeSessionTtl', async (global, actions, payload): Promise<void> => {
+addActionHandler('changeSessionTtl', async (global, actions, payload) => {
   const { days } = payload;
 
   const result = await callApi('changeSessionTtl', { days });
@@ -174,37 +162,31 @@ addActionHandler('changeSessionTtl', async (global, actions, payload): Promise<v
   }
 
   global = getGlobal();
-  global = {
+  setGlobal({
     ...global,
     activeSessions: {
       ...global.activeSessions,
       ttlDays: days,
     },
-  };
-  setGlobal(global);
+  });
 });
 
-addActionHandler('loadWebAuthorizations', async (global): Promise<void> => {
+addActionHandler('loadWebAuthorizations', async () => {
   const result = await callApi('fetchWebAuthorizations');
   if (!result) {
     return;
   }
-  const { users, webAuthorizations } = result;
-  global = getGlobal();
 
-  global = addUsers(global, buildCollectionByKey(users, 'id'));
-
-  global = {
-    ...global,
+  setGlobal({
+    ...getGlobal(),
     activeWebSessions: {
-      byHash: webAuthorizations,
-      orderedHashes: Object.keys(webAuthorizations),
+      byHash: result,
+      orderedHashes: Object.keys(result),
     },
-  };
-  setGlobal(global);
+  });
 });
 
-addActionHandler('terminateWebAuthorization', async (global, actions, payload): Promise<void> => {
+addActionHandler('terminateWebAuthorization', async (global, actions, payload) => {
   const { hash } = payload!;
 
   const result = await callApi('terminateWebAuthorization', hash);
@@ -216,17 +198,16 @@ addActionHandler('terminateWebAuthorization', async (global, actions, payload): 
 
   const { [hash]: removedSessions, ...newSessions } = global.activeWebSessions.byHash;
 
-  global = {
+  setGlobal({
     ...global,
     activeWebSessions: {
       byHash: newSessions,
       orderedHashes: global.activeWebSessions.orderedHashes.filter((el) => el !== hash),
     },
-  };
-  setGlobal(global);
+  });
 });
 
-addActionHandler('terminateAllWebAuthorizations', async (global): Promise<void> => {
+addActionHandler('terminateAllWebAuthorizations', async (global) => {
   const result = await callApi('terminateAllWebAuthorizations');
   if (!result) {
     return;
@@ -234,12 +215,11 @@ addActionHandler('terminateAllWebAuthorizations', async (global): Promise<void> 
 
   global = getGlobal();
 
-  global = {
+  setGlobal({
     ...global,
     activeWebSessions: {
       byHash: {},
       orderedHashes: [],
     },
-  };
-  setGlobal(global);
+  });
 });

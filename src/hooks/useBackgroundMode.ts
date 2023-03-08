@@ -1,44 +1,30 @@
-import { useCallback, useEffect, useRef } from '../lib/teact/teact';
+import { useEffect } from '../lib/teact/teact';
 
 export default function useBackgroundMode(
   onBlur?: AnyToVoidFunction,
   onFocus?: AnyToVoidFunction,
 ) {
-  const wasBlurred = useRef<boolean>(false);
-  const handleBlur = useCallback(() => {
-    if (wasBlurred.current) {
-      return;
-    }
-
-    onBlur?.();
-    wasBlurred.current = true;
-  }, [onBlur]);
-  const handleFocus = useCallback(() => {
-    onFocus?.();
-    wasBlurred.current = false;
-  }, [onFocus]);
-
   useEffect(() => {
     if (onBlur && !document.hasFocus()) {
-      handleBlur();
+      onBlur();
     }
 
     if (onBlur) {
-      window.addEventListener('blur', handleBlur);
+      window.addEventListener('blur', onBlur);
     }
 
     if (onFocus) {
-      window.addEventListener('focus', handleFocus);
+      window.addEventListener('focus', onFocus);
     }
 
     return () => {
       if (onFocus) {
-        window.removeEventListener('focus', handleFocus);
+        window.removeEventListener('focus', onFocus);
       }
 
       if (onBlur) {
-        window.removeEventListener('blur', handleBlur);
+        window.removeEventListener('blur', onBlur);
       }
     };
-  }, [handleBlur, handleFocus, onBlur, onFocus]);
+  }, [onBlur, onFocus]);
 }

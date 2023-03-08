@@ -9,9 +9,9 @@ import type { FolderEditDispatch } from '../../../hooks/reducers/useFoldersReduc
 
 import { IS_TOUCH_ENV } from '../../../util/environment';
 import buildClassName from '../../../util/buildClassName';
+import useFlag from '../../../hooks/useFlag';
 import useShowTransition from '../../../hooks/useShowTransition';
 import useLang from '../../../hooks/useLang';
-import useForumPanelRender from '../../../hooks/useForumPanelRender';
 
 import Transition from '../../ui/Transition';
 import LeftMainHeader from './LeftMainHeader';
@@ -20,10 +20,11 @@ import LeftSearch from '../search/LeftSearch.async';
 import ContactList from './ContactList.async';
 import NewChatButton from '../NewChatButton';
 import Button from '../../ui/Button';
-import ForumPanel from './ForumPanel';
 
 import './LeftMain.scss';
-import { getActions } from '../../../global';
+import TabList from '../../ui/TabList';
+import TabBarList from '../../ui/TabBarList';
+import TabWalletView from './TabWalletView';
 
 type OwnProps = {
   content: LeftColumnContent;
@@ -32,18 +33,15 @@ type OwnProps = {
   contactsFilter: string;
   shouldSkipTransition?: boolean;
   foldersDispatch: FolderEditDispatch;
-  isUpdateAvailable?: boolean;
-  isForumPanelOpen?: boolean;
-  isClosingSearch?: boolean;
   onSearchQuery: (query: string) => void;
   onContentChange: (content: LeftColumnContent) => void;
-  onSettingsScreenSelect: (screen: SettingsScreens) => void;
-  onTopicSearch: NoneToVoidFunction;
+  onScreenSelect: (screen: SettingsScreens) => void;
   onReset: () => void;
 };
 
 const TRANSITION_RENDER_COUNT = Object.keys(LeftColumnContent).length / 2;
 const BUTTON_CLOSE_DELAY_MS = 250;
+const APP_OUTDATED_TIMEOUT = 3 * 24 * 60 * 60 * 1000; // 3 days
 
 let closeTimeout: number | undefined;
 
@@ -51,30 +49,41 @@ const LeftMain: FC<OwnProps> = ({
   content,
   searchQuery,
   searchDate,
-  isClosingSearch,
   contactsFilter,
   shouldSkipTransition,
   foldersDispatch,
-  isUpdateAvailable,
-  isForumPanelOpen,
   onSearchQuery,
   onContentChange,
-  onSettingsScreenSelect,
+  onScreenSelect,
   onReset,
-  onTopicSearch,
 }) => {
-  const { closeForumPanel } = getActions();
   const [isNewChatButtonShown, setIsNewChatButtonShown] = useState(IS_TOUCH_ENV);
 
-  const { shouldRenderForumPanel, handleForumPanelAnimationEnd } = useForumPanelRender(isForumPanelOpen);
-  const isForumPanelVisible = isForumPanelOpen && content === LeftColumnContent.ChatList;
-
-  const {
-    shouldRender: shouldRenderUpdateButton,
-    transitionClassNames: updateButtonClassNames,
-  } = useShowTransition(isUpdateAvailable);
-
   const isMouseInside = useRef(false);
+
+  const handleSelectSettings = useCallback(() => {
+    onContentChange(LeftColumnContent.Settings);
+  }, [onContentChange]);
+
+  const handleSelectComponents = useCallback(() => {
+    onContentChange(LeftColumnContent.Components);
+  }, [onContentChange]);
+
+  const handleSelectContacts = useCallback(() => {
+    onContentChange(LeftColumnContent.Contacts);
+  }, [onContentChange]);
+
+  const handleSelectNewChannel = useCallback(() => {
+    onContentChange(LeftColumnContent.NewChannelStep1);
+  }, [onContentChange]);
+
+  const handleSelectNewGroup = useCallback(() => {
+    onContentChange(LeftColumnContent.NewGroupStep1);
+  }, [onContentChange]);
+
+  const handleSelectArchived = useCallback(() => {
+    onContentChange(LeftColumnContent.Archived);
+  }, [onContentChange]);
 
   const handleMouseEnter = useCallback(() => {
     if (content !== LeftColumnContent.ChatList) {
@@ -99,32 +108,31 @@ const LeftMain: FC<OwnProps> = ({
     }, BUTTON_CLOSE_DELAY_MS);
   }, []);
 
-  const handleSelectSettings = useCallback(() => {
-    onContentChange(LeftColumnContent.Settings);
-  }, [onContentChange]);
 
-  const handleSelectContacts = useCallback(() => {
-    onContentChange(LeftColumnContent.Contacts);
-  }, [onContentChange]);
+  const [shouldRenderUpdateButton, updateButtonClassNames, handleUpdateClick] = useAppOutdatedCheck();
 
-  const handleSelectArchived = useCallback(() => {
-    onContentChange(LeftColumnContent.Archived);
-    closeForumPanel();
-  }, [closeForumPanel, onContentChange]);
+  const lang = useLang();
 
-  const handleUpdateClick = useCallback(() => {
-    window.location.reload();
-  }, []);
+  const tabs = [
+    { type: LeftColumnContent.ChatList,icon:"fa-message fas"},
+    { type: LeftColumnContent.Wallet, icon:"fa-wallet fas"},
+    { type: LeftColumnContent.Chart, icon:"fa-chart-column fas"},
+    { type: LeftColumnContent.Discover, icon:"fas fa-location-arrow"},
+  ];
 
-  const handleSelectNewChannel = useCallback(() => {
-    onContentChange(LeftColumnContent.NewChannelStep1);
-  }, [onContentChange]);
-
-  const handleSelectNewGroup = useCallback(() => {
-    onContentChange(LeftColumnContent.NewGroupStep1);
-  }, [onContentChange]);
+  let defaultCurrentTab = 0;
+  for (let i = 0; i < tabs.length; i++) {
+    if(tabs[i].type === content){
+      defaultCurrentTab = i
+      break
+    }
+  }
+  const [currentTab,setCurrentTab] = useState(defaultCurrentTab)
 
   useEffect(() => {
+    if(currentTab !== defaultCurrentTab){
+      setCurrentTab(defaultCurrentTab)
+    }
     let autoCloseTimeout: number | undefined;
     if (content !== LeftColumnContent.ChatList) {
       autoCloseTimeout = window.setTimeout(() => {
@@ -140,10 +148,7 @@ const LeftMain: FC<OwnProps> = ({
         autoCloseTimeout = undefined;
       }
     };
-  }, [content]);
-
-  const lang = useLang();
-
+  }, [content,setCurrentTab,currentTab,defaultCurrentTab]);
   return (
     <div
       id="LeftColumn-main"
@@ -151,16 +156,15 @@ const LeftMain: FC<OwnProps> = ({
       onMouseLeave={!IS_TOUCH_ENV ? handleMouseLeave : undefined}
     >
       <LeftMainHeader
-        shouldHideSearch={isForumPanelVisible}
         content={content}
         contactsFilter={contactsFilter}
         onSearchQuery={onSearchQuery}
         onSelectSettings={handleSelectSettings}
+        onSelectComponents={handleSelectComponents}
         onSelectContacts={handleSelectContacts}
         onSelectArchived={handleSelectArchived}
         onReset={onReset}
         shouldSkipTransition={shouldSkipTransition}
-        isClosingSearch={isClosingSearch}
       />
       <Transition
         name={shouldSkipTransition ? 'none' : 'zoom-fade'}
@@ -172,14 +176,13 @@ const LeftMain: FC<OwnProps> = ({
         {(isActive) => {
           switch (content) {
             case LeftColumnContent.ChatList:
-              return (
-                <ChatFolders
-                  shouldHideFolderTabs={isForumPanelVisible}
-                  onSettingsScreenSelect={onSettingsScreenSelect}
-                  onLeftColumnContentChange={onContentChange}
-                  foldersDispatch={foldersDispatch}
-                />
-              );
+              return <ChatFolders onScreenSelect={onScreenSelect} foldersDispatch={foldersDispatch} />;
+            case LeftColumnContent.Chart:
+              return <TabWalletView onScreenSelect={onScreenSelect} foldersDispatch={foldersDispatch} />;
+            case LeftColumnContent.Wallet:
+              return <TabWalletView onScreenSelect={onScreenSelect} foldersDispatch={foldersDispatch} />;
+            case LeftColumnContent.Discover:
+              return <TabWalletView onScreenSelect={onScreenSelect} foldersDispatch={foldersDispatch} />;
             case LeftColumnContent.GlobalSearch:
               return (
                 <LeftSearch
@@ -206,22 +209,42 @@ const LeftMain: FC<OwnProps> = ({
           {lang('lng_update_telegram')}
         </Button>
       )}
-      {shouldRenderForumPanel && (
-        <ForumPanel
-          isOpen={isForumPanelOpen}
-          isHidden={!isForumPanelVisible}
-          onTopicSearch={onTopicSearch}
-          onCloseAnimationEnd={handleForumPanelAnimationEnd}
-        />
-      )}
-      <NewChatButton
-        isShown={isNewChatButtonShown}
-        onNewPrivateChat={handleSelectContacts}
-        onNewChannel={handleSelectNewChannel}
-        onNewGroup={handleSelectNewGroup}
-      />
+
+
+      <TabBarList activeTab={currentTab} tabs={tabs} onSwitchTab={(index)=>{
+        setCurrentTab(index)
+        onContentChange(tabs[index].type);
+      }} />
+
+      {/*<NewChatButton*/}
+      {/*  isShown={isNewChatButtonShown}*/}
+      {/*  onNewPrivateChat={handleSelectContacts}*/}
+      {/*  onNewChannel={handleSelectNewChannel}*/}
+      {/*  onNewGroup={handleSelectNewGroup}*/}
+      {/*/>*/}
+
     </div>
   );
 };
+
+function useAppOutdatedCheck() {
+  const [isAppOutdated, markIsAppOutdated] = useFlag(false);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(markIsAppOutdated, APP_OUTDATED_TIMEOUT);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [markIsAppOutdated]);
+
+  const { shouldRender, transitionClassNames } = useShowTransition(isAppOutdated);
+
+  const handleUpdateClick = () => {
+    window.location.reload();
+  };
+
+  return [shouldRender, transitionClassNames, handleUpdateClick] as const;
+}
 
 export default memo(LeftMain);

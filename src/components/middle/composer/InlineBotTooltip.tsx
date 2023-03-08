@@ -14,7 +14,6 @@ import useShowTransition from '../../../hooks/useShowTransition';
 import { throttle } from '../../../util/schedulers';
 import { useIntersectionObserver } from '../../../hooks/useIntersectionObserver';
 import usePrevious from '../../../hooks/usePrevious';
-import useCurrentOrPrev from '../../../hooks/useCurrentOrPrev';
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
 
 import MediaResult from './inlineResults/MediaResult';
@@ -66,7 +65,6 @@ const InlineBotTooltip: FC<OwnProps> = ({
   // eslint-disable-next-line no-null/no-null
   const containerRef = useRef<HTMLDivElement>(null);
   const { shouldRender, transitionClassNames } = useShowTransition(isOpen, undefined, undefined, false);
-  const renderedIsGallery = useCurrentOrPrev(isGallery, shouldRender);
   const {
     observe: observeIntersection,
   } = useIntersectionObserver({
@@ -83,8 +81,8 @@ const InlineBotTooltip: FC<OwnProps> = ({
 
   const selectedIndex = useKeyboardNavigation({
     isActive: isOpen,
-    shouldRemoveSelectionOnReset: renderedIsGallery,
-    noArrowNavigation: renderedIsGallery,
+    shouldRemoveSelectionOnReset: isGallery,
+    noArrowNavigation: isGallery,
     items: inlineBotResults,
     onSelect: onSelectResult,
     onClose,
@@ -105,7 +103,9 @@ const InlineBotTooltip: FC<OwnProps> = ({
       : undefined,
     shouldRender,
   );
-  const renderedInlineBotResults = inlineBotResults?.length ? inlineBotResults : prevInlineBotResults;
+  const renderedInlineBotResults = inlineBotResults && !inlineBotResults.length
+    ? prevInlineBotResults
+    : inlineBotResults;
 
   if (!shouldRender || !(renderedInlineBotResults?.length || switchPm)) {
     return undefined;
@@ -114,7 +114,7 @@ const InlineBotTooltip: FC<OwnProps> = ({
   const className = buildClassName(
     'InlineBotTooltip composer-tooltip',
     IS_TOUCH_ENV ? 'no-scrollbar' : 'custom-scroll',
-    renderedIsGallery && 'gallery',
+    isGallery && 'gallery',
     transitionClassNames,
   );
 
@@ -145,7 +145,7 @@ const InlineBotTooltip: FC<OwnProps> = ({
           return (
             <MediaResult
               key={inlineBotResult.id}
-              isForGallery={renderedIsGallery}
+              isForGallery={isGallery}
               inlineResult={inlineBotResult}
               onClick={onSelectResult}
             />
@@ -202,7 +202,7 @@ const InlineBotTooltip: FC<OwnProps> = ({
       sensitiveArea={160}
     >
       {switchPm && renderSwitchPm()}
-      {Boolean(renderedInlineBotResults?.length) && renderContent()}
+      {renderedInlineBotResults?.length && renderContent()}
     </InfiniteScroll>
   );
 };

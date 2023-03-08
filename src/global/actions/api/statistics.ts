@@ -1,15 +1,12 @@
 import { addActionHandler, getGlobal, setGlobal } from '../../index';
 
+import type { ApiChannelStatistics } from '../../../api/types';
 import { callApi } from '../../../api/gramjs';
-import {
-  updateStatistics, updateMessageStatistics, updateStatisticsGraph, addUsers,
-} from '../../reducers';
+import { updateStatistics, updateMessageStatistics, updateStatisticsGraph } from '../../reducers';
 import { selectChatMessages, selectChat } from '../../selectors';
-import { buildCollectionByKey } from '../../../util/iteratees';
-import { getCurrentTabId } from '../../../util/establishMultitabRole';
 
-addActionHandler('loadStatistics', async (global, actions, payload): Promise<void> => {
-  const { chatId, isGroup, tabId = getCurrentTabId() } = payload;
+addActionHandler('loadStatistics', async (global, actions, payload) => {
+  const { chatId, isGroup } = payload;
   const chat = selectChat(global, chatId);
   if (!chat?.fullInfo) {
     return;
@@ -21,22 +18,19 @@ addActionHandler('loadStatistics', async (global, actions, payload): Promise<voi
   }
 
   global = getGlobal();
-  const { stats, users } = result;
 
-  global = addUsers(global, buildCollectionByKey(users, 'id'));
-
-  if ('recentTopMessages' in stats && stats.recentTopMessages.length) {
+  if ((result as ApiChannelStatistics).recentTopMessages?.length) {
     const messages = selectChatMessages(global, chatId);
 
-    stats.recentTopMessages = stats.recentTopMessages.map((message) => ({ ...message, ...messages[message.msgId] }));
+    (result as ApiChannelStatistics).recentTopMessages = (result as ApiChannelStatistics).recentTopMessages
+      .map((message) => ({ ...message, ...messages[message.msgId] }));
   }
 
-  global = updateStatistics(global, chatId, stats, tabId);
-  setGlobal(global);
+  setGlobal(updateStatistics(global, chatId, result));
 });
 
-addActionHandler('loadMessageStatistics', async (global, actions, payload): Promise<void> => {
-  const { chatId, messageId, tabId = getCurrentTabId() } = payload;
+addActionHandler('loadMessageStatistics', async (global, actions, payload) => {
+  const { chatId, messageId } = payload;
   const chat = selectChat(global, chatId);
   if (!chat?.fullInfo) {
     return;
@@ -60,13 +54,12 @@ addActionHandler('loadMessageStatistics', async (global, actions, payload): Prom
 
   global = getGlobal();
 
-  global = updateMessageStatistics(global, result, tabId);
-  setGlobal(global);
+  setGlobal(updateMessageStatistics(global, result));
 });
 
-addActionHandler('loadStatisticsAsyncGraph', async (global, actions, payload): Promise<void> => {
+addActionHandler('loadStatisticsAsyncGraph', async (global, actions, payload) => {
   const {
-    chatId, token, name, isPercentage, tabId = getCurrentTabId(),
+    chatId, token, name, isPercentage,
   } = payload;
   const chat = selectChat(global, chatId);
   if (!chat?.fullInfo) {
@@ -80,7 +73,5 @@ addActionHandler('loadStatisticsAsyncGraph', async (global, actions, payload): P
     return;
   }
 
-  global = getGlobal();
-  global = updateStatisticsGraph(global, chatId, name, result, tabId);
-  setGlobal(global);
+  setGlobal(updateStatisticsGraph(getGlobal(), chatId, name, result));
 });

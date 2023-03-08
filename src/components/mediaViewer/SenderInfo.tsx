@@ -3,8 +3,8 @@ import React, { useCallback } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
 import type { ApiChat, ApiMessage, ApiUser } from '../../api/types';
-import type { AnimationLevel } from '../../types';
 
+import { IS_SINGLE_COLUMN_LAYOUT } from '../../util/environment';
 import { getSenderTitle, isUserId } from '../../global/helpers';
 import { formatMediaDateTime } from '../../util/dateFormat';
 import renderText from '../common/helpers/renderText';
@@ -15,7 +15,6 @@ import {
   selectUser,
 } from '../../global/selectors';
 import useLang from '../../hooks/useLang';
-import useAppLayout from '../../hooks/useAppLayout';
 
 import Avatar from '../common/Avatar';
 
@@ -25,13 +24,11 @@ type OwnProps = {
   chatId?: string;
   messageId?: number;
   isAvatar?: boolean;
-  isFallbackAvatar?: boolean;
 };
 
 type StateProps = {
   sender?: ApiUser | ApiChat;
   message?: ApiMessage;
-  animationLevel: AnimationLevel;
 };
 
 const ANIMATION_DURATION = 350;
@@ -40,10 +37,8 @@ const SenderInfo: FC<OwnProps & StateProps> = ({
   chatId,
   messageId,
   sender,
-  isFallbackAvatar,
   isAvatar,
   message,
-  animationLevel,
 }) => {
   const {
     closeMediaViewer,
@@ -51,22 +46,18 @@ const SenderInfo: FC<OwnProps & StateProps> = ({
     toggleChatInfo,
   } = getActions();
 
-  const { isMobile } = useAppLayout();
-
   const handleFocusMessage = useCallback(() => {
     closeMediaViewer();
 
-    if (!chatId || !messageId) return;
-
-    if (isMobile) {
+    if (IS_SINGLE_COLUMN_LAYOUT) {
       setTimeout(() => {
-        toggleChatInfo({ force: false }, { forceSyncOnIOs: true });
+        toggleChatInfo(false, { forceSyncOnIOs: true });
         focusMessage({ chatId, messageId });
       }, ANIMATION_DURATION);
     } else {
       focusMessage({ chatId, messageId });
     }
-  }, [chatId, isMobile, focusMessage, toggleChatInfo, messageId, closeMediaViewer]);
+  }, [chatId, focusMessage, toggleChatInfo, messageId, closeMediaViewer]);
 
   const lang = useLang();
 
@@ -79,9 +70,9 @@ const SenderInfo: FC<OwnProps & StateProps> = ({
   return (
     <div className="SenderInfo" onClick={handleFocusMessage}>
       {isUserId(sender.id) ? (
-        <Avatar key={sender.id} size="medium" user={sender as ApiUser} animationLevel={animationLevel} withVideo />
+        <Avatar key={sender.id} size="medium" user={sender as ApiUser} />
       ) : (
-        <Avatar key={sender.id} size="medium" chat={sender as ApiChat} animationLevel={animationLevel} withVideo />
+        <Avatar key={sender.id} size="medium" chat={sender as ApiChat} />
       )}
       <div className="meta">
         <div className="title" dir="auto">
@@ -89,7 +80,7 @@ const SenderInfo: FC<OwnProps & StateProps> = ({
         </div>
         <div className="date" dir="auto">
           {isAvatar
-            ? lang(isFallbackAvatar ? 'lng_mediaview_profile_public_photo' : 'lng_mediaview_profile_photo')
+            ? lang('lng_mediaview_profile_photo')
             : formatMediaDateTime(lang, message!.date * 1000, true)}
         </div>
       </div>
@@ -99,16 +90,14 @@ const SenderInfo: FC<OwnProps & StateProps> = ({
 
 export default withGlobal<OwnProps>(
   (global, { chatId, messageId, isAvatar }): StateProps => {
-    const { animationLevel } = global.settings.byKey;
     if (isAvatar && chatId) {
       return {
         sender: isUserId(chatId) ? selectUser(global, chatId) : selectChat(global, chatId),
-        animationLevel,
       };
     }
 
     if (!messageId || !chatId) {
-      return { animationLevel };
+      return {};
     }
 
     const message = selectChatMessage(global, chatId, messageId);
@@ -116,7 +105,6 @@ export default withGlobal<OwnProps>(
     return {
       message,
       sender: message && selectSender(global, message),
-      animationLevel,
     };
   },
 )(SenderInfo);

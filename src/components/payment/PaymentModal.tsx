@@ -4,20 +4,18 @@ import React, {
 } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
-import type { TabState } from '../../global/types';
-import type { ApiChat, ApiCountry, ApiPaymentCredentials } from '../../api/types';
-import type { Price, ShippingOption } from '../../types';
-import type { FormState } from '../../hooks/reducers/usePaymentReducer';
-
+import type { GlobalState } from '../../global/types';
+import type { ApiChat, ApiCountry } from '../../api/types';
+import type { ShippingOption, Price } from '../../types';
 import { PaymentStep } from '../../types';
-import { selectChat, selectTabState } from '../../global/selectors';
+
+import { selectChat } from '../../global/selectors';
 import { formatCurrency } from '../../util/formatCurrency';
 import buildClassName from '../../util/buildClassName';
 import { detectCardTypeText } from '../common/helpers/detectCardType';
-import captureKeyboardListeners from '../../util/captureKeyboardListeners';
-import useLang from '../../hooks/useLang';
-import useFlag from '../../hooks/useFlag';
+import type { FormState } from '../../hooks/reducers/usePaymentReducer';
 import usePaymentReducer from '../../hooks/reducers/usePaymentReducer';
+import useLang from '../../hooks/useLang';
 
 import ShippingInfo from './ShippingInfo';
 import Shipping from './Shipping';
@@ -28,8 +26,6 @@ import Modal from '../ui/Modal';
 import Transition from '../ui/Transition';
 import Spinner from '../ui/Spinner';
 import ConfirmPayment from './ConfirmPayment';
-import SavedPaymentCredentials from './SavedPaymentCredentials';
-import PasswordConfirm from './PasswordConfirm';
 
 import './PaymentModal.scss';
 
@@ -39,17 +35,18 @@ const SUPPORTED_PROVIDERS = new Set([DEFAULT_PROVIDER, DONATE_PROVIDER]);
 
 export type OwnProps = {
   isOpen?: boolean;
-  onClose: NoneToVoidFunction;
+  onClose: () => void;
 };
 
 type StateProps = {
   chat?: ApiChat;
-  isNameRequested?: boolean;
-  isShippingAddressRequested?: boolean;
-  isPhoneRequested?: boolean;
-  isEmailRequested?: boolean;
-  shouldSendPhoneToProvider?: boolean;
-  shouldSendEmailToProvider?: boolean;
+  nameRequested?: boolean;
+  shippingAddressRequested?: boolean;
+  phoneRequested?: boolean;
+  emailRequested?: boolean;
+  flexible?: boolean;
+  phoneToProvider?: boolean;
+  emailToProvider?: boolean;
   currency?: string;
   prices?: Price[];
   isProviderError: boolean;
@@ -58,21 +55,13 @@ type StateProps = {
   needZip?: boolean;
   confirmPaymentUrl?: string;
   countryList: ApiCountry[];
-  hasShippingOptions: boolean;
-  requestId?: string;
-  smartGlocalToken?: string;
-  stripeId?: string;
-  savedCredentials?: ApiPaymentCredentials[];
-  passwordValidUntil?: number;
-  isExtendedMedia?: boolean;
 };
 
-type GlobalStateProps = Pick<TabState['payment'], (
+type GlobalStateProps = Pick<GlobalState['payment'], (
   'step' | 'shippingOptions' |
-  'savedInfo' | 'canSaveCredentials' | 'nativeProvider' | 'passwordMissing' | 'invoice' | 'error'
+  'savedInfo' | 'canSaveCredentials' | 'nativeProvider' | 'passwordMissing' | 'invoiceContent' |
+  'error'
 )>;
-
-const NETWORK_REQUEST_TIMEOUT_S = 3;
 
 const PaymentModal: FC<OwnProps & StateProps & GlobalStateProps> = ({
   isOpen,
@@ -82,16 +71,16 @@ const PaymentModal: FC<OwnProps & StateProps & GlobalStateProps> = ({
   shippingOptions,
   savedInfo,
   canSaveCredentials,
-  isNameRequested,
-  isShippingAddressRequested,
-  isPhoneRequested,
-  isEmailRequested,
-  shouldSendPhoneToProvider,
-  shouldSendEmailToProvider,
+  nameRequested,
+  shippingAddressRequested,
+  phoneRequested,
+  emailRequested,
+  phoneToProvider,
+  emailToProvider,
   currency,
   passwordMissing,
   isProviderError,
-  invoice,
+  invoiceContent,
   nativeProvider,
   prices,
   needCardholderName,
@@ -100,55 +89,23 @@ const PaymentModal: FC<OwnProps & StateProps & GlobalStateProps> = ({
   confirmPaymentUrl,
   error,
   countryList,
-  hasShippingOptions,
-  requestId,
-  smartGlocalToken,
-  stripeId,
-  savedCredentials,
-  passwordValidUntil,
-  isExtendedMedia,
 }) => {
   const {
-    loadPasswordInfo,
     validateRequestedInfo,
     sendPaymentForm,
     setPaymentStep,
     sendCredentialsInfo,
     clearPaymentError,
-    validatePaymentPassword,
   } = getActions();
 
-  const lang = useLang();
-
-  const [isModalOpen, openModal, closeModal] = useFlag();
   const [paymentState, paymentDispatch] = usePaymentReducer();
   const [isLoading, setIsLoading] = useState(false);
   const [isTosAccepted, setIsTosAccepted] = useState(false);
-  const [twoFaPassword, setTwoFaPassword] = useState('');
-
+  const lang = useLang();
   const canRenderFooter = step !== PaymentStep.ConfirmPayment;
 
-  const setStep = useCallback((nextStep) => {
-    setPaymentStep({ step: nextStep });
-  }, [setPaymentStep]);
-
   useEffect(() => {
-    if (isOpen) {
-      setTwoFaPassword('');
-      loadPasswordInfo();
-      openModal();
-    }
-  }, [isOpen, loadPasswordInfo, openModal]);
-
-  // Modal window can be closed by an event from the server side
-  useEffect(() => {
-    if (!isOpen && isModalOpen) {
-      closeModal();
-    }
-  }, [closeModal, isModalOpen, isOpen]);
-
-  useEffect(() => {
-    if (step !== undefined || error) {
+    if (step || error) {
       setIsLoading(false);
     }
   }, [step, error]);
@@ -191,15 +148,6 @@ const PaymentModal: FC<OwnProps & StateProps & GlobalStateProps> = ({
     }
   }, [savedInfo, paymentDispatch, countryList]);
 
-  useEffect(() => {
-    if (savedCredentials?.length) {
-      paymentDispatch({
-        type: 'changeSavedCredentialId',
-        payload: savedCredentials[0].id,
-      });
-    }
-  }, [paymentDispatch, savedCredentials]);
-
   const handleErrorModalClose = useCallback(() => {
     clearPaymentError();
   }, [clearPaymentError]);
@@ -209,8 +157,8 @@ const PaymentModal: FC<OwnProps & StateProps & GlobalStateProps> = ({
       return 0;
     }
 
-    return getTotalPrice(prices, shippingOptions, paymentState.shipping, paymentState.tipAmount);
-  }, [step, prices, shippingOptions, paymentState.shipping, paymentState.tipAmount]);
+    return getTotalPrice(prices, shippingOptions, paymentState.shipping);
+  }, [step, paymentState.shipping, prices, shippingOptions]);
 
   const checkoutInfo = useMemo(() => {
     if (step !== PaymentStep.Checkout) {
@@ -218,14 +166,6 @@ const PaymentModal: FC<OwnProps & StateProps & GlobalStateProps> = ({
     }
     return getCheckoutInfo(paymentState, shippingOptions, nativeProvider || '');
   }, [step, paymentState, shippingOptions, nativeProvider]);
-
-  const handleNewCardClick = useCallback(() => {
-    setStep(PaymentStep.PaymentInfo);
-  }, [setStep]);
-
-  const handleClearPaymentError = useCallback(() => {
-    clearPaymentError();
-  }, [clearPaymentError]);
 
   function renderError() {
     if (!error) {
@@ -239,57 +179,37 @@ const PaymentModal: FC<OwnProps & StateProps & GlobalStateProps> = ({
       >
         <h4>{error.description || 'Error'}</h4>
         <p>{error.description || 'Error'}</p>
-        <div className="dialog-buttons mt-2">
-          <Button
-            isText
-            onClick={handleClearPaymentError}
-          >
-            {lang('OK')}
-          </Button>
-        </div>
+        <Button
+          isText
+          onClick={clearPaymentError}
+        >
+          {lang('OK')}
+        </Button>
       </Modal>
     );
   }
 
   function renderModalContent(currentStep: PaymentStep) {
     switch (currentStep) {
-      case PaymentStep.Checkout:
+      case PaymentStep.ShippingInfo:
         return (
-          <Checkout
-            chat={chat}
-            prices={prices}
+          <ShippingInfo
+            state={paymentState}
             dispatch={paymentDispatch}
-            shippingPrices={paymentState.shipping && shippingOptions
-              ? getShippingPrices(shippingOptions, paymentState.shipping)
-              : undefined}
-            totalPrice={totalPrice}
-            invoice={invoice}
-            checkoutInfo={checkoutInfo}
+            needAddress={Boolean(shippingAddressRequested)}
+            needEmail={Boolean(emailRequested || emailToProvider)}
+            needPhone={Boolean(phoneRequested || phoneToProvider)}
+            needName={Boolean(nameRequested)}
+            countryList={countryList}
+          />
+        );
+      case PaymentStep.Shipping:
+        return (
+          <Shipping
+            state={paymentState}
+            dispatch={paymentDispatch}
+            shippingOptions={shippingOptions || []}
             currency={currency!}
-            hasShippingOptions={hasShippingOptions}
-            tipAmount={paymentState.tipAmount}
-            needAddress={Boolean(isShippingAddressRequested)}
-            savedCredentials={savedCredentials}
-            isTosAccepted={isTosAccepted}
-            onAcceptTos={setIsTosAccepted}
-          />
-        );
-      case PaymentStep.SavedPayments:
-        return (
-          <SavedPaymentCredentials
-            state={paymentState}
-            savedCredentials={savedCredentials}
-            dispatch={paymentDispatch}
-            onNewCardClick={handleNewCardClick}
-          />
-        );
-      case PaymentStep.ConfirmPassword:
-        return (
-          <PasswordConfirm
-            state={paymentState}
-            savedCredentials={savedCredentials}
-            onPasswordChange={setTwoFaPassword}
-            isActive={currentStep === step}
           />
         );
       case PaymentStep.PaymentInfo:
@@ -304,33 +224,26 @@ const PaymentModal: FC<OwnProps & StateProps & GlobalStateProps> = ({
             countryList={countryList}
           />
         );
-      case PaymentStep.ShippingInfo:
+      case PaymentStep.Checkout:
         return (
-          <ShippingInfo
-            state={paymentState}
-            dispatch={paymentDispatch}
-            needAddress={Boolean(isShippingAddressRequested)}
-            needEmail={Boolean(isEmailRequested || shouldSendEmailToProvider)}
-            needPhone={Boolean(isPhoneRequested || shouldSendPhoneToProvider)}
-            needName={Boolean(isNameRequested)}
-            countryList={countryList}
-          />
-        );
-      case PaymentStep.Shipping:
-        return (
-          <Shipping
-            state={paymentState}
-            dispatch={paymentDispatch}
-            shippingOptions={shippingOptions || []}
+          <Checkout
+            chat={chat}
+            prices={prices}
+            shippingPrices={paymentState.shipping && shippingOptions
+              ? getShippingPrices(shippingOptions, paymentState.shipping)
+              : undefined}
+            totalPrice={totalPrice}
+            invoiceContent={invoiceContent}
+            checkoutInfo={checkoutInfo}
             currency={currency!}
+            isTosAccepted={isTosAccepted}
+            onAcceptTos={setIsTosAccepted}
           />
         );
       case PaymentStep.ConfirmPayment:
         return (
           <ConfirmPayment
             url={confirmPaymentUrl!}
-            noRedirect={isExtendedMedia}
-            onClose={closeModal}
           />
         );
       default:
@@ -355,126 +268,48 @@ const PaymentModal: FC<OwnProps & StateProps & GlobalStateProps> = ({
     sendPaymentForm({
       shippingOptionId: paymentState.shipping,
       saveCredentials: paymentState.saveCredentials,
-      savedCredentialId: paymentState.savedCredentialId,
-      tipAmount: paymentState.tipAmount,
     });
   }, [sendPaymentForm, paymentState]);
 
+  const setStep = useCallback((nextStep) => {
+    setPaymentStep({ step: nextStep });
+  }, [setPaymentStep]);
+
   const handleButtonClick = useCallback(() => {
+    setIsLoading(true);
     switch (step) {
       case PaymentStep.ShippingInfo:
-        setIsLoading(true);
         validateRequest();
         break;
-
       case PaymentStep.Shipping:
-        setStep(PaymentStep.Checkout);
+        setStep(PaymentStep.PaymentInfo);
         break;
-
-      case PaymentStep.SavedPayments:
-        setStep(PaymentStep.ConfirmPassword);
-        break;
-
-      case PaymentStep.ConfirmPassword:
-        if (twoFaPassword === '') {
-          return;
-        }
-
-        setIsLoading(true);
-        validatePaymentPassword({ password: twoFaPassword });
-        break;
-
       case PaymentStep.PaymentInfo:
-        setIsLoading(true);
         sendCredentials();
-        paymentDispatch({ type: 'changeSavedCredentialId', payload: '' });
         break;
-
-      case PaymentStep.Checkout: {
-        if (savedInfo && !requestId && !paymentState.shipping) {
-          setIsLoading(true);
-          validateRequest();
-          return;
-        }
-
-        if (
-          paymentState.savedCredentialId
-          && (!passwordValidUntil || passwordValidUntil <= (Date.now() / 1000 - NETWORK_REQUEST_TIMEOUT_S))
-        ) {
-          setStep(PaymentStep.ConfirmPassword);
-          return;
-        }
-
-        if (
-          !paymentState.savedCredentialId
-          && (
-            (nativeProvider === DEFAULT_PROVIDER && !stripeId)
-            || (nativeProvider === DONATE_PROVIDER && !smartGlocalToken)
-          )
-        ) {
-          setStep(PaymentStep.PaymentInfo);
-          return;
-        }
-
-        const { phone, email, fullName } = paymentState;
-        const shouldFillRequestedData = (isEmailRequested && !email)
-          || (isPhoneRequested && !phone)
-          || (isNameRequested && !fullName);
-
-        if ((isShippingAddressRequested && !requestId) || shouldFillRequestedData) {
-          setStep(PaymentStep.ShippingInfo);
-          return;
-        }
-
-        if (isShippingAddressRequested && !paymentState.shipping) {
-          setStep(PaymentStep.Shipping);
-          return;
-        }
-
-        setIsLoading(true);
+      case PaymentStep.Checkout:
         sendForm();
         break;
-      }
     }
-  }, [
-    isEmailRequested, isNameRequested, isPhoneRequested, isShippingAddressRequested, nativeProvider, passwordValidUntil,
-    paymentDispatch, paymentState, requestId, savedInfo, sendCredentials, sendForm, setStep, smartGlocalToken, step,
-    stripeId, twoFaPassword, validatePaymentPassword, validateRequest,
-  ]);
-
-  useEffect(() => {
-    return step === PaymentStep.ConfirmPassword
-      ? captureKeyboardListeners({ onEnter: handleButtonClick })
-      : undefined;
-  },
-  [handleButtonClick, step]);
+  }, [step, validateRequest, setStep, sendCredentials, sendForm]);
 
   const handleModalClose = useCallback(() => {
     paymentDispatch({
       type: 'resetState',
     });
     setIsTosAccepted(false);
-    onClose();
-  }, [onClose, paymentDispatch]);
-
-  const handleBackClick = useCallback(() => {
-    setStep(step === PaymentStep.ConfirmPassword ? PaymentStep.SavedPayments : PaymentStep.Checkout);
-  }, [setStep, step]);
+  }, [paymentDispatch]);
 
   const modalHeader = useMemo(() => {
     switch (step) {
-      case PaymentStep.Checkout:
-        return lang('PaymentCheckout');
       case PaymentStep.ShippingInfo:
         return lang('PaymentShippingInfo');
       case PaymentStep.Shipping:
         return lang('PaymentShippingMethod');
-      case PaymentStep.SavedPayments:
-        return lang('PaymentCheckoutMethod');
-      case PaymentStep.ConfirmPassword:
-        return lang('Checkout.PasswordEntry.Title');
       case PaymentStep.PaymentInfo:
         return lang('PaymentCardInfo');
+      case PaymentStep.Checkout:
+        return lang('PaymentCheckout');
       case PaymentStep.ConfirmPayment:
         return lang('Checkout.WebConfirmation.Title');
       default:
@@ -482,63 +317,44 @@ const PaymentModal: FC<OwnProps & StateProps & GlobalStateProps> = ({
     }
   }, [step, lang]);
 
-  const buttonText = step === PaymentStep.Checkout
-    ? lang('Checkout.PayPrice', formatCurrency(totalPrice, currency!, lang.code))
-    : lang('Next');
-
-  function getIsSubmitDisabled() {
-    if (isLoading) {
-      return true;
-    }
-
+  const buttonText = useMemo(() => {
     switch (step) {
       case PaymentStep.Checkout:
-        return Boolean(invoice?.isRecurring && !isTosAccepted);
-
-      case PaymentStep.PaymentInfo:
-        return Boolean(
-          paymentState.cardNumber === ''
-          || (needCardholderName && paymentState.cardholder === '')
-          || paymentState.cvv === ''
-          || paymentState.expiry === '',
-        );
-
+        return lang('Checkout.PayPrice', formatCurrency(totalPrice, currency!, lang.code));
       default:
-        return false;
+        return lang('Next');
     }
-  }
+  }, [step, lang, currency, totalPrice]);
+
+  const isSubmitDisabled = isLoading
+    || Boolean(step === PaymentStep.Checkout && invoiceContent?.isRecurring && !isTosAccepted);
 
   if (isProviderError) {
     return (
       <Modal
         className="error"
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        onCloseAnimationEnd={handleModalClose}
+        isOpen={isOpen}
+        onClose={onClose}
       >
         <p>
           Sorry, Telegram WebZ doesn&apos;t support payments with this provider yet. <br />
           Please use one of our mobile apps to do this.
         </p>
-        <div className="dialog-buttons mt-2">
-          <Button
-            isText
-            onClick={closeModal}
-          >
-            {lang('OK')}
-          </Button>
-        </div>
+        <Button
+          isText
+          onClick={onClose}
+        >
+          {lang('OK')}
+        </Button>
       </Modal>
     );
   }
 
-  const isSubmitDisabled = getIsSubmitDisabled();
-
   return (
     <Modal
-      className={buildClassName('PaymentModal', invoice?.isRecurring && 'recurring')}
-      isOpen={isModalOpen}
-      onClose={closeModal}
+      className={buildClassName('PaymentModal', invoiceContent?.isRecurring && 'recurring')}
+      isOpen={isOpen}
+      onClose={onClose}
       onCloseAnimationEnd={handleModalClose}
     >
       <div className="header" dir={lang.isRtl ? 'rtl' : undefined}>
@@ -547,10 +363,10 @@ const PaymentModal: FC<OwnProps & StateProps & GlobalStateProps> = ({
           color="translucent"
           round
           size="smaller"
-          onClick={step === PaymentStep.Checkout ? closeModal : handleBackClick}
+          onClick={onClose}
           ariaLabel="Close"
         >
-          <i className={step === PaymentStep.Checkout ? 'icon-close' : 'icon-arrow-left'} />
+          <i className="icon-close" />
         </Button>
         <h3>{modalHeader}</h3>
       </div>
@@ -590,34 +406,29 @@ export default memo(withGlobal<OwnProps>(
       savedInfo,
       canSaveCredentials,
       invoice,
-      invoiceContainer,
+      invoiceContent,
       nativeProvider,
       nativeParams,
       passwordMissing,
       error,
       confirmPaymentUrl,
       inputInvoice,
-      requestId,
-      stripeCredentials,
-      smartGlocalCredentials,
-      savedCredentials,
-      temporaryPassword,
-      isExtendedMedia,
-    } = selectTabState(global).payment;
+    } = global.payment;
 
     const chat = inputInvoice && 'chatId' in inputInvoice ? selectChat(global, inputInvoice.chatId) : undefined;
     const isProviderError = Boolean(invoice && (!nativeProvider || !SUPPORTED_PROVIDERS.has(nativeProvider)));
     const { needCardholderName, needCountry, needZip } = (nativeParams || {});
     const {
-      isNameRequested,
-      isShippingAddressRequested,
-      isPhoneRequested,
-      isEmailRequested,
-      shouldSendPhoneToProvider,
-      shouldSendEmailToProvider,
+      nameRequested,
+      phoneRequested,
+      emailRequested,
+      shippingAddressRequested,
+      flexible,
+      phoneToProvider,
+      emailToProvider,
       currency,
       prices,
-    } = (invoiceContainer || {});
+    } = (invoice || {});
 
     return {
       step,
@@ -627,29 +438,23 @@ export default memo(withGlobal<OwnProps>(
       canSaveCredentials,
       nativeProvider,
       passwordMissing,
-      isNameRequested,
-      isShippingAddressRequested,
-      isPhoneRequested,
-      isEmailRequested,
-      shouldSendPhoneToProvider,
-      shouldSendEmailToProvider,
+      nameRequested,
+      shippingAddressRequested,
+      phoneRequested,
+      emailRequested,
+      flexible,
+      phoneToProvider,
+      emailToProvider,
       currency,
       prices,
       isProviderError,
-      invoice,
+      invoiceContent,
       needCardholderName,
       needCountry,
       needZip,
       error,
       confirmPaymentUrl,
       countryList: global.countryList.general,
-      requestId,
-      hasShippingOptions: Boolean(shippingOptions?.length),
-      smartGlocalToken: smartGlocalCredentials?.token,
-      stripeId: stripeCredentials?.id,
-      savedCredentials,
-      passwordValidUntil: temporaryPassword?.validUntil,
-      isExtendedMedia,
     };
   },
 )(PaymentModal));
@@ -663,16 +468,11 @@ function getShippingPrices(shippingOptions: ShippingOption[], shippingOption: st
   return option?.prices;
 }
 
-function getTotalPrice(
-  prices: Price[] = [],
-  shippingOptions: ShippingOption[] | undefined,
-  shippingOption: string,
-  tipAmount: number,
-) {
+function getTotalPrice(prices: Price[] = [], shippingOptions: ShippingOption[] | undefined, shippingOption: string) {
   const shippingPrices = shippingOptions
     ? getShippingPrices(shippingOptions, shippingOption)
     : [];
-  let total = tipAmount;
+  let total = 0;
   const totalPrices = prices.concat(shippingPrices || []);
   total = totalPrices.reduce((acc, cur) => {
     return acc + cur.amount;
@@ -682,7 +482,7 @@ function getTotalPrice(
 
 function getCheckoutInfo(state: FormState, shippingOptions: ShippingOption[] | undefined, paymentProvider: string) {
   const cardTypeText = detectCardTypeText(state.cardNumber);
-  const paymentMethod = cardTypeText && state.cardNumber ? `${cardTypeText} *${state.cardNumber.slice(-4)}` : undefined;
+  const paymentMethod = `${cardTypeText} *${state.cardNumber.slice(-4)}`;
   const shippingAddress = state.streetLine1
     ? `${state.streetLine1}, ${state.city}, ${state.countryIso2}`
     : undefined;
@@ -729,19 +529,7 @@ function getRequestInfo(paymentState: FormState) {
   };
 }
 
-export type ApiCredentials = {
-  data: {
-    cardNumber: string;
-    cardholder: string;
-    expiryMonth: string;
-    expiryYear: string;
-    cvv: string;
-    country: string;
-    zip: string;
-  };
-};
-
-function getCredentials(paymentState: FormState): ApiCredentials {
+function getCredentials(paymentState: FormState) {
   const {
     cardNumber, cardholder, expiry, cvv, billingCountry, billingZip,
   } = paymentState;

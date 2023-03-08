@@ -1,21 +1,20 @@
+import type { FC } from '../../../lib/teact/teact';
 import React, { memo, useRef } from '../../../lib/teact/teact';
 
-import type { FC } from '../../../lib/teact/teact';
-import type { ObserveFn } from '../../../hooks/useIntersectionObserver';
-
 import { RECENT_SYMBOL_SET_ID } from '../../../config';
+import { IS_SINGLE_COLUMN_LAYOUT } from '../../../util/environment';
 import buildClassName from '../../../util/buildClassName';
 import windowSize from '../../../util/windowSize';
 
+import type { ObserveFn } from '../../../hooks/useIntersectionObserver';
 import { useOnIntersect } from '../../../hooks/useIntersectionObserver';
 import useMediaTransition from '../../../hooks/useMediaTransition';
 import useLang from '../../../hooks/useLang';
-import useAppLayout from '../../../hooks/useAppLayout';
 
 import EmojiButton from './EmojiButton';
 
-const EMOJIS_PER_ROW_ON_DESKTOP = 8;
-const EMOJI_MARGIN = 10;
+const EMOJIS_PER_ROW_ON_DESKTOP = 9;
+const EMOJI_MARGIN = 4;
 const MOBILE_CONTAINER_PADDING = 8;
 const EMOJI_SIZE = 40;
 
@@ -39,9 +38,8 @@ const EmojiCategory: FC<OwnProps> = ({
   const transitionClassNames = useMediaTransition(shouldRender);
 
   const lang = useLang();
-  const { isMobile } = useAppLayout();
 
-  const emojisPerRow = isMobile
+  const emojisPerRow = IS_SINGLE_COLUMN_LAYOUT
     ? Math.floor((windowSize.get().width - MOBILE_CONTAINER_PADDING) / (EMOJI_SIZE + EMOJI_MARGIN))
     : EMOJIS_PER_ROW_ON_DESKTOP;
   const height = Math.ceil(category.emojis.length / emojisPerRow) * (EMOJI_SIZE + EMOJI_MARGIN);

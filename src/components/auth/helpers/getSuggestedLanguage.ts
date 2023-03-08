@@ -1,7 +1,7 @@
 import type { LangCode } from '../../../types';
 
 export function getSuggestedLanguage() {
-  let suggestedLanguage = navigator.language.toLowerCase();
+  let suggestedLanguage = navigator.language;
 
   if (suggestedLanguage && suggestedLanguage !== 'pt-br') {
     suggestedLanguage = suggestedLanguage.substr(0, 2);

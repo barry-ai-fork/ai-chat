@@ -2,17 +2,15 @@ import type { FC } from '../../lib/teact/teact';
 import React, {
   useEffect, useRef, useCallback, useMemo,
 } from '../../lib/teact/teact';
-
-import type { BufferedRange } from '../../hooks/useBuffering';
-
-import { IS_IOS, IS_TOUCH_ENV } from '../../util/environment';
 import buildClassName from '../../util/buildClassName';
+
+import useFlag from '../../hooks/useFlag';
+import { IS_IOS, IS_SINGLE_COLUMN_LAYOUT } from '../../util/environment';
 import { formatMediaDuration } from '../../util/dateFormat';
 import { formatFileSize } from '../../util/textFormat';
-import { captureEvents } from '../../util/captureEvents';
 import useLang from '../../hooks/useLang';
-import useFlag from '../../hooks/useFlag';
-import useAppLayout from '../../hooks/useAppLayout';
+import type { BufferedRange } from '../../hooks/useBuffering';
+import { captureEvents } from '../../util/captureEvents';
 
 import Button from '../ui/Button';
 import RangeSlider from '../ui/RangeSlider';
@@ -28,9 +26,8 @@ type OwnProps = {
   duration: number;
   fileSize: number;
   isForceMobileVersion?: boolean;
-  isPlaying: boolean;
+  isPlayed: boolean;
   isFullscreenSupported: boolean;
-  isPictureInPictureSupported: boolean;
   isFullscreen: boolean;
   isVisible: boolean;
   isBuffered: boolean;
@@ -38,7 +35,6 @@ type OwnProps = {
   isMuted: boolean;
   playbackRate: number;
   onChangeFullscreen: (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => void;
-  onPictureInPictureChange?: () => void ;
   onVolumeClick: () => void;
   onVolumeChange: (volume: number) => void;
   onPlaybackRateChange: (playbackRate: number) => void;
@@ -58,7 +54,7 @@ const PLAYBACK_RATES = [
   2,
 ];
 
-const HIDE_CONTROLS_TIMEOUT_MS = 3000;
+const HIDE_CONTROLS_TIMEOUT_MS = 1500;
 
 const VideoPlayerControls: FC<OwnProps> = ({
   bufferedRanges,
@@ -67,7 +63,7 @@ const VideoPlayerControls: FC<OwnProps> = ({
   duration,
   fileSize,
   isForceMobileVersion,
-  isPlaying,
+  isPlayed,
   isFullscreenSupported,
   isFullscreen,
   isVisible,
@@ -79,8 +75,6 @@ const VideoPlayerControls: FC<OwnProps> = ({
   onVolumeClick,
   onVolumeChange,
   onPlaybackRateChange,
-  isPictureInPictureSupported,
-  onPictureInPictureChange,
   onPlayPause,
   setVisibility,
   onSeek,
@@ -91,12 +85,9 @@ const VideoPlayerControls: FC<OwnProps> = ({
   const isSeekingRef = useRef<boolean>(false);
   const isSeeking = isSeekingRef.current;
 
-  const { isMobile } = useAppLayout();
-
   useEffect(() => {
-    if (!IS_TOUCH_ENV) return undefined;
     let timeout: number | undefined;
-    if (!isVisible || !isPlaying || isSeeking || isPlaybackMenuOpen) {
+    if (!isVisible || !isPlayed || isSeeking || isPlaybackMenuOpen) {
       if (timeout) window.clearTimeout(timeout);
       return undefined;
     }
@@ -106,7 +97,7 @@ const VideoPlayerControls: FC<OwnProps> = ({
     return () => {
       if (timeout) window.clearTimeout(timeout);
     };
-  }, [isPlaying, isVisible, isSeeking, setVisibility, isPlaybackMenuOpen]);
+  }, [isPlayed, isVisible, isSeeking, setVisibility, isPlaybackMenuOpen]);
 
   useEffect(() => {
     if (isVisible) {
@@ -174,13 +165,13 @@ const VideoPlayerControls: FC<OwnProps> = ({
         <Button
           ariaLabel={lang('AccActionPlay')}
           size="tiny"
-          ripple={!isMobile}
+          ripple={!IS_SINGLE_COLUMN_LAYOUT}
           color="translucent-white"
           className="play"
           round
           onClick={onPlayPause}
         >
-          <i className={isPlaying ? 'icon-pause' : 'icon-play'} />
+          <i className={isPlayed ? 'icon-pause' : 'icon-play'} />
         </Button>
         <Button
           ariaLabel="Volume"
@@ -212,18 +203,6 @@ const VideoPlayerControls: FC<OwnProps> = ({
         >
           {`${playbackRate}x`}
         </Button>
-        {isPictureInPictureSupported && (
-          <Button
-            ariaLabel="Picture in picture"
-            size="tiny"
-            color="translucent-white"
-            className="fullscreen"
-            round
-            onClick={onPictureInPictureChange}
-          >
-            <i className="icon-pip" />
-          </Button>
-        )}
         {isFullscreenSupported && (
           <Button
             ariaLabel="Fullscreen"
@@ -239,11 +218,7 @@ const VideoPlayerControls: FC<OwnProps> = ({
       </div>
       <Menu
         isOpen={isPlaybackMenuOpen}
-        className={buildClassName(
-          'playback-rate-menu',
-          !isFullscreenSupported && 'no-fullscreen',
-          !isPictureInPictureSupported && 'no-pip',
-        )}
+        className="playback-rate-menu"
         positionX="right"
         positionY="bottom"
         autoClose

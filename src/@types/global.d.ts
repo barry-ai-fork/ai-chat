@@ -27,10 +27,6 @@ declare namespace React {
     offsetX: number;
     offsetY: number;
   }
-
-  interface KeyboardEvent {
-    isComposing: boolean;
-  }
 }
 
 type AnyLiteral = Record<string, any>;
@@ -61,7 +57,6 @@ type AllEmojis = Record<string, Emoji | EmojiWithSkins>;
 declare module '*.png';
 declare module '*.svg';
 declare module '*.tgs';
-declare module '*.wasm';
 
 declare module '*.txt' {
   const content: string;

@@ -1,18 +1,18 @@
 import type { ChangeEvent } from 'react';
 import type { FC } from '../../../lib/teact/teact';
 import React, {
-  memo, useCallback, useEffect, useMemo, useState,
+  memo, useCallback, useEffect, useState,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import { ManagementScreens, ManagementProgress } from '../../../types';
-import type { ApiAvailableReaction, ApiChat, ApiExportedInvite } from '../../../api/types';
+import type { ApiChat, ApiExportedInvite } from '../../../api/types';
 import { ApiMediaFormat } from '../../../api/types';
 
-import { getChatAvatarHash, getHasAdminRight, isChatPublic } from '../../../global/helpers';
+import { getChatAvatarHash, getHasAdminRight } from '../../../global/helpers';
 import useMedia from '../../../hooks/useMedia';
 import useLang from '../../../hooks/useLang';
-import { selectChat, selectTabState } from '../../../global/selectors';
+import { selectChat } from '../../../global/selectors';
 import useFlag from '../../../hooks/useFlag';
 import useHistoryBack from '../../../hooks/useHistoryBack';
 import { formatInteger } from '../../../util/textFormat';
@@ -43,7 +43,7 @@ type StateProps = {
   canInvite?: boolean;
   exportedInvites?: ApiExportedInvite[];
   lastSyncTime?: number;
-  availableReactions?: ApiAvailableReaction[];
+  availableReactionsCount?: number;
 };
 
 const CHANNEL_TITLE_EMPTY = 'Channel title can\'t be empty';
@@ -58,10 +58,10 @@ const ManageChannel: FC<OwnProps & StateProps> = ({
   canInvite,
   exportedInvites,
   lastSyncTime,
-  isActive,
-  availableReactions,
+  availableReactionsCount,
   onScreenSelect,
   onClose,
+  isActive,
 }) => {
   const {
     updateChat,
@@ -74,7 +74,7 @@ const ManageChannel: FC<OwnProps & StateProps> = ({
     loadChatJoinRequests,
   } = getActions();
 
-  const currentTitle = chat?.title || '';
+  const currentTitle = chat ? (chat.title || '') : '';
   const currentAbout = chat?.fullInfo ? (chat.fullInfo.about || '') : '';
   const hasLinkedChat = chat?.fullInfo?.linkedChatId;
 
@@ -108,7 +108,7 @@ const ManageChannel: FC<OwnProps & StateProps> = ({
     }
   }, [progress]);
 
-  const adminsCount = Object.keys(chat.fullInfo?.adminMembersById || {}).length;
+  const adminsCount = (chat?.fullInfo?.adminMembers?.length) || 0;
   const removedUsersCount = (chat?.fullInfo?.kickedMembers?.length) || 0;
 
   const handleClickEditType = useCallback(() => {
@@ -191,22 +191,7 @@ const ManageChannel: FC<OwnProps & StateProps> = ({
     openChat({ id: undefined });
   }, [chat.isCreator, chat.id, closeDeleteDialog, closeManagement, leaveChannel, deleteChannel, openChat]);
 
-  const chatReactionsDescription = useMemo(() => {
-    if (!chat.fullInfo?.enabledReactions) {
-      return lang('ReactionsOff');
-    }
-
-    if (chat.fullInfo.enabledReactions.type === 'all') {
-      return lang('ReactionsAll');
-    }
-
-    const enabledLength = chat.fullInfo.enabledReactions.allowed.length;
-    const totalLength = availableReactions?.filter((reaction) => !reaction.isInactive).length || 0;
-
-    const text = totalLength ? `${enabledLength} / ${totalLength}` : `${enabledLength}`;
-    return text;
-  }, [availableReactions, chat, lang]);
-  const isChannelPublic = useMemo(() => isChatPublic(chat), [chat]);
+  const enabledReactionsCount = chat.fullInfo?.enabledReactions?.length || 0;
 
   if (chat.isRestricted || chat.isForbidden) {
     return undefined;
@@ -240,12 +225,11 @@ const ManageChannel: FC<OwnProps & StateProps> = ({
             maxLength={CHANNEL_MAX_DESCRIPTION}
             maxLengthIndicator={(CHANNEL_MAX_DESCRIPTION - about.length).toString()}
             disabled={!canChangeInfo}
-            noReplaceNewlines
           />
           {chat.isCreator && (
             <ListItem icon="lock" multiline onClick={handleClickEditType}>
               <span className="title">{lang('ChannelType')}</span>
-              <span className="subtitle">{isChannelPublic ? lang('TypePublic') : lang('TypePrivate')}</span>
+              <span className="subtitle">{chat.username ? lang('TypePublic') : lang('TypePrivate')}</span>
             </ListItem>
           )}
           <ListItem
@@ -290,7 +274,7 @@ const ManageChannel: FC<OwnProps & StateProps> = ({
           >
             <span className="title">{lang('Reactions')}</span>
             <span className="subtitle" dir="auto">
-              {chatReactionsDescription}
+              {enabledReactionsCount}/{availableReactionsCount}
             </span>
           </ListItem>
           <div className="ListItem no-selection narrow">
@@ -361,10 +345,9 @@ const ManageChannel: FC<OwnProps & StateProps> = ({
 export default memo(withGlobal<OwnProps>(
   (global, { chatId }): StateProps => {
     const chat = selectChat(global, chatId)!;
-    const { management } = selectTabState(global);
-    const { progress } = management;
+    const { progress } = global.management;
     const isSignaturesShown = Boolean(chat?.isSignaturesShown);
-    const { invites } = management.byChatId[chatId] || {};
+    const { invites } = global.management.byChatId[chatId] || {};
 
     return {
       chat,
@@ -374,7 +357,7 @@ export default memo(withGlobal<OwnProps>(
       canInvite: getHasAdminRight(chat, 'inviteUsers'),
       lastSyncTime: global.lastSyncTime,
       exportedInvites: invites,
-      availableReactions: global.availableReactions,
+      availableReactionsCount: global.availableReactions?.filter((l) => !l.isInactive).length,
     };
   },
 )(ManageChannel));

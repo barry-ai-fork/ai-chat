@@ -4,7 +4,6 @@ import { getActions, getGlobal, withGlobal } from '../../../global';
 
 import type { ApiChat } from '../../../api/types';
 
-import { selectTabState } from '../../../global/selectors';
 import { unique } from '../../../util/iteratees';
 import { filterUsersByName, isUserBot, sortChatIds } from '../../../global/helpers';
 import useLang from '../../../hooks/useLang';
@@ -140,7 +139,7 @@ export default memo(withGlobal<OwnProps>(
       fetchingStatus,
       globalResults,
       localResults,
-    } = selectTabState(global).globalSearch;
+    } = global.globalSearch;
     const { userIds: globalUserIds } = globalResults || {};
     const { userIds: localUserIds } = localResults || {};
 

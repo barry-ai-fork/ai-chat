@@ -5,10 +5,8 @@ import React, {
   useRef,
   useState,
 } from '../../lib/teact/teact';
-import { getActions } from '../../global';
 
 import type { TextPart } from '../../types';
-import type { CallbackAction } from '../../global/types';
 
 import { ANIMATION_END_DELAY } from '../../config';
 import useShowTransition from '../../hooks/useShowTransition';
@@ -26,7 +24,7 @@ type OwnProps = {
   message: TextPart[];
   duration?: number;
   onDismiss: () => void;
-  action?: CallbackAction;
+  action?: VoidFunction;
   actionText?: string;
   className?: string;
 };
@@ -39,11 +37,10 @@ const Notification: FC<OwnProps> = ({
   message, duration = DEFAULT_DURATION, containerId, onDismiss,
   action, actionText,
 }) => {
-  const actions = getActions();
-
   const [isOpen, setIsOpen] = useState(true);
   // eslint-disable-next-line no-null/no-null
   const timerRef = useRef<number | undefined>(null);
+
   const { transitionClassNames } = useShowTransition(isOpen);
 
   const closeAndDismiss = useCallback(() => {
@@ -51,13 +48,10 @@ const Notification: FC<OwnProps> = ({
     setTimeout(onDismiss, ANIMATION_DURATION + ANIMATION_END_DELAY);
   }, [onDismiss]);
 
-  const handleClick = useCallback(() => {
-    if (action) {
-      // @ts-ignore
-      actions[action.action](action.payload);
-    }
+  function handleClick() {
+    action?.();
     closeAndDismiss();
-  }, [action, actions, closeAndDismiss]);
+  }
 
   useEffect(() => (isOpen ? captureEscKeyListener(closeAndDismiss) : undefined), [isOpen, closeAndDismiss]);
 
@@ -98,7 +92,7 @@ const Notification: FC<OwnProps> = ({
         {action && actionText && (
           <Button
             color="translucent-white"
-            onClick={handleClick}
+            onClick={action}
             className="Notification-button"
           >
             {actionText}

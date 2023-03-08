@@ -6,17 +6,21 @@ import type { ApiSticker } from '../../../api/types';
 import type { ActiveEmojiInteraction } from '../../../global/types';
 import type { ObserveFn } from '../../../hooks/useIntersectionObserver';
 
+import { LOCAL_TGS_URLS } from '../../common/helpers/animatedAssets';
 import { LIKE_STICKER_ID } from '../../common/helpers/mediaDimensions';
 import {
   selectAnimatedEmoji,
   selectAnimatedEmojiEffect,
   selectAnimatedEmojiSound,
+  selectLocalAnimatedEmoji,
+  selectLocalAnimatedEmojiEffect,
 } from '../../../global/selectors';
 import buildClassName from '../../../util/buildClassName';
 import { useIsIntersecting } from '../../../hooks/useIntersectionObserver';
 import useAnimatedEmoji from '../../common/hooks/useAnimatedEmoji';
 
 import AnimatedIconFromSticker from '../../common/AnimatedIconFromSticker';
+import AnimatedIconWithPreview from '../../common/AnimatedIconWithPreview';
 
 import './AnimatedEmoji.scss';
 
@@ -25,6 +29,7 @@ type OwnProps = {
   withEffects: boolean;
   isOwn?: boolean;
   observeIntersection?: ObserveFn;
+  size?: 'large' | 'medium' | 'small';
   lastSyncTime?: number;
   forceLoadPreview?: boolean;
   messageId?: number;
@@ -35,6 +40,8 @@ type OwnProps = {
 interface StateProps {
   sticker?: ApiSticker;
   effect?: ApiSticker;
+  localSticker?: keyof typeof LOCAL_TGS_URLS;
+  localEffect?: string;
   soundId?: string;
 }
 
@@ -50,6 +57,8 @@ const AnimatedEmoji: FC<OwnProps & StateProps> = ({
   activeEmojiInteractions,
   sticker,
   effect,
+  localSticker,
+  localEffect,
   soundId,
 }) => {
   const {
@@ -57,10 +66,22 @@ const AnimatedEmoji: FC<OwnProps & StateProps> = ({
     size,
     style,
     handleClick,
-  } = useAnimatedEmoji(chatId, messageId, soundId, activeEmojiInteractions, isOwn, effect?.emoji);
+  } = useAnimatedEmoji(chatId, messageId, soundId, activeEmojiInteractions, isOwn, localEffect, effect?.emoji);
   const isIntersecting = useIsIntersecting(ref, observeIntersection);
 
-  return (
+  return localSticker ? (
+    <AnimatedIconWithPreview
+      tgsUrl={LOCAL_TGS_URLS[localSticker]}
+      size={size}
+      quality={QUALITY}
+      play={isIntersecting}
+      forceOnHeavyAnimation
+      ref={ref}
+      className="AnimatedEmoji media-inner"
+      style={style}
+      onClick={handleClick}
+    />
+  ) : (
     <AnimatedIconFromSticker
       sticker={sticker}
       size={size}
@@ -79,9 +100,13 @@ const AnimatedEmoji: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>((global, { emoji, withEffects }) => {
+  const localSticker = selectLocalAnimatedEmoji(global, emoji);
+
   return {
     sticker: selectAnimatedEmoji(global, emoji),
     effect: withEffects ? selectAnimatedEmojiEffect(global, emoji) : undefined,
     soundId: selectAnimatedEmojiSound(global, emoji),
+    localSticker,
+    localEffect: localSticker && withEffects ? selectLocalAnimatedEmojiEffect(localSticker) : undefined,
   };
 })(AnimatedEmoji));

@@ -1,48 +1,29 @@
-import type { GlobalState, TabArgs } from '../types';
-import type { ApiStickerSetInfo, ApiSticker, ApiStickerSet } from '../../api/types';
+import type { GlobalState } from '../types';
+import type { ApiSticker } from '../../api/types';
 
-import { RESTRICTED_EMOJI_SET_ID } from '../../config';
-import { selectIsCurrentUserPremium } from './users';
-import { selectTabState } from './tabs';
-import { getCurrentTabId } from '../../util/establishMultitabRole';
-
-export function selectIsStickerFavorite<T extends GlobalState>(global: T, sticker: ApiSticker) {
+export function selectIsStickerFavorite(global: GlobalState, sticker: ApiSticker) {
   const { stickers } = global.stickers.favorite;
   return stickers && stickers.some(({ id }) => id === sticker.id);
 }
 
-export function selectCurrentStickerSearch<T extends GlobalState>(
-  global: T,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-) {
-  return selectTabState(global, tabId).stickerSearch;
+export function selectCurrentStickerSearch(global: GlobalState) {
+  return global.stickers.search;
 }
 
-export function selectCurrentGifSearch<T extends GlobalState>(
-  global: T,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-) {
-  return selectTabState(global, tabId).gifSearch;
+export function selectCurrentGifSearch(global: GlobalState) {
+  return global.gifs.search;
 }
 
-export function selectStickerSet<T extends GlobalState>(global: T, id: string | ApiStickerSetInfo) {
-  if (typeof id === 'string') {
-    return global.stickers.setsById[id];
-  }
-
-  if ('id' in id) {
-    return global.stickers.setsById[id.id];
-  }
-
-  if ('isMissing' in id) return undefined;
-
-  return Object.values(global.stickers.setsById).find(({ shortName }) => (
-    shortName.toLowerCase() === id.shortName.toLowerCase()
-  ));
+export function selectStickerSet(global: GlobalState, id: string) {
+  return global.stickers.setsById[id];
 }
 
-export function selectStickersForEmoji<T extends GlobalState>(global: T, emoji: string) {
-  const addedSets = global.stickers.added.setIds;
+export function selectStickerSetByShortName(global: GlobalState, shortName: string) {
+  return Object.values(global.stickers.setsById).find((l) => l.shortName.toLowerCase() === shortName.toLowerCase());
+}
+
+export function selectStickersForEmoji(global: GlobalState, emoji: string) {
+  const stickerSets = Object.values(global.stickers.setsById);
   let stickersForEmoji: ApiSticker[] = [];
   // Favorites
   global.stickers.favorite.stickers.forEach((sticker) => {
@@ -50,8 +31,7 @@ export function selectStickersForEmoji<T extends GlobalState>(global: T, emoji: 
   });
 
   // Added sets
-  addedSets?.forEach((id) => {
-    const packs = global.stickers.setsById[id].packs;
+  stickerSets.forEach(({ packs }) => {
     if (!packs) {
       return;
     }
@@ -61,53 +41,12 @@ export function selectStickersForEmoji<T extends GlobalState>(global: T, emoji: 
   return stickersForEmoji;
 }
 
-export function selectCustomEmojiForEmoji<T extends GlobalState>(global: T, emoji: string) {
-  const isCurrentUserPremium = selectIsCurrentUserPremium(global);
-  const addedCustomSets = global.customEmojis.added.setIds;
-  let customEmojiForEmoji: ApiSticker[] = [];
-
-  // Added sets
-  addedCustomSets?.forEach((id) => {
-    const packs = global.stickers.setsById[id].packs;
-    if (!packs) {
-      return;
-    }
-
-    customEmojiForEmoji = customEmojiForEmoji.concat(packs[emoji] || [], packs[cleanEmoji(emoji)] || []);
-  });
-  return isCurrentUserPremium ? customEmojiForEmoji : customEmojiForEmoji.filter(({ isFree }) => isFree);
-}
-
-// Slow, not to be used in `withGlobal`
-export function selectCustomEmojiForEmojis<T extends GlobalState>(global: T, emojis: string[]) {
-  const isCurrentUserPremium = selectIsCurrentUserPremium(global);
-  const addedCustomSets = global.customEmojis.added.setIds;
-  let customEmojiForEmoji: ApiSticker[] = [];
-
-  // Added sets
-  addedCustomSets?.forEach((id) => {
-    const packs = global.stickers.setsById[id].packs;
-    if (!packs) {
-      return;
-    }
-    const customEmojis = Object.entries(packs).filter(([emoji]) => (
-      emojis.includes(emoji) || emojis.includes(cleanEmoji(emoji))
-    )).flatMap(([, stickers]) => stickers);
-    customEmojiForEmoji = customEmojiForEmoji.concat(customEmojis);
-  });
-  return isCurrentUserPremium ? customEmojiForEmoji : customEmojiForEmoji.filter(({ isFree }) => isFree);
-}
-
-export function selectIsSetPremium(stickerSet: Pick<ApiStickerSet, 'stickers' | 'isEmoji'>) {
-  return stickerSet.isEmoji && stickerSet.stickers?.some((sticker) => !sticker.isFree);
-}
-
 function cleanEmoji(emoji: string) {
   // Some emojis (❤️ for example) with a service symbol 'VARIATION SELECTOR-16' are not recognized as animated
   return emoji.replace('\ufe0f', '');
 }
 
-export function selectAnimatedEmoji<T extends GlobalState>(global: T, emoji: string) {
+export function selectAnimatedEmoji(global: GlobalState, emoji: string) {
   const { animatedEmojis } = global;
   if (!animatedEmojis || !animatedEmojis.stickers) {
     return undefined;
@@ -118,7 +57,7 @@ export function selectAnimatedEmoji<T extends GlobalState>(global: T, emoji: str
   return animatedEmojis.stickers.find((sticker) => sticker.emoji === emoji || sticker.emoji === cleanedEmoji);
 }
 
-export function selectAnimatedEmojiEffect<T extends GlobalState>(global: T, emoji: string) {
+export function selectAnimatedEmojiEffect(global: GlobalState, emoji: string) {
   const { animatedEmojiEffects } = global;
   if (!animatedEmojiEffects || !animatedEmojiEffects.stickers) {
     return undefined;
@@ -129,14 +68,20 @@ export function selectAnimatedEmojiEffect<T extends GlobalState>(global: T, emoj
   return animatedEmojiEffects.stickers.find((sticker) => sticker.emoji === emoji || sticker.emoji === cleanedEmoji);
 }
 
-export function selectAnimatedEmojiSound<T extends GlobalState>(global: T, emoji: string) {
+export function selectAnimatedEmojiSound(global: GlobalState, emoji: string) {
   return global?.appConfig?.emojiSounds[cleanEmoji(emoji)];
 }
 
-export function selectIsAlwaysHighPriorityEmoji<T extends GlobalState>(
-  global: T, stickerSet: ApiStickerSetInfo | ApiStickerSet,
-) {
-  if (!('id' in stickerSet)) return false;
-  return stickerSet.id === global.appConfig?.defaultEmojiStatusesStickerSetId
-    || stickerSet.id === RESTRICTED_EMOJI_SET_ID;
+export function selectLocalAnimatedEmoji(global: GlobalState, emoji: string) {
+  const cleanedEmoji = cleanEmoji(emoji);
+
+  return cleanedEmoji === '🍑' ? 'Peach' : (cleanedEmoji === '🍆' ? 'Eggplant' : undefined);
+}
+
+export function selectLocalAnimatedEmojiEffect(emoji: string) {
+  return emoji === 'Eggplant' ? 'Cumshot' : undefined;
+}
+
+export function selectLocalAnimatedEmojiEffectByName(name: string) {
+  return name === 'Cumshot' ? '🍆' : undefined;
 }

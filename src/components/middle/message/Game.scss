@@ -30,10 +30,5 @@
 
   .skeleton {
     aspect-ratio: 16/9;
-
-    @supports not (aspect-ratio: 16/9) {
-      height: 0 !important;
-      padding-bottom: 56.25%;
-    }
   }
 }

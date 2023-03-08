@@ -3,7 +3,7 @@ import type {
   ApiBotInlineMediaResult, ApiBotInlineResult, ApiBotInlineSwitchPm,
   ApiChatInviteImporter,
   ApiExportedInvite,
-  ApiLanguage, ApiMessage, ApiStickerSet,
+  ApiLanguage, ApiMessage, ApiShippingAddress, ApiStickerSet, ApiWebDocument,
 } from '../api/types';
 
 export type TextPart = TeactNode;
@@ -21,13 +21,12 @@ export enum FocusDirection {
 }
 
 export interface IAlbum {
-  albumId: string;
+  albumId: string ;
   messages: ApiMessage[];
   mainMessage: ApiMessage;
 }
 
 export type ThemeKey = 'light' | 'dark';
-export type AnimationLevel = 0 | 1 | 2;
 
 export interface IThemeSettings {
   background?: string;
@@ -49,9 +48,20 @@ export type NotifySettings = {
   notificationSoundVolume: number;
 };
 
+
+export enum ComponentsScreens {
+  Main,
+  Icons,
+  Buttons,
+  DropdownMenu,
+  Tab,
+  UI,
+}
+
+
 export type LangCode = (
   'en' | 'ar' | 'be' | 'ca' | 'nl' | 'fr' | 'de' | 'id' | 'it' | 'ko' | 'ms' | 'fa' | 'pl' | 'pt-br' | 'ru' | 'es'
-  | 'tr' | 'uk' | 'uz'
+  | 'tr' | 'uk' | 'uz'| 'zh-rCN'
 );
 
 export type TimeFormat = '24h' | '12h';
@@ -60,7 +70,7 @@ export interface ISettings extends NotifySettings, Record<string, any> {
   theme: ThemeKey;
   shouldUseSystemTheme: boolean;
   messageTextSize: number;
-  animationLevel: AnimationLevel;
+  animationLevel: 0 | 1 | 2;
   messageSendKeyCombo: 'enter' | 'ctrl-enter';
   canAutoLoadPhotoFromContacts: boolean;
   canAutoLoadPhotoInPrivateChats: boolean;
@@ -78,7 +88,6 @@ export interface ISettings extends NotifySettings, Record<string, any> {
   canAutoPlayGifs: boolean;
   canAutoPlayVideos: boolean;
   shouldSuggestStickers: boolean;
-  shouldSuggestCustomEmoji: boolean;
   shouldLoopStickers: boolean;
   hasPassword?: boolean;
   languages?: ApiLanguage[];
@@ -89,10 +98,6 @@ export interface ISettings extends NotifySettings, Record<string, any> {
   wasTimeFormatSetManually: boolean;
   isConnectionStatusMinimized: boolean;
   shouldArchiveAndMuteNewNonContact?: boolean;
-  canTranslate: boolean;
-  canTranslateChats: boolean;
-  doNotTranslate: string[];
-  canDisplayChatInTitle: boolean;
 }
 
 export interface ApiPrivacySettings {
@@ -133,17 +138,34 @@ export interface Price {
   amount: number;
 }
 
-export interface ApiInvoiceContainer {
-  isTest?: boolean;
-  isNameRequested?: boolean;
-  isPhoneRequested?: boolean;
-  isEmailRequested?: boolean;
-  isShippingAddressRequested?: boolean;
-  isFlexible?: boolean;
-  shouldSendPhoneToProvider?: boolean;
-  shouldSendEmailToProvider?: boolean;
+export interface Invoice {
   currency?: string;
+  emailRequested?: boolean;
+  emailToProvider?: boolean;
+  flexible?: boolean;
+  nameRequested?: boolean;
+  phoneRequested?: boolean;
+  phoneToProvider?: boolean;
   prices?: Price[];
+  shippingAddressRequested?: boolean;
+  test?: boolean;
+}
+
+export interface Receipt {
+  currency: string;
+  prices: Price[];
+  info?: {
+    shippingAddress?: ApiShippingAddress;
+    phone?: string;
+    name?: string;
+  };
+  totalAmount: number;
+  credentialsTitle: string;
+  shippingPrices?: Price[];
+  shippingMethod?: string;
+  photo?: ApiWebDocument;
+  text?: string;
+  title?: string;
 }
 
 export enum SettingsScreens {
@@ -163,7 +185,6 @@ export enum SettingsScreens {
   PrivacyPhoneCall,
   PrivacyPhoneP2P,
   PrivacyForwarding,
-  PrivacyVoiceMessages,
   PrivacyGroupChats,
   PrivacyPhoneNumberAllowedContacts,
   PrivacyPhoneNumberDeniedContacts,
@@ -177,8 +198,6 @@ export enum SettingsScreens {
   PrivacyPhoneP2PDeniedContacts,
   PrivacyForwardingAllowedContacts,
   PrivacyForwardingDeniedContacts,
-  PrivacyVoiceMessagesAllowedContacts,
-  PrivacyVoiceMessagesDeniedContacts,
   PrivacyGroupChatsAllowedContacts,
   PrivacyGroupChatsDeniedContacts,
   PrivacyBlockedUsers,
@@ -206,6 +225,7 @@ export enum SettingsScreens {
   TwoFaRecoveryEmail,
   TwoFaRecoveryEmailCode,
   TwoFaCongratulations,
+  QuickReaction,
   ActiveWebsites,
   PasscodeDisabled,
   PasscodeNewPasscode,
@@ -217,15 +237,10 @@ export enum SettingsScreens {
   PasscodeTurnOff,
   PasscodeCongratulations,
   Experimental,
-  Stickers,
-  QuickReaction,
-  CustomEmoji,
-  DoNotTranslate,
 }
 
 export type StickerSetOrRecent = Pick<ApiStickerSet, (
-  'id' | 'accessHash' | 'title' | 'count' | 'stickers' | 'hasThumbnail' | 'isLottie' | 'isVideos' | 'isEmoji' |
-  'installedDate' | 'isArchived'
+  'id' | 'title' | 'count' | 'stickers' | 'hasThumbnail' | 'isLottie' | 'isVideos'
 )>;
 
 export enum LeftColumnContent {
@@ -238,6 +253,10 @@ export enum LeftColumnContent {
   NewChannelStep2,
   NewGroupStep1,
   NewGroupStep2,
+  Components,
+  Chart,
+  Wallet,
+  Discover,
 }
 
 export enum GlobalSearchContent {
@@ -259,8 +278,6 @@ export enum RightColumnContent {
   GifSearch,
   PollResults,
   AddingMembers,
-  CreateTopic,
-  EditTopic,
 }
 
 export enum MediaViewerOrigin {
@@ -273,7 +290,6 @@ export enum MediaViewerOrigin {
   Album,
   ScheduledAlbum,
   SearchResult,
-  SuggestedAvatar,
 }
 
 export enum AudioOrigin {
@@ -306,7 +322,6 @@ export enum ManagementProgress {
 export interface ManagementState {
   isActive: boolean;
   nextScreen?: ManagementScreens;
-  checkedUsername?: string;
   isUsernameAvailable?: boolean;
   error?: string;
   invites?: ApiExportedInvite[];
@@ -327,7 +342,7 @@ export enum NewChatMembersProgress {
 
 export type ProfileTabType = 'members' | 'commonChats' | 'media' | 'documents' | 'links' | 'audio' | 'voice';
 export type SharedMediaType = 'media' | 'documents' | 'links' | 'audio' | 'voice';
-export type ApiPrivacyKey = 'phoneNumber' | 'lastSeen' | 'profilePhoto' | 'voiceMessages' |
+export type ApiPrivacyKey = 'phoneNumber' | 'lastSeen' | 'profilePhoto' |
 'forwards' | 'chatInvite' | 'phoneCall' | 'phoneP2P';
 export type PrivacyVisibility = 'everybody' | 'contacts' | 'nonContacts' | 'nobody';
 
@@ -338,12 +353,10 @@ export enum ProfileState {
 }
 
 export enum PaymentStep {
-  Checkout,
-  SavedPayments,
-  ConfirmPassword,
-  PaymentInfo,
   ShippingInfo,
   Shipping,
+  PaymentInfo,
+  Checkout,
   ConfirmPayment,
 }
 
@@ -396,5 +409,4 @@ export type InlineBotSettings = {
   results?: (ApiBotInlineResult | ApiBotInlineMediaResult)[];
   isGallery?: boolean;
   switchPm?: ApiBotInlineSwitchPm;
-  cacheTime: number;
 };

@@ -14,14 +14,12 @@ const store: Record<string, boolean> = {};
 type OwnProps = {
   withGradient?: boolean;
   big?: boolean;
-  className?: string;
   onClick?: VoidFunction;
 };
 
 const PremiumIcon: FC<OwnProps> = ({
   withGradient,
   big,
-  className,
   onClick,
 }) => {
   const html = useMemo(() => {
@@ -31,9 +29,7 @@ const PremiumIcon: FC<OwnProps> = ({
   return (
     <i
       onClick={onClick}
-      className={buildClassName(
-        'PremiumIcon', className, withGradient && 'gradient', onClick && 'clickable', big && 'big',
-      )}
+      className={buildClassName('PremiumIcon', withGradient && 'gradient', onClick && 'clickable', big && 'big')}
       dangerouslySetInnerHTML={html}
       title="Premium"
     />

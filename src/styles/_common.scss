@@ -4,12 +4,8 @@
 .media-inner {
   position: relative;
 
-  video.full-media,
-  img.full-media,
-  img.thumbnail,
-  canvas.thumbnail {
-    width: 100%;
-    height: 100%;
+  video,
+  img {
     display: block;
     object-fit: cover;
   }
@@ -19,12 +15,8 @@
     background-size: contain;
   }
 
-  .thumbnail {
-    position: absolute;
-    top: 0;
-    left: 0;
-  }
-
+  .thumbnail ~ .thumbnail,
+  .thumbnail ~ .full-media,
   .media-loading {
     position: absolute;
   }
@@ -81,30 +73,19 @@
 .chat-list {
   background: var(--color-background);
   height: 100%;
-  padding: 0.5rem 0.4375rem 0.5rem 0.4375rem;
+  padding: 0.5rem 0.125rem 0.5rem 0.4375rem;
 
   overflow-y: auto;
-  @include overflow-y-overlay();
-
-  &.forum-panel-open {
-    .info {
-      opacity: 0;
-      transform: translateX(-20%);
-    }
-
-    .Chat[dir="rtl"] .info {
-      transform: translateX(20%);
-    }
-
-    .Avatar {
-      transform: scale(0.9);
-    }
+  body.is-android & {
+    @include overflow-y-overlay();
   }
 
-  @media (min-width: 600px) {
-    &.forum-panel-open .selected-forum .Avatar {
-      transform: none;
-    }
+  .scroll-container {
+    position: relative;
+  }
+
+  .ListItem.chat-item-clickable {
+    margin: 0;
   }
 
   @media (max-width: 600px) {
@@ -112,43 +93,15 @@
     padding-right: 0;
   }
 
-  .scroll-container {
-    position: relative;
-  }
-
   .no-results {
     color: var(--color-text-meta);
     margin-top: 2rem;
     text-align: center;
   }
-
-  .Avatar {
-    transition: transform var(--layer-transition);
-  }
-
-  .ListItem {
-    &.chat-item-clickable {
-      margin: 0;
-    }
-  }
-
-  body.is-ios &,
-  body.is-android & {
-    .ListItem::after {
-      opacity: 1;
-      transition: opacity var(--layer-transition);
-    }
-
-    &.forum-panel-open {
-      .ListItem::after {
-        opacity: 0;
-      }
-    }
-  }
 }
 
 // Used by Avatar and ProfilePhoto components
-.Avatar, .ProfilePhoto {
+div {
   &.color-bg-1 {
     --color-user: var(--color-user-1);
   }
@@ -183,6 +136,6 @@
   }
 
   &.deleted-account {
-    --color-user: var(--color-deleted-account);
+    --color-user: var(--color-gray);
   }
 }

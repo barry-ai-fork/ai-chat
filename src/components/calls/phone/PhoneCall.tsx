@@ -6,15 +6,14 @@ import { getActions, withGlobal } from '../../../global';
 import '../../../global/actions/calls';
 
 import type { ApiPhoneCall, ApiUser } from '../../../api/types';
-import type { AnimationLevel } from '../../../types';
 
 import {
   IS_ANDROID,
   IS_IOS,
   IS_REQUEST_FULLSCREEN_SUPPORTED,
+  IS_SINGLE_COLUMN_LAYOUT,
 } from '../../../util/environment';
 import { LOCAL_TGS_URLS } from '../../common/helpers/animatedAssets';
-import { selectTabState } from '../../../global/selectors';
 import buildClassName from '../../../util/buildClassName';
 import { selectPhoneCallUser } from '../../../global/selectors/calls';
 import useLang from '../../../hooks/useLang';
@@ -26,7 +25,6 @@ import {
 } from '../../../lib/secret-sauce';
 import useInterval from '../../../hooks/useInterval';
 import useForceUpdate from '../../../hooks/useForceUpdate';
-import useAppLayout from '../../../hooks/useAppLayout';
 
 import Modal from '../../ui/Modal';
 import Avatar from '../../common/Avatar';
@@ -41,7 +39,6 @@ type StateProps = {
   phoneCall?: ApiPhoneCall;
   isOutgoing: boolean;
   isCallPanelVisible?: boolean;
-  animationLevel: AnimationLevel;
 };
 
 const PhoneCall: FC<StateProps> = ({
@@ -49,17 +46,15 @@ const PhoneCall: FC<StateProps> = ({
   isOutgoing,
   phoneCall,
   isCallPanelVisible,
-  animationLevel,
 }) => {
   const lang = useLang();
   const {
-    hangUp, requestMasterAndAcceptCall, playGroupCallSound, toggleGroupCallPanel, connectToActivePhoneCall,
+    hangUp, acceptCall, playGroupCallSound, toggleGroupCallPanel, connectToActivePhoneCall,
   } = getActions();
   // eslint-disable-next-line no-null/no-null
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [isFullscreen, openFullscreen, closeFullscreen] = useFlag();
-  const { isMobile } = useAppLayout();
 
   const toggleFullscreen = useCallback(() => {
     if (isFullscreen) {
@@ -232,7 +227,7 @@ const PhoneCall: FC<StateProps> = ({
       onClose={handleClose}
       className={buildClassName(
         styles.root,
-        isMobile && styles.singleColumn,
+        IS_SINGLE_COLUMN_LAYOUT && styles.singleColumn,
       )}
       dialogRef={containerRef}
     >
@@ -240,9 +235,7 @@ const PhoneCall: FC<StateProps> = ({
         user={user}
         size="jumbo"
         className={hasVideo || hasPresentation ? styles.blurred : ''}
-        withVideo
         noLoop={phoneCall?.state !== 'requesting'}
-        animationLevel={animationLevel}
       />
       {phoneCall?.screencastState === 'active' && streams?.presentation
         && <video className={styles.mainVideo} muted autoPlay playsInline srcObject={streams.presentation} />}
@@ -348,7 +341,7 @@ const PhoneCall: FC<StateProps> = ({
         )}
         {isIncomingRequested && (
           <PhoneCallButton
-            onClick={requestMasterAndAcceptCall}
+            onClick={acceptCall}
             icon="phone-discard"
             isDisabled={isDiscarded}
             label={lang('lng_call_accept')}
@@ -371,14 +364,12 @@ const PhoneCall: FC<StateProps> = ({
 export default memo(withGlobal(
   (global): StateProps => {
     const { phoneCall, currentUserId } = global;
-    const { isCallPanelVisible, isMasterTab } = selectTabState(global);
 
     return {
-      isCallPanelVisible: Boolean(isCallPanelVisible),
+      isCallPanelVisible: Boolean(global.isCallPanelVisible),
       user: selectPhoneCallUser(global),
       isOutgoing: phoneCall?.adminId === currentUserId,
-      phoneCall: isMasterTab ? phoneCall : undefined,
-      animationLevel: global.settings.byKey.animationLevel,
+      phoneCall,
     };
   },
 )(PhoneCall));

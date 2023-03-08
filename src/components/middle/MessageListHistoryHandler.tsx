@@ -1,12 +1,10 @@
-import React, { memo } from '../../lib/teact/teact';
-import { getActions, withGlobal } from '../../global';
-
 import type { FC } from '../../lib/teact/teact';
-import type { MessageList as GlobalMessageList } from '../../global/types';
+import React, { memo } from '../../lib/teact/teact';
+import { getActions, withGlobal } from '../../lib/teact/teactn';
 
-import { createLocationHash } from '../../util/routing';
-import { selectTabState } from '../../global/selectors';
+import { createMessageHash } from '../../util/routing';
 import useHistoryBack from '../../hooks/useHistoryBack';
+import type { MessageList as GlobalMessageList } from '../../global/types';
 
 type StateProps = {
   messageLists?: GlobalMessageList[];
@@ -24,7 +22,7 @@ const MessageListHistoryHandler: FC<StateProps> = ({ messageLists }) => {
   const MessageHistoryRecord: FC<GlobalMessageList> = ({ chatId, type, threadId }) => {
     useHistoryBack({
       isActive: true,
-      hash: createLocationHash(chatId, type, threadId),
+      hash: createMessageHash(chatId, type, threadId),
       onBack: closeChat,
     });
   };
@@ -46,7 +44,7 @@ const MessageListHistoryHandler: FC<StateProps> = ({ messageLists }) => {
 export default memo(withGlobal(
   (global): StateProps => {
     return {
-      messageLists: selectTabState(global).messageLists,
+      messageLists: global.messages.messageLists,
     };
   },
 )(MessageListHistoryHandler));

@@ -22,13 +22,13 @@ const {
 } = require('./auth');
 const { downloadFile } = require('./downloadFile');
 const { uploadFile } = require('./uploadFile');
-const {
-    updateTwoFaSettings,
-    getTmpPassword,
-} = require('./2fa');
+const { updateTwoFaSettings } = require('./2fa');
 
 const DEFAULT_DC_ID = 2;
 const WEBDOCUMENT_DC_ID = 4;
+// const DEFAULT_IPV4_IP = 'zws2.web.telegram.org';
+const DEFAULT_IPV4_IP = '127.0.0.1';
+const DEFAULT_IPV6_IP = '[2001:67c:4e8:f002::a]';
 const EXPORTED_SENDER_RECONNECT_TIMEOUT = 1000; // 1 sec
 const EXPORTED_SENDER_RELEASE_TIMEOUT = 30000; // 30 sec
 const WEBDOCUMENT_REQUEST_PART_SIZE = 131072; // 128kb
@@ -71,7 +71,6 @@ class TelegramClient {
         useWSS: false,
         additionalDcsDisabled: false,
         testServers: false,
-        dcId: DEFAULT_DC_ID,
     };
 
     /**
@@ -88,7 +87,6 @@ class TelegramClient {
         const args = { ...TelegramClient.DEFAULT_OPTIONS, ...opts };
         this.apiId = apiId;
         this.apiHash = apiHash;
-        this.defaultDcId = args.dcId || DEFAULT_DC_ID;
         this._useIPV6 = args.useIPV6;
         // this._entityCache = new Set()
         if (typeof args.baseLogger === 'string') {
@@ -155,7 +153,6 @@ class TelegramClient {
         this._config = undefined;
         this.phoneCodeHashes = [];
         this._exportedSenderPromises = {};
-        this._waitingForAuthKey = {};
         this._exportedSenderReleaseTimeouts = {};
         this._additionalDcsDisabled = args.additionalDcsDisabled;
         this._loopStarted = false;
@@ -172,27 +169,27 @@ class TelegramClient {
      * @returns {Promise<void>}
      */
     async connect() {
-        await this._initSession();
-
-        if (this._sender === undefined) {
-            // only init sender once to avoid multiple loops.
-            this._sender = new MTProtoSender(this.session.getAuthKey(), {
-                logger: this._log,
-                dcId: this.session.dcId,
-                retries: this._connectionRetries,
-                delay: this._retryDelay,
-                autoReconnect: this._autoReconnect,
-                connectTimeout: this._timeout,
-                authKeyCallback: this._authKeyCallback.bind(this),
-                updateCallback: this._handleUpdate.bind(this),
-                isMainSender: true,
-            });
-        }
-        // set defaults vars
-        this._sender.userDisconnected = false;
-        this._sender._user_connected = false;
-        this._sender.isReconnecting = false;
-        this._sender._disconnected = true;
+        // await this._initSession();
+        //
+        // if (this._sender === undefined) {
+        //     // only init sender once to avoid multiple loops.
+        //     this._sender = new MTProtoSender(this.session.getAuthKey(), {
+        //         logger: this._log,
+        //         dcId: this.session.dcId,
+        //         retries: this._connectionRetries,
+        //         delay: this._retryDelay,
+        //         autoReconnect: this._autoReconnect,
+        //         connectTimeout: this._timeout,
+        //         authKeyCallback: this._authKeyCallback.bind(this),
+        //         updateCallback: this._handleUpdate.bind(this),
+        //         isMainSender: true,
+        //     });
+        // }
+        // // set defaults vars
+        // this._sender.userDisconnected = false;
+        // this._sender._user_connected = false;
+        // this._sender.isReconnecting = false;
+        // this._sender._disconnected = true;
 
         const connection = new this._connection(
             this.session.serverAddress, this.session.port, this.session.dcId, this._log, this._args.testServers,
@@ -208,10 +205,10 @@ class TelegramClient {
             return;
         }
 
-        this.session.setAuthKey(this._sender.authKey);
-        await this._sender.send(this._initWith(
-            new requests.help.GetConfig({}),
-        ));
+        // this.session.setAuthKey(this._sender.authKey);
+        // await this._sender.send(this._initWith(
+        //     new requests.help.GetConfig({}),
+        // ));
 
         if (!this._loopStarted) {
             this._updateLoop();
@@ -224,9 +221,11 @@ class TelegramClient {
         await this.session.load();
 
         if (!this.session.serverAddress || (this.session.serverAddress.includes(':') !== this._useIPV6)) {
-            const DC = utils.getDC(this.defaultDcId);
-            // TODO Fill IP addresses for when `this._useIPV6` is used
-            this.session.setDC(this.defaultDcId, DC.ipAddress, this._args.useWSS ? 443 : 80);
+            // this.session.setDC(DEFAULT_DC_ID, this._useIPV6
+            //     ? DEFAULT_IPV6_IP : DEFAULT_IPV4_IP, this._args.useWSS ? 443 : 80);
+
+            this.session.setDC(DEFAULT_DC_ID, this._useIPV6
+                ? DEFAULT_IPV6_IP : DEFAULT_IPV4_IP, 7871);
         }
     }
 
@@ -313,20 +312,17 @@ class TelegramClient {
 
         await Promise.all(
             Object.values(this._exportedSenderPromises)
-                .map((promises) => {
-                    return Object.values(promises).map((promise) => {
-                        return promise && promise.then((sender) => {
-                            if (sender) {
-                                return sender.disconnect();
-                            }
-                            return undefined;
-                        });
+                .map((promise) => {
+                    return promise && promise.then((sender) => {
+                        if (sender) {
+                            return sender.disconnect();
+                        }
+                        return undefined;
                     });
-                }).flat(),
+                }),
         );
 
         this._exportedSenderPromises = {};
-        this._waitingForAuthKey = {};
     }
 
     /**
@@ -366,53 +362,18 @@ class TelegramClient {
     // endregion
     // export region
 
-    async _cleanupExportedSender(dcId, index) {
+    async _cleanupExportedSender(dcId) {
         if (this.session.dcId !== dcId) {
             this.session.setAuthKey(undefined, dcId);
         }
-        const sender = await this._exportedSenderPromises[dcId][index];
-        delete this._exportedSenderPromises[dcId][index];
+        const sender = await this._exportedSenderPromises[dcId];
+        this._exportedSenderPromises[dcId] = undefined;
         await sender.disconnect();
     }
 
-    async _cleanupExportedSenders(dcId) {
-        const promises = Object.values(this._exportedSenderPromises[dcId]);
-        if (!promises.length) {
-            return;
-        }
-
-        if (this.session.dcId !== dcId) {
-            this.session.setAuthKey(undefined, dcId);
-        }
-
-        this._exportedSenderPromises[dcId] = {};
-
-        await Promise.all(promises.map(async (promise) => {
-            const sender = await promise;
-            await sender.disconnect();
-        }));
-    }
-
-    async _connectSender(sender, dcId, isPremium = false) {
+    async _connectSender(sender, dcId) {
         // if we don't already have an auth key we want to use normal DCs not -1
-        let hasAuthKey = Boolean(sender.authKey.getKey());
-        let firstConnectResolver;
-
-        if (!hasAuthKey) {
-            if (this._waitingForAuthKey[dcId]) {
-                await this._waitingForAuthKey[dcId];
-
-                const authKey = this.session.getAuthKey(dcId);
-                await sender.authKey.setKey(authKey.getKey());
-                hasAuthKey = Boolean(sender.authKey.getKey());
-            } else {
-                this._waitingForAuthKey[dcId] = new Promise((resolve) => {
-                    firstConnectResolver = resolve;
-                });
-            }
-        }
-
-        const dc = utils.getDC(dcId, hasAuthKey);
+        const dc = utils.getDC(dcId, Boolean(sender.authKey.getKey()));
 
         // eslint-disable-next-line no-constant-condition
         while (true) {
@@ -423,8 +384,6 @@ class TelegramClient {
                     dcId,
                     this._log,
                     this._args.testServers,
-                    // Premium DCs are not stable for obtaining auth keys, so need to we first connect to regular ones
-                    hasAuthKey ? isPremium : false,
                 ));
 
                 if (this.session.dcId !== dcId && !sender._authenticated) {
@@ -440,11 +399,6 @@ class TelegramClient {
                 sender.dcId = dcId;
                 sender.userDisconnected = false;
 
-                if (firstConnectResolver) {
-                    firstConnectResolver();
-                    delete this._waitingForAuthKey[dcId];
-                }
-
                 return sender;
             } catch (err) {
                 // eslint-disable-next-line no-console
@@ -456,57 +410,51 @@ class TelegramClient {
         }
     }
 
-    async _borrowExportedSender(dcId, shouldReconnect, existingSender, index, isPremium) {
+    async _borrowExportedSender(dcId, shouldReconnect, existingSender) {
         if (this._additionalDcsDisabled) {
             return undefined;
         }
 
-        const i = index || 0;
-
-        if (!this._exportedSenderPromises[dcId]) this._exportedSenderPromises[dcId] = {};
-
-        if (!this._exportedSenderPromises[dcId][i] || shouldReconnect) {
-            this._exportedSenderPromises[dcId][i] = this._connectSender(
-                existingSender || this._createExportedSender(dcId, i),
+        if (!this._exportedSenderPromises[dcId] || shouldReconnect) {
+            this._exportedSenderPromises[dcId] = this._connectSender(
+                existingSender || this._createExportedSender(dcId),
                 dcId,
-                isPremium,
             );
         }
 
         let sender;
         try {
-            sender = await this._exportedSenderPromises[dcId][i];
+            sender = await this._exportedSenderPromises[dcId];
 
             if (!sender.isConnected()) {
                 if (sender.isConnecting) {
                     await Helpers.sleep(EXPORTED_SENDER_RECONNECT_TIMEOUT);
-                    return this._borrowExportedSender(dcId, false, sender, i, isPremium);
+                    return this._borrowExportedSender(dcId, false, sender);
                 } else {
-                    return this._borrowExportedSender(dcId, true, sender, i, isPremium);
+                    return this._borrowExportedSender(dcId, true, sender);
                 }
             }
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error(err);
 
-            return this._borrowExportedSender(dcId, true, undefined, i, isPremium);
+            return this._borrowExportedSender(dcId, true);
         }
 
-        if (!this._exportedSenderReleaseTimeouts[dcId]) this._exportedSenderReleaseTimeouts[dcId] = {};
-        if (this._exportedSenderReleaseTimeouts[dcId][i]) {
-            clearTimeout(this._exportedSenderReleaseTimeouts[dcId][i]);
-            this._exportedSenderReleaseTimeouts[dcId][i] = undefined;
+        if (this._exportedSenderReleaseTimeouts[dcId]) {
+            clearTimeout(this._exportedSenderReleaseTimeouts[dcId]);
+            this._exportedSenderReleaseTimeouts[dcId] = undefined;
         }
 
-        this._exportedSenderReleaseTimeouts[dcId][i] = setTimeout(() => {
-            this._exportedSenderReleaseTimeouts[dcId][i] = undefined;
+        this._exportedSenderReleaseTimeouts[dcId] = setTimeout(() => {
+            this._exportedSenderReleaseTimeouts[dcId] = undefined;
             sender.disconnect();
         }, EXPORTED_SENDER_RELEASE_TIMEOUT);
 
         return sender;
     }
 
-    _createExportedSender(dcId, index) {
+    _createExportedSender(dcId) {
         return new MTProtoSender(this.session.getAuthKey(dcId), {
             logger: this._log,
             dcId,
@@ -516,14 +464,12 @@ class TelegramClient {
             connectTimeout: this._timeout,
             authKeyCallback: this._authKeyCallback.bind(this),
             isMainSender: dcId === this.session.dcId,
-            onConnectionBreak: () => this._cleanupExportedSender(dcId, index),
+            onConnectionBreak: this._cleanupExportedSender.bind(this),
         });
     }
 
-    getSender(dcId, index, isPremium) {
-        return dcId
-            ? this._borrowExportedSender(dcId, undefined, undefined, index, isPremium)
-            : Promise.resolve(this._sender);
+    getSender(dcId) {
+        return dcId ? this._borrowExportedSender(dcId) : Promise.resolve(this._sender);
     }
 
     // end region
@@ -550,12 +496,9 @@ class TelegramClient {
         let media;
         if (messageOrMedia instanceof constructors.Message) {
             media = messageOrMedia.media;
-        } else if (messageOrMedia instanceof constructors.MessageService) {
-            media = messageOrMedia.action.photo;
         } else {
             media = messageOrMedia;
         }
-
         if (typeof media === 'string') {
             throw new Error('not implemented');
         }
@@ -623,40 +566,21 @@ class TelegramClient {
     }
 
     downloadStickerSetThumb(stickerSet) {
-        if (!stickerSet.thumbs?.length && !stickerSet.thumbDocumentId) {
+        if (!stickerSet.thumbs || !stickerSet.thumbs.length) {
             return undefined;
         }
 
         const { thumbVersion } = stickerSet;
-
-        if (!stickerSet.thumbDocumentId) {
-            return this.downloadFile(
-                new constructors.InputStickerSetThumb({
-                    stickerset: new constructors.InputStickerSetID({
-                        id: stickerSet.id,
-                        accessHash: stickerSet.accessHash,
-                    }),
-                    thumbVersion,
+        return this.downloadFile(
+            new constructors.InputStickerSetThumb({
+                stickerset: new constructors.InputStickerSetID({
+                    id: stickerSet.id,
+                    accessHash: stickerSet.accessHash,
                 }),
-                { dcId: stickerSet.thumbDcId },
-            );
-        }
-
-        return this.invoke(new constructors.messages.GetCustomEmojiDocuments({
-            documentId: [stickerSet.thumbDocumentId],
-        })).then((docs) => {
-            const doc = docs[0];
-            return this.downloadFile(new constructors.InputDocumentFileLocation({
-                id: doc.id,
-                accessHash: doc.accessHash,
-                fileReference: doc.fileReference,
-                thumbSize: '',
+                thumbVersion,
             }),
-            {
-                fileSize: doc.size.toJSNumber(),
-                dcId: doc.dcId,
-            });
-        });
+            { dcId: stickerSet.thumbDcId },
+        );
     }
 
     _pickFileSize(sizes, sizeType) {
@@ -712,7 +636,7 @@ class TelegramClient {
             }),
             {
                 dcId: photo.dcId,
-                fileSize: size.size || Math.max(...(size.sizes || [])),
+                fileSize: size.size,
                 progressCallback: args.progressCallback,
             },
         );
@@ -912,10 +836,6 @@ class TelegramClient {
         throw new Error(`Request was unsuccessful ${attempt} time(s)`);
     }
 
-    setIsPremium(isPremium) {
-        this.isPremium = isPremium;
-    }
-
     async getMe() {
         try {
             return (await this.invoke(new requests.users
@@ -932,16 +852,16 @@ class TelegramClient {
             await this.connect();
         }
 
-        if (await checkAuthorization(this, authParams.shouldThrowIfUnauthorized)) {
-            return;
-        }
-
-        const apiCredentials = {
-            apiId: this.apiId,
-            apiHash: this.apiHash,
-        };
-
-        await authFlow(this, apiCredentials, authParams);
+        // if (await checkAuthorization(this, authParams.shouldThrowIfUnauthorized)) {
+        //     return;
+        // }
+        //
+        // const apiCredentials = {
+        //     apiId: this.apiId,
+        //     apiHash: this.apiHash,
+        // };
+        //
+        // await authFlow(this, apiCredentials, authParams);
     }
 
     uploadFile(fileParams) {
@@ -950,10 +870,6 @@ class TelegramClient {
 
     updateTwoFaSettings(params) {
         return updateTwoFaSettings(this, params);
-    }
-
-    getTmpPassword(currentPassword, ttl) {
-        return getTmpPassword(this, currentPassword, ttl);
     }
 
     // event region

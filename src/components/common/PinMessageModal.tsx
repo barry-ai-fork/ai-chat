@@ -37,6 +37,7 @@ type StateProps = {
 const PinMessageModal: FC<OwnProps & StateProps> = ({
   isOpen,
   messageId,
+  chatId,
   isChannel,
   isGroup,
   isSuperGroup,
@@ -48,17 +49,17 @@ const PinMessageModal: FC<OwnProps & StateProps> = ({
 
   const handlePinMessageForAll = useCallback(() => {
     pinMessage({
-      messageId, isUnpin: false,
+      chatId, messageId, isUnpin: false,
     });
     onClose();
-  }, [pinMessage, messageId, onClose]);
+  }, [pinMessage, chatId, messageId, onClose]);
 
   const handlePinMessage = useCallback(() => {
     pinMessage({
-      messageId, isUnpin: false, isOneSide: true, isSilent: true,
+      chatId, messageId, isUnpin: false, isOneSide: true, isSilent: true,
     });
     onClose();
-  }, [messageId, onClose, pinMessage]);
+  }, [chatId, messageId, onClose, pinMessage]);
 
   const lang = useLang();
 
@@ -82,19 +83,17 @@ const PinMessageModal: FC<OwnProps & StateProps> = ({
       title={lang('PinMessageAlertTitle')}
     >
       <p>{renderMessage()}</p>
-      <div className="dialog-buttons-column">
-        <Button className="confirm-dialog-button" isText onClick={handlePinMessage}>
-          {lang('DialogPin')}
+      <Button className="confirm-dialog-button" isText onClick={handlePinMessage}>
+        {lang('DialogPin')}
+      </Button>
+      {canPinForAll && (
+        <Button className="confirm-dialog-button" isText onClick={handlePinMessageForAll}>
+          {contactName
+            ? renderText(lang('Conversation.PinMessagesFor', contactName))
+            : lang('Conversation.PinMessageAlert.PinAndNotifyMembers')}
         </Button>
-        {canPinForAll && (
-          <Button className="confirm-dialog-button" isText onClick={handlePinMessageForAll}>
-            {contactName
-              ? renderText(lang('Conversation.PinMessagesFor', contactName))
-              : lang('Conversation.PinMessageAlert.PinAndNotifyMembers')}
-          </Button>
-        )}
-        <Button className="confirm-dialog-button" isText onClick={onClose}>{lang('Cancel')}</Button>
-      </div>
+      )}
+      <Button className="confirm-dialog-button" isText onClick={onClose}>{lang('Cancel')}</Button>
     </Modal>
   );
 };

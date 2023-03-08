@@ -61,6 +61,7 @@ const PickerSelectedItem: FC<OwnProps & StateProps> = ({
         user={user}
         size="small"
         isSavedMessages={user?.isSelf}
+        noVideo
       />
     );
 
@@ -74,7 +75,6 @@ const PickerSelectedItem: FC<OwnProps & StateProps> = ({
   const fullClassName = buildClassName(
     'PickerSelectedItem',
     className,
-    chat?.isForum && 'forum-avatar',
     isMinimized && 'minimized',
     canClose && 'closeable',
   );

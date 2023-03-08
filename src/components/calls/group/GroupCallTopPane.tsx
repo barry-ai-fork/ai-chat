@@ -5,11 +5,10 @@ import React, {
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiChat, ApiGroupCall, ApiUser } from '../../../api/types';
-import type { AnimationLevel } from '../../../types';
 
 import { selectChatGroupCall } from '../../../global/selectors/calls';
 import buildClassName from '../../../util/buildClassName';
-import { selectChat, selectTabState } from '../../../global/selectors';
+import { selectChat } from '../../../global/selectors';
 import useLang from '../../../hooks/useLang';
 
 import Button from '../../ui/Button';
@@ -20,7 +19,6 @@ import './GroupCallTopPane.scss';
 type OwnProps = {
   chatId: string;
   hasPinnedOffset: boolean;
-  className?: string;
 };
 
 type StateProps = {
@@ -28,31 +26,28 @@ type StateProps = {
   isActive: boolean;
   usersById: Record<string, ApiUser>;
   chatsById: Record<string, ApiChat>;
-  animationLevel: AnimationLevel;
 };
 
 const GroupCallTopPane: FC<OwnProps & StateProps> = ({
   chatId,
   isActive,
-  className,
   groupCall,
   hasPinnedOffset,
   usersById,
   chatsById,
-  animationLevel,
 }) => {
   const {
-    requestMasterAndJoinGroupCall,
+    joinGroupCall,
     subscribeToGroupCallUpdates,
   } = getActions();
 
   const lang = useLang();
 
   const handleJoinGroupCall = useCallback(() => {
-    requestMasterAndJoinGroupCall({
+    joinGroupCall({
       chatId,
     });
-  }, [requestMasterAndJoinGroupCall, chatId]);
+  }, [joinGroupCall, chatId]);
 
   const participants = groupCall?.participants;
 
@@ -99,7 +94,6 @@ const GroupCallTopPane: FC<OwnProps & StateProps> = ({
         'GroupCallTopPane',
         hasPinnedOffset && 'has-pinned-offset',
         !isActive && 'is-hidden',
-        className,
       )}
       onClick={handleJoinGroupCall}
     >
@@ -111,9 +105,9 @@ const GroupCallTopPane: FC<OwnProps & StateProps> = ({
         {fetchedParticipants.map((p) => {
           if (!p) return undefined;
           if (p.user) {
-            return <Avatar key={p.user.id} user={p.user} animationLevel={animationLevel} />;
+            return <Avatar key={p.user.id} user={p.user} />;
           } else {
-            return <Avatar key={p.chat.id} chat={p.chat} animationLevel={animationLevel} />;
+            return <Avatar key={p.chat.id} chat={p.chat} />;
           }
         })}
       </div>
@@ -128,7 +122,6 @@ export default memo(withGlobal<OwnProps>(
   (global, { chatId }) => {
     const chat = selectChat(global, chatId)!;
     const groupCall = selectChatGroupCall(global, chatId);
-    const activeGroupCallId = selectTabState(global).isMasterTab ? global.groupCalls.activeGroupCallId : undefined;
     return {
       groupCall,
       usersById: global.users.byId,
@@ -136,8 +129,7 @@ export default memo(withGlobal<OwnProps>(
       activeGroupCallId: global.groupCalls.activeGroupCallId,
       isActive: ((!groupCall ? (chat && chat.isCallNotEmpty && chat.isCallActive)
         : (groupCall.participantsCount > 0 && groupCall.isLoaded)))
-        && (activeGroupCallId !== groupCall?.id),
-      animationLevel: global.settings.byKey.animationLevel,
+        && (global.groupCalls.activeGroupCallId !== groupCall?.id),
     };
   },
 )(GroupCallTopPane));

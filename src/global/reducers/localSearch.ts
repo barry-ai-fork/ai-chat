@@ -1,12 +1,9 @@
-import type { GlobalState, TabArgs } from '../types';
+import type { GlobalState } from '../types';
 import type { ApiMessageSearchType } from '../../api/types';
 
 import { areSortedArraysEqual, unique } from '../../util/iteratees';
 import type { SharedMediaType } from '../../types';
 import { buildChatThreadKey } from '../helpers';
-import { updateTabState } from './tabs';
-import { selectTabState } from '../selectors';
-import { getCurrentTabId } from '../../util/establishMultitabRole';
 
 interface TextSearchParams {
   isActive: boolean;
@@ -27,164 +24,137 @@ interface MediaSearchParams {
   }>>;
 }
 
-function replaceLocalTextSearch<T extends GlobalState>(
-  global: T,
+function replaceLocalTextSearch(
+  global: GlobalState,
   chatThreadKey: string,
   searchParams: TextSearchParams,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  return updateTabState(global, {
+): GlobalState {
+  return {
+    ...global,
     localTextSearch: {
       byChatThreadKey: {
-        ...selectTabState(global, tabId).localTextSearch.byChatThreadKey,
+        ...global.localTextSearch.byChatThreadKey,
         [chatThreadKey]: searchParams,
       },
     },
-  }, tabId);
+  };
 }
 
-export function updateLocalTextSearch<T extends GlobalState>(
-  global: T,
+export function updateLocalTextSearch(
+  global: GlobalState,
   chatId: string,
   threadId: number,
   isActive: boolean,
   query?: string,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
+): GlobalState {
   const chatThreadKey = buildChatThreadKey(chatId, threadId);
 
   return replaceLocalTextSearch(global, chatThreadKey, {
-    ...selectTabState(global, tabId).localTextSearch.byChatThreadKey[chatThreadKey],
+    ...global.localTextSearch.byChatThreadKey[chatThreadKey],
     isActive,
     query,
-  }, tabId);
+  });
 }
 
-export function replaceLocalTextSearchResults<T extends GlobalState>(
-  global: T,
+export function replaceLocalTextSearchResults(
+  global: GlobalState,
   chatId: string,
   threadId: number,
   foundIds?: number[],
   totalCount?: number,
   nextOffsetId?: number,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
+): GlobalState {
   const chatThreadKey = buildChatThreadKey(chatId, threadId);
 
   return replaceLocalTextSearch(global, chatThreadKey, {
-    ...selectTabState(global, tabId).localTextSearch.byChatThreadKey[chatThreadKey],
+    ...global.localTextSearch.byChatThreadKey[chatThreadKey],
     results: {
       foundIds,
       totalCount,
       nextOffsetId,
     },
-  }, tabId);
+  });
 }
 
-export function updateLocalTextSearchResults<T extends GlobalState>(
-  global: T,
+export function updateLocalTextSearchResults(
+  global: GlobalState,
   chatId: string,
   threadId: number,
   newFoundIds: number[],
   totalCount?: number,
   nextOffsetId?: number,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
+): GlobalState {
   const chatThreadKey = buildChatThreadKey(chatId, threadId);
-  const { results } = selectTabState(global, tabId).localTextSearch.byChatThreadKey[chatThreadKey] || {};
+  const { results } = global.localTextSearch.byChatThreadKey[chatThreadKey] || {};
   const prevFoundIds = (results?.foundIds) || [];
   const foundIds = orderFoundIds(unique(Array.prototype.concat(prevFoundIds, newFoundIds)));
   const foundOrPrevFoundIds = areSortedArraysEqual(prevFoundIds, foundIds) ? prevFoundIds : foundIds;
 
-  return replaceLocalTextSearchResults(global, chatId, threadId, foundOrPrevFoundIds, totalCount, nextOffsetId, tabId);
+  return replaceLocalTextSearchResults(global, chatId, threadId, foundOrPrevFoundIds, totalCount, nextOffsetId);
 }
 
-function replaceLocalMediaSearch<T extends GlobalState>(
-  global: T,
+function replaceLocalMediaSearch(
+  global: GlobalState,
   chatId: string,
-  threadId: number,
   searchParams: MediaSearchParams,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  const chatThreadKey = buildChatThreadKey(chatId, threadId);
-
-  return updateTabState(global, {
+): GlobalState {
+  return {
+    ...global,
     localMediaSearch: {
-      byChatThreadKey: {
-        ...selectTabState(global, tabId).localMediaSearch.byChatThreadKey,
-        [chatThreadKey]: searchParams,
+      byChatId: {
+        ...global.localMediaSearch.byChatId,
+        [chatId]: searchParams,
       },
     },
-  }, tabId);
+  };
 }
 
-export function updateLocalMediaSearchType<T extends GlobalState>(
-  global: T,
+export function updateLocalMediaSearchType(
+  global: GlobalState,
   chatId: string,
-  threadId: number,
   currentType: SharedMediaType | undefined,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  const chatThreadKey = buildChatThreadKey(chatId, threadId);
-
-  return replaceLocalMediaSearch(global, chatId, threadId, {
-    ...selectTabState(global, tabId).localMediaSearch.byChatThreadKey[chatThreadKey],
+): GlobalState {
+  return replaceLocalMediaSearch(global, chatId, {
+    ...global.localMediaSearch.byChatId[chatId],
     currentType,
-  }, tabId);
+  });
 }
 
-export function replaceLocalMediaSearchResults<T extends GlobalState>(
-  global: T,
+export function replaceLocalMediaSearchResults(
+  global: GlobalState,
   chatId: string,
-  threadId: number,
   type: ApiMessageSearchType,
   foundIds?: number[],
   totalCount?: number,
   nextOffsetId?: number,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  const chatThreadKey = buildChatThreadKey(chatId, threadId);
-
-  return replaceLocalMediaSearch(global, chatId, threadId, {
-    ...selectTabState(global, tabId).localMediaSearch.byChatThreadKey[chatThreadKey],
+): GlobalState {
+  return replaceLocalMediaSearch(global, chatId, {
+    ...global.localMediaSearch.byChatId[chatId],
     resultsByType: {
-      ...(selectTabState(global, tabId).localMediaSearch.byChatThreadKey[chatThreadKey] || {}).resultsByType,
+      ...(global.localMediaSearch.byChatId[chatId] || {}).resultsByType,
       [type]: {
         foundIds,
         totalCount,
         nextOffsetId,
       },
     },
-  }, tabId);
+  });
 }
 
-export function updateLocalMediaSearchResults<T extends GlobalState>(
-  global: T,
+export function updateLocalMediaSearchResults(
+  global: GlobalState,
   chatId: string,
-  threadId: number,
   type: SharedMediaType,
   newFoundIds: number[],
   totalCount?: number,
   nextOffsetId?: number,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  const chatThreadKey = buildChatThreadKey(chatId, threadId);
-
-  const { resultsByType } = selectTabState(global, tabId).localMediaSearch.byChatThreadKey[chatThreadKey] || {};
+): GlobalState {
+  const { resultsByType } = global.localMediaSearch.byChatId[chatId] || {};
   const prevFoundIds = resultsByType?.[type] ? resultsByType[type]!.foundIds : [];
   const foundIds = orderFoundIds(unique(Array.prototype.concat(prevFoundIds, newFoundIds)));
   const foundOrPrevFoundIds = areSortedArraysEqual(prevFoundIds, foundIds) ? prevFoundIds : foundIds;
 
-  return replaceLocalMediaSearchResults(
-    global,
-    chatId,
-    threadId,
-    type,
-    foundOrPrevFoundIds,
-    totalCount,
-    nextOffsetId,
-    tabId,
-  );
+  return replaceLocalMediaSearchResults(global, chatId, type, foundOrPrevFoundIds, totalCount, nextOffsetId);
 }
 
 function orderFoundIds(listedIds: number[]) {

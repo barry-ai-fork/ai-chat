@@ -1,11 +1,8 @@
 import { addActionHandler, getGlobal, setGlobal } from '../../index';
-import { callApi } from '../../../api/gramjs';
 
-import type { ActionReturnType, GlobalState, TabArgs } from '../../types';
-import type { ApiInvoice, ApiRequestInputInvoice } from '../../../api/types';
 import { PaymentStep } from '../../../types';
+import type { ApiChat, ApiRequestInputInvoice } from '../../../api/types';
 
-import { DEBUG_PAYMENT_SMART_GLOCAL } from '../../../config';
 import {
   selectPaymentRequestId,
   selectProviderPublishableKey,
@@ -15,10 +12,13 @@ import {
   selectPaymentFormId,
   selectProviderPublicToken,
   selectSmartGlocalCredentials,
-  selectPaymentInputInvoice, selectTabState,
+  selectPaymentInputInvoice,
 } from '../../selectors';
+import { callApi } from '../../../api/gramjs';
 import { getStripeError } from '../../helpers';
 import { buildQueryString } from '../../../util/requestQuery';
+import { DEBUG_PAYMENT_SMART_GLOCAL } from '../../../config';
+
 import {
   updateShippingOptions,
   setPaymentStep,
@@ -26,169 +26,170 @@ import {
   setPaymentForm,
   setStripeCardInfo,
   setReceipt,
+  clearPayment,
   closeInvoice,
-  setSmartGlocalCardInfo, addUsers, setInvoiceInfo, updatePayment,
+  setSmartGlocalCardInfo, addUsers, setInvoiceInfo,
 } from '../../reducers';
 import { buildCollectionByKey } from '../../../util/iteratees';
-import { updateTabState } from '../../reducers/tabs';
-import { getCurrentTabId } from '../../../util/establishMultitabRole';
-import type { ApiCredentials } from '../../../components/payment/PaymentModal';
 
-addActionHandler('validateRequestedInfo', (global, actions, payload): ActionReturnType => {
-  const { requestInfo, saveInfo, tabId = getCurrentTabId() } = payload;
-
-  const inputInvoice = selectPaymentInputInvoice(global, tabId);
-  if (!inputInvoice) {
-    return;
-  }
-
+addActionHandler('validateRequestedInfo', (global, actions, payload) => {
+  const { requestInfo, saveInfo } = payload;
+  const inputInvoice = selectPaymentInputInvoice(global);
+  if (!inputInvoice) return;
   if ('slug' in inputInvoice) {
-    void validateRequestedInfo(global, inputInvoice, requestInfo, saveInfo, tabId);
+    void validateRequestedInfo(inputInvoice, requestInfo, saveInfo);
   } else {
     const chat = selectChat(global, inputInvoice.chatId);
-    if (!chat) {
-      return;
-    }
-
-    void validateRequestedInfo(global, {
+    if (!chat) return;
+    void validateRequestedInfo({
       chat,
       messageId: inputInvoice.messageId,
-    }, requestInfo, saveInfo, tabId);
+    }, requestInfo, saveInfo);
   }
 });
 
-addActionHandler('openInvoice', async (global, actions, payload): Promise<void> => {
-  const { tabId = getCurrentTabId() } = payload;
-  let invoice: ApiInvoice | undefined;
-  if ('slug' in payload) {
-    invoice = await getPaymentForm(global, { slug: payload.slug }, tabId);
-  } else {
-    const chat = selectChat(global, payload.chatId);
-    if (!chat) {
-      return;
-    }
-
-    invoice = await getPaymentForm(global, {
-      chat,
-      messageId: payload.messageId,
-    }, tabId);
-  }
-
-  if (!invoice) {
+async function validateRequestedInfo(inputInvoice: ApiRequestInputInvoice, requestInfo: any, shouldSave?: true) {
+  const result = await callApi('validateRequestedInfo', {
+    inputInvoice, requestInfo, shouldSave,
+  });
+  if (!result) {
     return;
   }
 
+  const { id, shippingOptions } = result;
+  if (!id) {
+    return;
+  }
+
+  let global = setRequestInfoId(getGlobal(), id);
+  if (shippingOptions) {
+    global = updateShippingOptions(global, shippingOptions);
+    global = setPaymentStep(global, PaymentStep.Shipping);
+  } else {
+    global = setPaymentStep(global, PaymentStep.PaymentInfo);
+  }
+  setGlobal(global);
+}
+
+addActionHandler('openInvoice', async (global, actions, payload) => {
+  let invoice;
+  if ('slug' in payload) {
+    invoice = await getPaymentForm({ slug: payload.slug });
+  } else {
+    const chat = selectChat(global, payload.chatId);
+    if (!chat) return;
+    invoice = await getPaymentForm({
+      chat,
+      messageId: payload.messageId,
+    });
+  }
+  if (!invoice) return;
+
   global = getGlobal();
-  global = setInvoiceInfo(global, invoice, tabId);
-  global = updateTabState(global, {
+  global = setInvoiceInfo(global, invoice);
+  setGlobal({
+    ...global,
     payment: {
-      ...selectTabState(global, tabId).payment,
+      ...global.payment,
       inputInvoice: payload,
       isPaymentModalOpen: true,
       status: 'cancelled',
-      isExtendedMedia: (payload as any).isExtendedMedia,
     },
-  }, tabId);
-  setGlobal(global);
+  });
 });
 
-async function getPaymentForm<T extends GlobalState>(
-  global: T, inputInvoice: ApiRequestInputInvoice,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): Promise<ApiInvoice | undefined> {
+async function getPaymentForm(inputInvoice: ApiRequestInputInvoice) {
   const result = await callApi('getPaymentForm', inputInvoice);
   if (!result) {
     return undefined;
   }
-
-  const { form, invoice, users } = result;
-
-  global = getGlobal();
-  global = setPaymentForm(global, form, tabId);
-  global = setPaymentStep(global, PaymentStep.Checkout, tabId);
-  global = addUsers(global, buildCollectionByKey(users, 'id'));
+  const { form, invoice } = result;
+  let global = setPaymentForm(getGlobal(), form);
+  let step = PaymentStep.PaymentInfo;
+  const {
+    shippingAddressRequested, nameRequested, phoneRequested, emailRequested,
+  } = global.payment.invoice || {};
+  if (shippingAddressRequested || nameRequested || phoneRequested || emailRequested) {
+    step = PaymentStep.ShippingInfo;
+  }
+  global = setPaymentStep(global, step);
   setGlobal(global);
-
   return invoice;
 }
 
-addActionHandler('getReceipt', async (global, actions, payload): Promise<void> => {
-  const {
-    receiptMessageId, chatId, messageId, tabId = getCurrentTabId(),
-  } = payload;
+addActionHandler('getReceipt', (global, actions, payload) => {
+  const { receiptMessageId, chatId, messageId } = payload;
   const chat = chatId && selectChat(global, chatId);
   if (!messageId || !receiptMessageId || !chat) {
     return;
   }
 
+  void getReceipt(chat, messageId, receiptMessageId);
+});
+
+async function getReceipt(chat: ApiChat, messageId: number, receiptMessageId: number) {
   const result = await callApi('getReceipt', chat, receiptMessageId);
   if (!result) {
     return;
   }
 
-  global = getGlobal();
+  let global = getGlobal();
   const message = selectChatMessage(global, chat.id, messageId);
-  global = addUsers(global, buildCollectionByKey(result.users, 'id'));
-  global = setReceipt(global, result.receipt, message, tabId);
+  global = setReceipt(global, result, message);
   setGlobal(global);
-});
+}
 
-addActionHandler('clearPaymentError', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  global = updateTabState(global, {
+addActionHandler('clearPaymentError', (global) => {
+  setGlobal({
+    ...global,
     payment: {
-      ...selectTabState(global, tabId).payment,
+      ...global.payment,
       error: undefined,
     },
-  }, tabId);
-  setGlobal(global);
+  });
 });
 
-addActionHandler('clearReceipt', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  return updateTabState(global, {
+addActionHandler('clearReceipt', (global) => {
+  setGlobal({
+    ...global,
     payment: {
-      ...selectTabState(global, tabId).payment,
+      ...global.payment,
       receipt: undefined,
     },
-  }, tabId);
+  });
 });
 
-addActionHandler('sendCredentialsInfo', (global, actions, payload): ActionReturnType => {
-  const { credentials, tabId = getCurrentTabId() } = payload;
-
-  const { nativeProvider } = selectTabState(global, tabId).payment;
+addActionHandler('sendCredentialsInfo', (global, actions, payload) => {
+  const { nativeProvider } = global.payment;
+  const { credentials } = payload;
   const { data } = credentials;
 
   if (nativeProvider === 'stripe') {
-    const publishableKey = selectProviderPublishableKey(global, tabId);
+    const publishableKey = selectProviderPublishableKey(global);
     if (!publishableKey) {
       return;
     }
-    void sendStripeCredentials(global, data, publishableKey, tabId);
+    void sendStripeCredentials(data, publishableKey);
   } else if (nativeProvider === 'smartglocal') {
-    const publicToken = selectProviderPublicToken(global, tabId);
+    const publicToken = selectProviderPublicToken(global);
     if (!publicToken) {
       return;
     }
-    void sendSmartGlocalCredentials(global, data, publicToken, tabId);
+    void sendSmartGlocalCredentials(data, publicToken);
   }
 });
 
-addActionHandler('sendPaymentForm', async (global, actions, payload): Promise<void> => {
-  const {
-    shippingOptionId, saveCredentials, savedCredentialId, tipAmount,
-    tabId = getCurrentTabId(),
-  } = payload;
-  const inputInvoice = selectPaymentInputInvoice(global, tabId);
-  const formId = selectPaymentFormId(global, tabId);
-  const requestInfoId = selectPaymentRequestId(global, tabId);
-  const { nativeProvider, temporaryPassword } = selectTabState(global, tabId).payment;
+addActionHandler('sendPaymentForm', (global, actions, payload) => {
+  const { shippingOptionId, saveCredentials } = payload;
+  const inputInvoice = selectPaymentInputInvoice(global);
+  const formId = selectPaymentFormId(global);
+  const requestInfoId = selectPaymentRequestId(global);
+  const { nativeProvider } = global.payment;
   const publishableKey = nativeProvider === 'stripe'
-    ? selectProviderPublishableKey(global, tabId) : selectProviderPublicToken(global, tabId);
+    ? selectProviderPublishableKey(global) : selectProviderPublicToken(global);
 
   if (!inputInvoice || !publishableKey || !formId || !nativeProvider) {
-    return;
+    return undefined;
   }
 
   let requestInputInvoice;
@@ -199,7 +200,7 @@ addActionHandler('sendPaymentForm', async (global, actions, payload): Promise<vo
   } else {
     const chat = selectChat(global, inputInvoice.chatId);
     if (!chat) {
-      return;
+      return undefined;
     }
 
     requestInputInvoice = {
@@ -208,40 +209,31 @@ addActionHandler('sendPaymentForm', async (global, actions, payload): Promise<vo
     };
   }
 
-  global = updatePayment(global, { status: 'pending' }, tabId);
-  setGlobal(global);
-
-  const credentials = {
+  void sendPaymentForm(requestInputInvoice, formId, {
     save: saveCredentials,
-    data: nativeProvider === 'stripe'
-      ? selectStripeCredentials(global, tabId) : selectSmartGlocalCredentials(global, tabId),
+    data: nativeProvider === 'stripe' ? selectStripeCredentials(global) : selectSmartGlocalCredentials(global),
+  }, requestInfoId, shippingOptionId);
+
+  return {
+    ...global,
+    payment: {
+      ...global.payment,
+      status: 'pending',
+    },
   };
-  const result = await callApi('sendPaymentForm', {
-    inputInvoice: requestInputInvoice,
-    formId,
-    credentials,
-    requestedInfoId: requestInfoId,
-    shippingOptionId,
-    savedCredentialId,
-    temporaryPassword: temporaryPassword?.value,
-    tipAmount,
-  });
-
-  if (!result) {
-    return;
-  }
-
-  global = getGlobal();
-  global = updatePayment(global, { status: 'paid' }, tabId);
-  global = closeInvoice(global, tabId);
-  setGlobal(global);
 });
 
-async function sendStripeCredentials<T extends GlobalState>(
-  global: T,
-  data: ApiCredentials['data'],
+async function sendStripeCredentials(
+  data: {
+    cardNumber: string;
+    cardholder?: string;
+    expiryMonth: string;
+    expiryYear: string;
+    cvv: string;
+    country: string;
+    zip: string;
+  },
   publishableKey: string,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
 ) {
   const query = buildQueryString({
     'card[number]': data.cardNumber,
@@ -263,40 +255,43 @@ async function sendStripeCredentials<T extends GlobalState>(
   const result = await response.json();
   if (result.error) {
     const error = getStripeError(result.error);
-    global = getGlobal();
-    global = updateTabState(global, {
+    const global = getGlobal();
+    setGlobal({
+      ...global,
       payment: {
-        ...selectTabState(global, tabId).payment,
+        ...global.payment,
         status: 'failed',
         error: {
           ...error,
         },
       },
-    }, tabId);
-    setGlobal(global);
+    });
     return;
   }
-  global = getGlobal();
-  global = setStripeCardInfo(global, {
+  let global = setStripeCardInfo(getGlobal(), {
     type: result.type,
     id: result.id,
-  }, tabId);
-  global = setPaymentStep(global, PaymentStep.Checkout, tabId);
+  });
+  global = setPaymentStep(global, PaymentStep.Checkout);
   setGlobal(global);
 }
 
-async function sendSmartGlocalCredentials<T extends GlobalState>(
-  global: T,
-  data: ApiCredentials['data'],
+async function sendSmartGlocalCredentials(
+  data: {
+    cardNumber: string;
+    cardholder?: string;
+    expiryMonth: string;
+    expiryYear: string;
+    cvv: string;
+  },
   publicToken: string,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
 ) {
   const params = {
     card: {
-      number: data.cardNumber.replace(/\D+/g, ''),
+      number: data.cardNumber.replace(/[^\d]+/g, ''),
       expiration_month: data.expiryMonth,
       expiration_year: data.expiryYear,
-      security_code: data.cvv.replace(/\D+/g, ''),
+      security_code: data.cvv.replace(/[^\d]+/g, ''),
     },
   };
   const url = DEBUG_PAYMENT_SMART_GLOCAL
@@ -317,53 +312,71 @@ async function sendSmartGlocalCredentials<T extends GlobalState>(
   if (result.status !== 'ok') {
     // TODO после получения документации сделать аналог getStripeError(result.error);
     const error = { description: 'payment error' };
-    global = getGlobal();
-    global = updateTabState(global, {
+    const global = getGlobal();
+    setGlobal({
+      ...global,
       payment: {
-        ...selectTabState(global, tabId).payment,
+        ...global.payment,
         status: 'failed',
         error: {
           ...error,
         },
       },
-    }, tabId);
-    setGlobal(global);
+    });
     return;
   }
 
-  global = getGlobal();
-  global = setSmartGlocalCardInfo(global, {
+  let global = setSmartGlocalCardInfo(getGlobal(), {
     type: 'card',
     token: result.data.token,
-  }, tabId);
-  global = setPaymentStep(global, PaymentStep.Checkout, tabId);
+  });
+  global = setPaymentStep(global, PaymentStep.Checkout);
   setGlobal(global);
 }
 
-addActionHandler('setPaymentStep', (global, actions, payload): ActionReturnType => {
-  const { step, tabId = getCurrentTabId() } = payload;
-  return setPaymentStep(global, step ?? PaymentStep.Checkout, tabId);
+async function sendPaymentForm(
+  inputInvoice: ApiRequestInputInvoice,
+  formId: string,
+  credentials: any,
+  requestedInfoId?: string,
+  shippingOptionId?: string,
+) {
+  const result = await callApi('sendPaymentForm', {
+    inputInvoice, formId, credentials, requestedInfoId, shippingOptionId,
+  });
+
+  if (result === true) {
+    let global = clearPayment(getGlobal());
+    global = {
+      ...global,
+      payment: {
+        ...global.payment,
+        status: 'paid',
+      },
+    };
+    setGlobal(closeInvoice(global));
+  }
+}
+
+addActionHandler('setPaymentStep', (global, actions, payload = {}) => {
+  return setPaymentStep(global, payload.step || PaymentStep.ShippingInfo);
 });
 
-addActionHandler('closePremiumModal', (global, actions, payload): ActionReturnType => {
-  const { isClosed, tabId = getCurrentTabId() } = payload || {};
-
-  const tabState = selectTabState(global, tabId);
-  if (!tabState.premiumModal) return undefined;
-  return updateTabState(global, {
+addActionHandler('closePremiumModal', (global, actions, payload) => {
+  if (!global.premiumModal) return undefined;
+  const { isClosed } = payload || {};
+  return {
+    ...global,
     premiumModal: {
-      ...tabState.premiumModal,
+      ...global.premiumModal,
       ...(isClosed && { isOpen: false }),
       isClosing: !isClosed,
     },
-  }, tabId);
+  };
 });
 
-addActionHandler('openPremiumModal', async (global, actions, payload): Promise<void> => {
-  const {
-    initialSection, fromUserId, isSuccess, isGift, monthsAmount, toUserId,
-    tabId = getCurrentTabId(),
-  } = payload || {};
+addActionHandler('openPremiumModal', async (global, actions, payload) => {
+  const { initialSection, fromUserId, isSuccess } = payload || {};
 
   actions.loadPremiumStickers();
 
@@ -373,88 +386,14 @@ addActionHandler('openPremiumModal', async (global, actions, payload): Promise<v
   global = getGlobal();
   global = addUsers(global, buildCollectionByKey(result.users, 'id'));
 
-  global = updateTabState(global, {
+  setGlobal({
+    ...global,
     premiumModal: {
       promo: result.promo,
       initialSection,
       isOpen: true,
       fromUserId,
-      toUserId,
-      isGift,
-      monthsAmount,
       isSuccess,
     },
-  }, tabId);
-  setGlobal(global);
-});
-
-addActionHandler('openGiftPremiumModal', async (global, actions, payload): Promise<void> => {
-  const { forUserId, tabId = getCurrentTabId() } = payload || {};
-  const result = await callApi('fetchPremiumPromo');
-  if (!result) return;
-
-  global = getGlobal();
-  global = addUsers(global, buildCollectionByKey(result.users, 'id'));
-
-  // TODO Support all subscription options
-  const month = result.promo.options.find((option) => option.months === 1)!;
-
-  global = updateTabState(global, {
-    giftPremiumModal: {
-      isOpen: true,
-      forUserId,
-      monthlyCurrency: month.currency,
-      monthlyAmount: month.amount,
-    },
-  }, tabId);
-  setGlobal(global);
-});
-
-addActionHandler('closeGiftPremiumModal', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  global = updateTabState(global, {
-    giftPremiumModal: { isOpen: false },
-  }, tabId);
-  setGlobal(global);
-});
-
-addActionHandler('validatePaymentPassword', async (global, actions, payload): Promise<void> => {
-  const { password, tabId = getCurrentTabId() } = payload;
-  const result = await callApi('fetchTemporaryPaymentPassword', password);
-
-  global = getGlobal();
-
-  if (!result) {
-    global = updatePayment(global, { error: { message: 'Unknown Error', field: 'password' } }, tabId);
-  } else if ('error' in result) {
-    global = updatePayment(global, { error: { message: result.error, field: 'password' } }, tabId);
-  } else {
-    global = updatePayment(global, { temporaryPassword: result, step: PaymentStep.Checkout }, tabId);
-  }
-
-  setGlobal(global);
-});
-
-async function validateRequestedInfo<T extends GlobalState>(
-  global: T, inputInvoice: ApiRequestInputInvoice, requestInfo: any, shouldSave?: boolean,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-) {
-  const result = await callApi('validateRequestedInfo', {
-    inputInvoice, requestInfo, shouldSave,
   });
-  if (!result) {
-    return;
-  }
-
-  const { id, shippingOptions } = result;
-  global = getGlobal();
-
-  global = setRequestInfoId(global, id, tabId);
-  if (shippingOptions) {
-    global = updateShippingOptions(global, shippingOptions, tabId);
-    global = setPaymentStep(global, PaymentStep.Shipping, tabId);
-  } else {
-    global = setPaymentStep(global, PaymentStep.Checkout, tabId);
-  }
-  setGlobal(global);
-}
+});

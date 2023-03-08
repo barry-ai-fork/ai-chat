@@ -1,9 +1,7 @@
 import type { FC } from '../../lib/teact/teact';
 import React, { useRef } from '../../lib/teact/teact';
 
-import type {
-  ApiUser, ApiMessage, ApiChat,
-} from '../../api/types';
+import type { ApiUser, ApiMessage, ApiChat } from '../../api/types';
 
 import {
   getMessageMediaHash,
@@ -11,25 +9,23 @@ import {
   getSenderTitle,
   getMessageRoundVideo,
   getUserColorKey,
-  getMessageIsSpoiler,
 } from '../../global/helpers';
 import renderText from './helpers/renderText';
 import { getPictogramDimensions } from './helpers/mediaDimensions';
 import buildClassName from '../../util/buildClassName';
-
 import type { ObserveFn } from '../../hooks/useIntersectionObserver';
 import { useIsIntersecting } from '../../hooks/useIntersectionObserver';
 import useMedia from '../../hooks/useMedia';
-import useThumbnail from '../../hooks/useThumbnail';
+import useWebpThumbnail from '../../hooks/useWebpThumbnail';
 import useLang from '../../hooks/useLang';
+import { renderMessageSummary } from './helpers/renderMessageText';
 
 import ActionMessage from '../middle/ActionMessage';
-import MessageSummary from './MessageSummary';
-import MediaSpoiler from './MediaSpoiler';
 
 import './EmbeddedMessage.scss';
 
 type OwnProps = {
+  observeIntersection?: ObserveFn;
   className?: string;
   message?: ApiMessage;
   sender?: ApiUser | ApiChat;
@@ -37,9 +33,6 @@ type OwnProps = {
   customText?: string;
   noUserColors?: boolean;
   isProtected?: boolean;
-  hasContextMenu?: boolean;
-  observeIntersectionForLoading?: ObserveFn;
-  observeIntersectionForPlaying?: ObserveFn;
   onClick: NoneToVoidFunction;
 };
 
@@ -53,19 +46,16 @@ const EmbeddedMessage: FC<OwnProps> = ({
   customText,
   isProtected,
   noUserColors,
-  hasContextMenu,
-  observeIntersectionForLoading,
-  observeIntersectionForPlaying,
+  observeIntersection,
   onClick,
 }) => {
   // eslint-disable-next-line no-null/no-null
   const ref = useRef<HTMLDivElement>(null);
-  const isIntersecting = useIsIntersecting(ref, observeIntersectionForLoading);
+  const isIntersecting = useIsIntersecting(ref, observeIntersection);
 
   const mediaBlobUrl = useMedia(message && getMessageMediaHash(message, 'pictogram'), !isIntersecting);
-  const mediaThumbnail = useThumbnail(message);
+  const mediaThumbnail = useWebpThumbnail(message);
   const isRoundVideo = Boolean(message && getMessageRoundVideo(message));
-  const isSpoiler = Boolean(message && getMessageIsSpoiler(message));
 
   const lang = useLang();
 
@@ -81,31 +71,19 @@ const EmbeddedMessage: FC<OwnProps> = ({
       )}
       onClick={message ? onClick : undefined}
     >
-      {mediaThumbnail && renderPictogram(mediaThumbnail, mediaBlobUrl, isRoundVideo, isProtected, isSpoiler)}
+      {mediaThumbnail && renderPictogram(mediaThumbnail, mediaBlobUrl, isRoundVideo, isProtected)}
       <div className="message-text">
         <p dir="auto">
           {!message ? (
             customText || NBSP
           ) : isActionMessage(message) ? (
-            <ActionMessage
-              message={message}
-              isEmbedded
-              observeIntersectionForLoading={observeIntersectionForLoading}
-              observeIntersectionForPlaying={observeIntersectionForPlaying}
-            />
+            <ActionMessage message={message} isEmbedded />
           ) : (
-            <MessageSummary
-              lang={lang}
-              message={message}
-              noEmoji={Boolean(mediaThumbnail)}
-              observeIntersectionForLoading={observeIntersectionForLoading}
-              observeIntersectionForPlaying={observeIntersectionForPlaying}
-            />
+            renderMessageSummary(lang, message, Boolean(mediaThumbnail))
           )}
         </p>
         <div className="message-title" dir="auto">{renderText(senderTitle || title || NBSP)}</div>
       </div>
-      {hasContextMenu && <i className="embedded-more icon-more" />}
     </div>
   );
 };
@@ -115,27 +93,21 @@ function renderPictogram(
   blobUrl?: string,
   isRoundVideo?: boolean,
   isProtected?: boolean,
-  isSpoiler?: boolean,
 ) {
   const { width, height } = getPictogramDimensions();
 
-  const srcUrl = blobUrl || thumbDataUri;
-
   return (
-    <div className={buildClassName('embedded-thumb', isRoundVideo && 'round')}>
-      {!isSpoiler && (
-        <img
-          src={srcUrl}
-          width={width}
-          height={height}
-          alt=""
-          className="pictogram"
-          draggable={false}
-        />
-      )}
-      <MediaSpoiler thumbDataUri={srcUrl} isVisible={Boolean(isSpoiler)} width={width} height={height} />
+    <>
+      <img
+        src={blobUrl || thumbDataUri}
+        width={width}
+        height={height}
+        alt=""
+        className={isRoundVideo ? 'round' : ''}
+        draggable={!isProtected}
+      />
       {isProtected && <span className="protector" />}
-    </div>
+    </>
   );
 }
 

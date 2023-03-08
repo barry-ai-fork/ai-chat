@@ -1,43 +1,22 @@
-**Telegram Web Z was updated to version 1.60**
+**Telegram Web Z was updated to version 1.49**
 
-[🤩](customEmoji:5373026167722876724) **What’s New**
+👏 **Harder**
+• [Telegram Premium](https://t.me/TelegramTips/336). By subscribing, users unlock doubled limits, 4 GB file uploads, faster downloads, exclusive stickers and reactions, improved chat management – and a whole lot more.
+• Native trackpad gestures in the Media Viewer. Swipe left or right to move through media, swipe up or down to exit.
+• Improved polls that support retracting votes and closing the poll – plus a confetti effect.
 
-• Archived Chats Header - Archived Chats are now accessible from the chat list in a collapsable header.
-
-• Reply Threads - You can tap to view all replies to a message in a separate window.
-
-• Emoji In Captions - You can now open the emoji panel [🙂](customEmoji:5971928678198676594) when adding a caption to media.
-
-• Message Translation - You can translate any message into another language from the context menu. To show this option, enable Translation in _Settings > Language_.
-
-• Emoji Statuses - Premium users can update their animated emoji status from the [🌟](customEmoji:6046154264353442824) at the top of their chat list.
-
-• Granular Media Permissions - Admins can choose which media types are allowed in their groups, each with separate toggles.
-
-[😍](customEmoji:5372886001465170842) **What’s Better**
-
-• Multiple tabs can be opened by holding <Ctrl> (⌘ on macOS) and clicking on a chat.
-
-• Opening a chat changes the title of your browser tab to the chat name. This can be modified in _Settings > Privacy and Security_.
-
-• Bot reply keyboards are now supported in groups and channels.
-
-• The video and audio players always remember your last playback speed.
-
-• Opening topics has an improved animation.
-
-• Performance when typing messages has been drastically improved.
-
-• Fixed disappearing drafts.
-
-• Fixed missing results in Global Search.
-
-• Fixed rare issues with opening text format options.
-
-• Fixed pasting text from Google Docs.
-
-• Fixed auto-closing context menu on iOS PWA.
-
-• Fixed changing group and channel admin rights.
-
+🤩 **Better**
 • Various layout and performance improvements.
+• Improved payment form validation.
+• Use the hotkey `⌘+`, to access app Settings on macOS.
+• See a helpful info screen when JavaScript support is disabled.
+
+💪 **Stronger**
+• Call panel properly disappears after answering on another device.
+• Fixed unexpected message deleting when using search in the forwarding menu.
+• Fixed unnecessary up-scaling when uploading small images.
+• Archived chats do not appear in the ‘Forward to’ list.
+• Fixed loading loop when disabling reactions in group management.
+• Various fixes in the text formatting menu.
+
+🦄 **We also welcome** you to join our official channels in **[English](https://t.me/webztalks)** and **[Russian](https://t.me/webzchannelru)** — where we post app updates and share our experiences building one of the world’s most feature-rich web applications.

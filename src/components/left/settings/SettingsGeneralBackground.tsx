@@ -10,7 +10,6 @@ import type { ApiWallpaper } from '../../../api/types';
 
 import { DARK_THEME_PATTERN_COLOR, DEFAULT_PATTERN_COLOR } from '../../../config';
 import { throttle } from '../../../util/schedulers';
-import { validateFiles } from '../../../util/files';
 import { openSystemFilesDialog } from '../../../util/systemFilesDialog';
 import { getAverageColor, getPatternColor, rgb2hex } from '../../../util/colors';
 import { selectTheme } from '../../../global/selectors';
@@ -56,7 +55,7 @@ const SettingsGeneralBackground: FC<OwnProps & StateProps> = ({
     setThemeSettings,
   } = getActions();
 
-  const themeRef = useRef<ThemeKey>();
+  const themeRef = useRef<string>();
   themeRef.current = theme;
   // Due to the parent Transition, this component never gets unmounted,
   // that's why we use throttled API call on every update.
@@ -69,9 +68,8 @@ const SettingsGeneralBackground: FC<OwnProps & StateProps> = ({
   const handleFileSelect = useCallback((e: Event) => {
     const { files } = e.target as HTMLInputElement;
 
-    const validatedFiles = validateFiles(files);
-    if (validatedFiles?.length) {
-      uploadWallpaper(validatedFiles[0]);
+    if (files && files.length > 0) {
+      uploadWallpaper(files[0]);
     }
   }, [uploadWallpaper]);
 
@@ -94,20 +92,20 @@ const SettingsGeneralBackground: FC<OwnProps & StateProps> = ({
   }, [setThemeSettings, theme]);
 
   const handleWallPaperSelect = useCallback((slug: string) => {
-    setThemeSettings({ theme: themeRef.current!, background: slug });
+    setThemeSettings({ theme: themeRef.current, background: slug });
     const currentWallpaper = loadedWallpapers && loadedWallpapers.find((wallpaper) => wallpaper.slug === slug);
     if (currentWallpaper?.document.thumbnail) {
       getAverageColor(currentWallpaper.document.thumbnail.dataUri)
         .then((color) => {
           const patternColor = getPatternColor(color);
           const rgbColor = `#${rgb2hex(color)}`;
-          setThemeSettings({ theme: themeRef.current!, backgroundColor: rgbColor, patternColor });
+          setThemeSettings({ theme: themeRef.current, backgroundColor: rgbColor, patternColor });
         });
     }
   }, [loadedWallpapers, setThemeSettings]);
 
   const handleWallPaperBlurChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setThemeSettings({ theme: themeRef.current!, isBlurred: e.target.checked });
+    setThemeSettings({ theme: themeRef.current, isBlurred: e.target.checked });
   }, [setThemeSettings]);
 
   const lang = useLang();

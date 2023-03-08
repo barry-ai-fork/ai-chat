@@ -13,6 +13,7 @@ import buildClassName from '../../util/buildClassName';
 import {
   selectAnimatedEmojiEffect,
 } from '../../global/selectors';
+import { LOCAL_TGS_URLS } from '../common/helpers/animatedAssets';
 import { dispatchHeavyAnimationEvent } from '../../hooks/useHeavyAnimationCheck';
 
 import AnimatedSticker from '../common/AnimatedSticker';
@@ -25,6 +26,7 @@ export type OwnProps = {
 
 type StateProps = {
   effectAnimationId?: string;
+  localEffectAnimation?: string;
 };
 
 const HIDE_ANIMATION_DURATION = 250;
@@ -33,6 +35,7 @@ const EFFECT_SIZE = 309;
 
 const EmojiInteractionAnimation: FC<OwnProps & StateProps> = ({
   effectAnimationId,
+  localEffectAnimation,
   activeEmojiInteraction,
 }) => {
   const { stopActiveEmojiInteraction } = getActions();
@@ -80,14 +83,16 @@ const EmojiInteractionAnimation: FC<OwnProps & StateProps> = ({
     }, PLAYING_DURATION);
   }, [stop]);
 
-  const effectHash = effectAnimationId && `sticker${effectAnimationId}`;
-  const effectTgsUrl = useMedia(effectHash, !effectAnimationId);
+  const effectTgsUrl = useMedia(`sticker${effectAnimationId}`, !effectAnimationId);
 
   if (!activeEmojiInteraction.startSize) {
     return undefined;
   }
 
   const scale = (activeEmojiInteraction.startSize || 0) / EFFECT_SIZE;
+  const tgsUrl = localEffectAnimation && (localEffectAnimation in LOCAL_TGS_URLS)
+    ? LOCAL_TGS_URLS[localEffectAnimation as keyof typeof LOCAL_TGS_URLS]
+    : effectTgsUrl;
 
   return (
     <div
@@ -102,7 +107,7 @@ const EmojiInteractionAnimation: FC<OwnProps & StateProps> = ({
       <AnimatedSticker
         key={`effect_${effectAnimationId}`}
         size={EFFECT_SIZE}
-        tgsUrl={effectTgsUrl}
+        tgsUrl={tgsUrl}
         play={isPlaying}
         quality={IS_ANDROID ? 0.5 : undefined}
         forceOnHeavyAnimation
@@ -119,6 +124,9 @@ export default memo(withGlobal<OwnProps>(
       && selectAnimatedEmojiEffect(global, activeEmojiInteraction.animatedEffect);
     return {
       effectAnimationId: animatedEffect ? animatedEffect.id : undefined,
+      localEffectAnimation: !animatedEffect && activeEmojiInteraction.animatedEffect
+      && Object.keys(LOCAL_TGS_URLS).includes(activeEmojiInteraction.animatedEffect)
+        ? activeEmojiInteraction.animatedEffect : undefined,
     };
   },
 )(EmojiInteractionAnimation));

@@ -100,7 +100,6 @@ const ManageChatRemovedUsers: FC<OwnProps & StateProps> = ({
               <PrivateChatInfo
                 userId={member.userId}
                 status={getRemovedBy(member)}
-                forceShowSelf
               />
             </ListItem>
           ))}

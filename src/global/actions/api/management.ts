@@ -1,88 +1,77 @@
 import { addActionHandler, getGlobal, setGlobal } from '../../index';
 
 import { ManagementProgress } from '../../../types';
-import type { ActionReturnType } from '../../types';
-
 import { callApi } from '../../../api/gramjs';
 import {
   addUsers, updateChat, updateManagement, updateManagementProgress,
 } from '../../reducers';
-import {
-  selectChat, selectCurrentMessageList, selectTabState, selectUser,
-} from '../../selectors';
-import { ensureIsSuperGroup } from './chats';
-import { getUserFirstOrLastName } from '../../helpers';
-import { buildCollectionByKey } from '../../../util/iteratees';
-import { getCurrentTabId } from '../../../util/establishMultitabRole';
-import * as langProvider from '../../../util/langProvider';
+import { selectChat, selectCurrentMessageList, selectUser } from '../../selectors';
+import { migrateChat } from './chats';
+import { isChatBasicGroup } from '../../helpers';
 
-addActionHandler('checkPublicLink', async (global, actions, payload): Promise<void> => {
-  const { username, tabId = getCurrentTabId() } = payload;
-
-  const { chatId } = selectCurrentMessageList(global, tabId) || {};
+addActionHandler('checkPublicLink', async (global, actions, payload) => {
+  const { chatId } = selectCurrentMessageList(global) || {};
   if (!chatId) {
     return;
   }
 
   // No need to check the username if already in progress
-  if (selectTabState(global, tabId).management.progress === ManagementProgress.InProgress) {
+  if (global.management.progress === ManagementProgress.InProgress) {
     return;
   }
 
-  global = updateManagement(
-    global, chatId, { isUsernameAvailable: undefined, checkedUsername: undefined }, tabId,
-  );
+  const { username } = payload!;
+
+  global = updateManagementProgress(global, ManagementProgress.InProgress);
+  global = updateManagement(global, chatId, { isUsernameAvailable: undefined });
   setGlobal(global);
 
-  const { result, error } = (await callApi('checkChatUsername', { username }))!;
+  const isUsernameAvailable = await callApi('checkChatUsername', { username })!;
 
   global = getGlobal();
   global = updateManagementProgress(
-    global, result === true ? ManagementProgress.Complete : ManagementProgress.Error, tabId,
+    global, isUsernameAvailable ? ManagementProgress.Complete : ManagementProgress.Error,
   );
-  global = updateManagement(global, chatId, {
-    isUsernameAvailable: result === true,
-    checkedUsername: username,
-    error,
-  }, tabId);
+  global = updateManagement(global, chatId, { isUsernameAvailable });
   setGlobal(global);
 
-  if (result === undefined) {
-    actions.openLimitReachedModal({ limit: 'channelsPublic', tabId });
+  if (isUsernameAvailable === undefined) {
+    actions.openLimitReachedModal({ limit: 'channelsPublic' });
   }
 });
 
-addActionHandler('updatePublicLink', async (global, actions, payload): Promise<void> => {
-  const { username, tabId = getCurrentTabId() } = payload;
-
-  const { chatId } = selectCurrentMessageList(global, tabId) || {};
-  if (!chatId) {
+addActionHandler('updatePublicLink', async (global, actions, payload) => {
+  const { chatId } = selectCurrentMessageList(global) || {};
+  let chat = chatId && selectChat(global, chatId);
+  if (!chatId || !chat) {
     return;
   }
 
-  const chat = await ensureIsSuperGroup(global, actions, chatId, tabId);
-  if (!chat) return;
+  const { username } = payload!;
 
-  global = getGlobal();
-
-  global = updateManagementProgress(global, ManagementProgress.InProgress, tabId);
+  global = updateManagementProgress(global, ManagementProgress.InProgress);
   setGlobal(global);
+
+  if (isChatBasicGroup(chat)) {
+    chat = await migrateChat(chat);
+
+    if (!chat) {
+      return;
+    }
+
+    actions.openChat({ id: chat.id });
+  }
 
   const result = await callApi('setChatUsername', { chat, username });
 
   global = getGlobal();
-  global = updateManagementProgress(global, result ? ManagementProgress.Complete : ManagementProgress.Error, tabId);
-  global = updateManagement(global, chatId, {
-    isUsernameAvailable: undefined,
-    checkedUsername: undefined,
-    error: undefined,
-  }, tabId);
+  global = updateManagementProgress(global, result ? ManagementProgress.Complete : ManagementProgress.Error);
+  global = updateManagement(global, chatId, { isUsernameAvailable: undefined });
   setGlobal(global);
 });
 
-addActionHandler('updatePrivateLink', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  const { chatId } = selectCurrentMessageList(global, tabId) || {};
+addActionHandler('updatePrivateLink', (global) => {
+  const { chatId } = selectCurrentMessageList(global) || {};
   const chat = chatId && selectChat(global, chatId);
   if (!chatId || !chat) {
     return;
@@ -91,28 +80,26 @@ addActionHandler('updatePrivateLink', (global, actions, payload): ActionReturnTy
   callApi('updatePrivateLink', { chat });
 });
 
-addActionHandler('setEditingExportedInvite', (global, actions, payload): ActionReturnType => {
-  const { chatId, invite, tabId = getCurrentTabId() } = payload;
+addActionHandler('setEditingExportedInvite', (global, actions, payload) => {
+  const { chatId, invite } = payload;
 
-  global = updateManagement(global, chatId, { editingInvite: invite }, tabId);
-  setGlobal(global);
+  setGlobal(updateManagement(global, chatId, { editingInvite: invite }));
 });
 
-addActionHandler('setOpenedInviteInfo', (global, actions, payload): ActionReturnType => {
-  const { chatId, invite, tabId = getCurrentTabId() } = payload;
+addActionHandler('setOpenedInviteInfo', (global, actions, payload) => {
+  const { chatId, invite } = payload;
 
   const update = invite ? { inviteInfo: { invite } } : { inviteInfo: undefined };
 
-  global = updateManagement(global, chatId, update, tabId);
-  setGlobal(global);
+  setGlobal(updateManagement(global, chatId, update));
 });
 
-addActionHandler('loadExportedChatInvites', async (global, actions, payload): Promise<void> => {
+addActionHandler('loadExportedChatInvites', async (global, actions, payload) => {
   const {
-    chatId, adminId, isRevoked, limit, tabId = getCurrentTabId(),
+    chatId, adminId, isRevoked, limit,
   } = payload!;
   const peer = selectChat(global, chatId);
-  const admin = selectUser(global, adminId || global.currentUserId!);
+  const admin = selectUser(global, adminId || global.currentUserId);
   if (!peer || !admin) return;
 
   const result = await callApi('fetchExportedChatInvites', {
@@ -121,19 +108,15 @@ addActionHandler('loadExportedChatInvites', async (global, actions, payload): Pr
   if (!result) {
     return;
   }
-  global = getGlobal();
-  const { invites, users } = result;
 
-  global = addUsers(global, buildCollectionByKey(users, 'id'));
+  const update = isRevoked ? { revokedInvites: result } : { invites: result };
 
-  const update = isRevoked ? { revokedInvites: invites } : { invites };
-  global = updateManagement(global, chatId, update, tabId);
-  setGlobal(global);
+  setGlobal(updateManagement(getGlobal(), chatId, update));
 });
 
-addActionHandler('editExportedChatInvite', async (global, actions, payload): Promise<void> => {
+addActionHandler('editExportedChatInvite', async (global, actions, payload) => {
   const {
-    chatId, link, isRevoked, expireDate, usageLimit, isRequestNeeded, title, tabId = getCurrentTabId(),
+    chatId, link, isRevoked, expireDate, usageLimit, isRequestNeeded, title,
   } = payload!;
   const peer = selectChat(global, chatId);
   if (!peer) return;
@@ -151,13 +134,12 @@ addActionHandler('editExportedChatInvite', async (global, actions, payload): Pro
     return;
   }
 
-  const { oldInvite, newInvite, users } = result;
+  const { oldInvite, newInvite } = result;
 
   global = getGlobal();
-  const { management } = selectTabState(global, tabId);
-  const invites = (management.byChatId[chatId].invites || [])
+  const invites = (global.management.byChatId[chatId].invites || [])
     .filter((current) => current.link !== oldInvite.link);
-  const revokedInvites = [...(management.byChatId[chatId].revokedInvites || [])];
+  const revokedInvites = [...(global.management.byChatId[chatId].revokedInvites || [])];
 
   if (newInvite.isRevoked) {
     revokedInvites.unshift(newInvite);
@@ -165,18 +147,15 @@ addActionHandler('editExportedChatInvite', async (global, actions, payload): Pro
     invites.push(newInvite);
   }
 
-  global = addUsers(global, buildCollectionByKey(users, 'id'));
-
-  global = updateManagement(global, chatId, {
+  setGlobal(updateManagement(global, chatId, {
     invites,
     revokedInvites,
-  }, tabId);
-  setGlobal(global);
+  }));
 });
 
-addActionHandler('exportChatInvite', async (global, actions, payload): Promise<void> => {
+addActionHandler('exportChatInvite', async (global, actions, payload) => {
   const {
-    chatId, expireDate, usageLimit, isRequestNeeded, title, tabId = getCurrentTabId(),
+    chatId, expireDate, usageLimit, isRequestNeeded, title,
   } = payload!;
   const peer = selectChat(global, chatId);
   if (!peer) return;
@@ -193,16 +172,15 @@ addActionHandler('exportChatInvite', async (global, actions, payload): Promise<v
   }
 
   global = getGlobal();
-  const invites = selectTabState(global, tabId).management.byChatId[chatId].invites || [];
-  global = updateManagement(global, chatId, {
+  const invites = global.management.byChatId[chatId].invites || [];
+  setGlobal(updateManagement(global, chatId, {
     invites: [...invites, result],
-  }, tabId);
-  setGlobal(global);
+  }));
 });
 
-addActionHandler('deleteExportedChatInvite', async (global, actions, payload): Promise<void> => {
+addActionHandler('deleteExportedChatInvite', async (global, actions, payload) => {
   const {
-    chatId, link, tabId = getCurrentTabId(),
+    chatId, link,
   } = payload!;
   const peer = selectChat(global, chatId);
   if (!peer) return;
@@ -216,20 +194,19 @@ addActionHandler('deleteExportedChatInvite', async (global, actions, payload): P
   }
 
   global = getGlobal();
-  const managementState = selectTabState(global, tabId).management.byChatId[chatId];
-  global = updateManagement(global, chatId, {
+  const managementState = global.management.byChatId[chatId];
+  setGlobal(updateManagement(global, chatId, {
     invites: managementState?.invites?.filter((invite) => invite.link !== link),
     revokedInvites: managementState?.revokedInvites?.filter((invite) => invite.link !== link),
-  }, tabId);
-  setGlobal(global);
+  }));
 });
 
-addActionHandler('deleteRevokedExportedChatInvites', async (global, actions, payload): Promise<void> => {
+addActionHandler('deleteRevokedExportedChatInvites', async (global, actions, payload) => {
   const {
-    chatId, adminId, tabId = getCurrentTabId(),
+    chatId, adminId,
   } = payload!;
   const peer = selectChat(global, chatId);
-  const admin = selectUser(global, adminId || global.currentUserId!);
+  const admin = selectUser(global, adminId || global.currentUserId);
   if (!peer || !admin) return;
 
   const result = await callApi('deleteRevokedExportedChatInvites', {
@@ -241,20 +218,17 @@ addActionHandler('deleteRevokedExportedChatInvites', async (global, actions, pay
   }
 
   global = getGlobal();
-  global = updateManagement(global, chatId, {
+  setGlobal(updateManagement(global, chatId, {
     revokedInvites: [],
-  }, tabId);
-  setGlobal(global);
+  }));
 });
 
-addActionHandler('loadChatInviteImporters', async (
-  global, actions, payload,
-): Promise<void> => {
+addActionHandler('loadChatInviteImporters', async (global, actions, payload) => {
   const {
-    chatId, link, offsetDate, offsetUserId, limit, tabId = getCurrentTabId(),
+    chatId, link, offsetDate, offsetUserId, limit,
   } = payload!;
   const peer = selectChat(global, chatId);
-  const offsetUser = offsetUserId ? selectUser(global, offsetUserId) : undefined;
+  const offsetUser = selectUser(global, offsetUserId);
   if (!peer || (offsetUserId && !offsetUser)) return;
 
   const result = await callApi('fetchChatInviteImporters', {
@@ -270,7 +244,7 @@ addActionHandler('loadChatInviteImporters', async (
   const { importers, users } = result;
 
   global = getGlobal();
-  const currentInviteInfo = selectTabState(global, tabId).management.byChatId[chatId]?.inviteInfo;
+  const currentInviteInfo = global.management.byChatId[chatId]?.inviteInfo;
   if (!currentInviteInfo?.invite || currentInviteInfo.invite.link !== link) {
     return;
   }
@@ -280,19 +254,17 @@ addActionHandler('loadChatInviteImporters', async (
       ...currentInviteInfo,
       importers,
     },
-  }, tabId);
+  });
   global = addUsers(global, users);
   setGlobal(global);
 });
 
-addActionHandler('loadChatInviteRequesters', async (
-  global, actions, payload,
-): Promise<void> => {
+addActionHandler('loadChatInviteRequesters', async (global, actions, payload) => {
   const {
-    chatId, link, offsetDate, offsetUserId, limit, tabId = getCurrentTabId(),
+    chatId, link, offsetDate, offsetUserId, limit,
   } = payload!;
   const peer = selectChat(global, chatId);
-  const offsetUser = offsetUserId ? selectUser(global, offsetUserId) : undefined;
+  const offsetUser = selectUser(global, offsetUserId);
   if (!peer || (offsetUserId && !offsetUser)) return;
 
   const result = await callApi('fetchChatInviteImporters', {
@@ -309,7 +281,7 @@ addActionHandler('loadChatInviteRequesters', async (
   const { importers, users } = result;
 
   global = getGlobal();
-  const currentInviteInfo = selectTabState(global, tabId).management.byChatId[chatId]?.inviteInfo;
+  const currentInviteInfo = global.management.byChatId[chatId]?.inviteInfo;
   if (!currentInviteInfo?.invite || currentInviteInfo.invite.link !== link) {
     return;
   }
@@ -318,17 +290,17 @@ addActionHandler('loadChatInviteRequesters', async (
       ...currentInviteInfo,
       requesters: importers,
     },
-  }, tabId);
+  });
   global = addUsers(global, users);
   setGlobal(global);
 });
 
-addActionHandler('loadChatJoinRequests', async (global, actions, payload): Promise<void> => {
+addActionHandler('loadChatJoinRequests', async (global, actions, payload) => {
   const {
-    chatId, offsetDate = 0, offsetUserId, limit = 0,
+    chatId, offsetDate, offsetUserId, limit,
   } = payload!;
   const peer = selectChat(global, chatId);
-  const offsetUser = offsetUserId ? selectUser(global, offsetUserId) : undefined;
+  const offsetUser = selectUser(global, offsetUserId);
   if (!peer || (offsetUserId && !offsetUser)) return;
 
   const result = await callApi('fetchChatInviteImporters', {
@@ -349,7 +321,7 @@ addActionHandler('loadChatJoinRequests', async (global, actions, payload): Promi
   setGlobal(global);
 });
 
-addActionHandler('hideChatJoinRequest', async (global, actions, payload): Promise<void> => {
+addActionHandler('hideChatJoinRequest', async (global, actions, payload) => {
   const {
     chatId, userId, isApproved,
   } = payload!;
@@ -368,13 +340,12 @@ addActionHandler('hideChatJoinRequest', async (global, actions, payload): Promis
   const targetChat = selectChat(global, chatId);
   if (!targetChat) return;
 
-  global = updateChat(global, chatId, {
+  setGlobal(updateChat(global, chatId, {
     joinRequests: targetChat.joinRequests?.filter((importer) => importer.userId !== userId),
-  });
-  setGlobal(global);
+  }));
 });
 
-addActionHandler('hideAllChatJoinRequests', async (global, actions, payload): Promise<void> => {
+addActionHandler('hideAllChatJoinRequests', async (global, actions, payload) => {
   const {
     chatId, isApproved, link,
   } = payload!;
@@ -392,18 +363,17 @@ addActionHandler('hideAllChatJoinRequests', async (global, actions, payload): Pr
   const targetChat = selectChat(global, chatId);
   if (!targetChat) return;
 
-  global = updateChat(global, chatId, {
+  setGlobal(updateChat(global, chatId, {
     joinRequests: [],
     fullInfo: {
       ...targetChat.fullInfo,
       recentRequesterIds: [],
       requestsPending: 0,
     },
-  });
-  setGlobal(global);
+  }));
 });
 
-addActionHandler('hideChatReportPanel', async (global, actions, payload): Promise<void> => {
+addActionHandler('hideChatReportPanel', async (global, actions, payload) => {
   const { chatId } = payload!;
   const chat = selectChat(global, chatId);
   if (!chat) return;
@@ -411,61 +381,7 @@ addActionHandler('hideChatReportPanel', async (global, actions, payload): Promis
   const result = await callApi('hideChatReportPanel', chat);
   if (!result) return;
 
-  global = getGlobal();
-  global = updateChat(global, chatId, {
+  setGlobal(updateChat(getGlobal(), chatId, {
     settings: undefined,
-  });
-  setGlobal(global);
-});
-
-addActionHandler('uploadContactProfilePhoto', async (global, actions, payload): Promise<void> => {
-  const {
-    userId, file, isSuggest, tabId = getCurrentTabId(),
-  } = payload;
-
-  const user = selectUser(global, userId);
-  if (!user) return;
-
-  global = updateManagementProgress(global, ManagementProgress.InProgress, tabId);
-  setGlobal(global);
-
-  const result = await callApi('uploadContactProfilePhoto', {
-    user,
-    file,
-    isSuggest,
-  });
-
-  if (!result) {
-    global = getGlobal();
-    global = updateManagementProgress(global, ManagementProgress.Error, tabId);
-    setGlobal(global);
-
-    return;
-  }
-
-  global = getGlobal();
-  global = addUsers(global, buildCollectionByKey(result.users, 'id'));
-  setGlobal(global);
-
-  const { id, accessHash } = user;
-  const newUser = await callApi('fetchFullUser', { id, accessHash });
-  if (!newUser) {
-    global = getGlobal();
-    global = updateManagementProgress(global, ManagementProgress.Error, tabId);
-    setGlobal(global);
-    return;
-  }
-
-  actions.loadProfilePhotos({ profileId: userId });
-
-  global = getGlobal();
-  global = updateManagementProgress(global, ManagementProgress.Complete, tabId);
-  setGlobal(global);
-
-  if (file && !isSuggest) {
-    actions.showNotification({
-      message: langProvider.translate('UserInfo.SetCustomPhoto.SuccessPhotoText', getUserFirstOrLastName(user)),
-      tabId,
-    });
-  }
+  }));
 });

@@ -9,7 +9,8 @@ import { getUserFirstOrLastName } from '../../global/helpers';
 import renderText from '../common/helpers/renderText';
 import useLang from '../../hooks/useLang';
 
-import ConfirmDialog from '../ui/ConfirmDialog';
+import Modal from '../ui/Modal';
+import Button from '../ui/Button';
 
 export type OwnProps = {
   isOpen: boolean;
@@ -34,7 +35,7 @@ const DeleteMemberModal: FC<OwnProps & StateProps> = ({
   const lang = useLang();
 
   const handleDeleteChatMember = useCallback(() => {
-    deleteChatMember({ chatId: chat!.id, userId: userId! });
+    deleteChatMember({ chatId: chat!.id, userId });
     onClose();
   }, [chat, deleteChatMember, onClose, userId]);
 
@@ -43,15 +44,19 @@ const DeleteMemberModal: FC<OwnProps & StateProps> = ({
   }
 
   return (
-    <ConfirmDialog
+    <Modal
       isOpen={isOpen}
       onClose={onClose}
+      onEnter={handleDeleteChatMember}
+      className="delete"
       title={lang('GroupRemoved.Remove')}
-      textParts={renderText(lang('PeerInfo.Confirm.RemovePeer', contactName))}
-      confirmLabel={lang('lng_box_remove')}
-      confirmHandler={handleDeleteChatMember}
-      confirmIsDestructive
-    />
+    >
+      <p>{renderText(lang('PeerInfo.Confirm.RemovePeer', contactName))}</p>
+      <Button color="danger" className="confirm-dialog-button" isText onClick={handleDeleteChatMember}>
+        {lang('lng_box_remove')}
+      </Button>
+      <Button className="confirm-dialog-button" isText onClick={onClose}>{lang('Cancel')}</Button>
+    </Modal>
   );
 };
 

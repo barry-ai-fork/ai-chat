@@ -6,10 +6,10 @@ import { withGlobal } from '../../../global';
 
 import type { ApiChat, ApiUser } from '../../../api/types';
 
-import { GROUP_CALL_THUMB_VIDEO_DISABLED } from '../../../config';
 import buildClassName from '../../../util/buildClassName';
 import { selectChat, selectUser } from '../../../global/selectors';
 import useLang from '../../../hooks/useLang';
+import { ENABLE_THUMBNAIL_VIDEO } from '../../../config';
 
 import Avatar from '../../common/Avatar';
 
@@ -60,8 +60,8 @@ const GroupCallParticipantVideo: FC<OwnProps & StateProps> = ({
           {lang('Back')}
         </button>
       )}
-      <Avatar user={user} chat={chat} className="thumbnail-avatar" />
-      {!GROUP_CALL_THUMB_VIDEO_DISABLED && (
+      <Avatar user={user} chat={chat} className="thumbnail-avatar" noVideo />
+      {ENABLE_THUMBNAIL_VIDEO && (
         <div className="thumbnail-wrapper">
           <video className="thumbnail" muted autoPlay playsInline srcObject={streams?.[type]} />
         </div>

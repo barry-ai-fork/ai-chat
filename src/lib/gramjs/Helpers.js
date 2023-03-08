@@ -340,6 +340,22 @@ function crc32(buf) {
     return (crc ^ (-1)) >>> 0;
 }
 
+/**
+ * Creates a deferred object
+ * @return {Deferred}
+ */
+function createDeferred() {
+    let resolve;
+    const promise = new Promise((_resolve) => {
+        resolve = _resolve;
+    });
+
+    return {
+        promise,
+        resolve,
+    };
+}
+
 module.exports = {
     readBigIntFromBuffer,
     readBufferFromBigInt,
@@ -360,4 +376,5 @@ module.exports = {
     toSignedLittleBuffer,
     convertToLittle,
     bufferXor,
+    createDeferred,
 };

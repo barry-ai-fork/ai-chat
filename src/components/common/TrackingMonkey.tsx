@@ -2,9 +2,8 @@ import type { FC } from '../../lib/teact/teact';
 import React, { useState, useCallback, memo } from '../../lib/teact/teact';
 
 import { STICKER_SIZE_AUTH, STICKER_SIZE_AUTH_MOBILE, STICKER_SIZE_TWO_FA } from '../../config';
+import { IS_SINGLE_COLUMN_LAYOUT } from '../../util/environment';
 import { LOCAL_TGS_URLS } from './helpers/animatedAssets';
-
-import useAppLayout from '../../hooks/useAppLayout';
 
 import AnimatedSticker from './AnimatedSticker';
 
@@ -20,6 +19,7 @@ type OwnProps = {
 
 const TRACKING_START_FRAME = 15;
 const TRACKING_END_FRAME = 180;
+const STICKER_SIZE = IS_SINGLE_COLUMN_LAYOUT ? STICKER_SIZE_AUTH_MOBILE : STICKER_SIZE_AUTH;
 
 const TrackingMonkey: FC<OwnProps> = ({
   code,
@@ -29,19 +29,17 @@ const TrackingMonkey: FC<OwnProps> = ({
   isBig,
 }) => {
   const [isFirstMonkeyLoaded, setIsFirstMonkeyLoaded] = useState(false);
-  const { isMobile } = useAppLayout();
-  const trackningFramesPerSymbol = (TRACKING_END_FRAME - TRACKING_START_FRAME) / codeLength;
-  const stickerSize = isMobile ? STICKER_SIZE_AUTH_MOBILE : STICKER_SIZE_AUTH;
+  const TRACKING_FRAMES_PER_SYMBOL = (TRACKING_END_FRAME - TRACKING_START_FRAME) / codeLength;
 
   const handleFirstMonkeyLoad = useCallback(() => setIsFirstMonkeyLoaded(true), []);
 
   function getTrackingFrames(): [number, number] {
     const startFrame = (code && code.length > 1) || trackingDirection < 0
-      ? TRACKING_START_FRAME + trackningFramesPerSymbol * (code.length - 1)
+      ? TRACKING_START_FRAME + TRACKING_FRAMES_PER_SYMBOL * (code.length - 1)
       : 0;
     const endFrame = code.length === codeLength
       ? TRACKING_END_FRAME
-      : TRACKING_START_FRAME + trackningFramesPerSymbol * code.length;
+      : TRACKING_START_FRAME + TRACKING_FRAMES_PER_SYMBOL * code.length;
 
     if (trackingDirection < 1) {
       return [
@@ -62,14 +60,14 @@ const TrackingMonkey: FC<OwnProps> = ({
         <div className="monkey-preview" />
       )}
       <AnimatedSticker
-        size={isBig ? STICKER_SIZE_TWO_FA : stickerSize}
+        size={isBig ? STICKER_SIZE_TWO_FA : STICKER_SIZE}
         className={isTracking ? 'hidden' : undefined}
         tgsUrl={LOCAL_TGS_URLS.MonkeyIdle}
         play={!isTracking}
         onLoad={handleFirstMonkeyLoad}
       />
       <AnimatedSticker
-        size={isBig ? STICKER_SIZE_TWO_FA : stickerSize}
+        size={isBig ? STICKER_SIZE_TWO_FA : STICKER_SIZE}
         className={!isTracking ? 'hidden' : 'shown'}
         tgsUrl={LOCAL_TGS_URLS.MonkeyTracking}
         playSegment={isTracking ? getTrackingFrames() : undefined}

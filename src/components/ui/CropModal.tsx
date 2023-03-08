@@ -37,7 +37,7 @@ async function ensureCroppie() {
 
 let cropper: Croppie;
 
-async function initCropper(imgFile: Blob) {
+async function initCropper(imgFile: File) {
   try {
     const cropContainer = document.getElementById('avatar-crop');
     if (!cropContainer) {
@@ -70,7 +70,7 @@ async function initCropper(imgFile: Blob) {
 }
 
 type OwnProps = {
-  file?: Blob;
+  file?: File;
   onChange: (file: File) => void;
   onClose: () => void;
 };

@@ -18,7 +18,6 @@ import { renderTextWithEntities } from '../../common/helpers/renderTextWithEntit
 import { formatMediaDuration } from '../../../util/dateFormat';
 import type { LangFn } from '../../../hooks/useLang';
 import useLang from '../../../hooks/useLang';
-import { getServerTimeOffset } from '../../../util/serverTime';
 
 import CheckboxGroup from '../../ui/CheckboxGroup';
 import RadioGroup from '../../ui/RadioGroup';
@@ -38,6 +37,7 @@ type OwnProps = {
 type StateProps = {
   recentVoterIds?: number[];
   usersById: Record<string, ApiUser>;
+  serverTimeOffset: number;
 };
 
 const SOLUTION_CONTAINER_ID = '#middle-column-portals';
@@ -50,6 +50,7 @@ const Poll: FC<OwnProps & StateProps> = ({
   recentVoterIds,
   usersById,
   onSendVote,
+  serverTimeOffset,
 }) => {
   const { loadMessage, openPollResults, requestConfetti } = getActions();
 
@@ -61,7 +62,7 @@ const Poll: FC<OwnProps & StateProps> = ({
   const [wasSubmitted, setWasSubmitted] = useState<boolean>(false);
   const [closePeriod, setClosePeriod] = useState<number>(
     !summary.closed && summary.closeDate && summary.closeDate > 0
-      ? Math.min(summary.closeDate - Math.floor(Date.now() / 1000) + getServerTimeOffset(), summary.closePeriod!)
+      ? Math.min(summary.closeDate - Math.floor(Date.now() / 1000) + serverTimeOffset, summary.closePeriod!)
       : 0,
   );
   // eslint-disable-next-line no-null/no-null
@@ -233,6 +234,7 @@ const Poll: FC<OwnProps & StateProps> = ({
             <Avatar
               size="micro"
               user={user}
+              noVideo
             />
           ))}
         </div>
@@ -276,7 +278,7 @@ const Poll: FC<OwnProps & StateProps> = ({
         )}
       </div>
       {canVote && (
-        <div className="poll-answers" onClick={stopPropagation}>
+        <div className="poll-answers">
           {isMultiple
             ? (
               <CheckboxGroup
@@ -354,14 +356,10 @@ function getReadableVotersCount(lang: LangFn, isQuiz: true | undefined, count?: 
   return lang(isQuiz ? 'Answer' : 'Vote', count, 'i');
 }
 
-function stopPropagation(e: React.MouseEvent<HTMLDivElement>) {
-  e.stopPropagation();
-}
-
 export default memo(withGlobal<OwnProps>(
   (global, { poll }) => {
     const { recentVoterIds } = poll.results;
-    const { users: { byId: usersById } } = global;
+    const { serverTimeOffset, users: { byId: usersById } } = global;
     if (!recentVoterIds || recentVoterIds.length === 0) {
       return {};
     }
@@ -369,6 +367,7 @@ export default memo(withGlobal<OwnProps>(
     return {
       recentVoterIds,
       usersById,
+      serverTimeOffset,
     };
   },
 )(Poll));

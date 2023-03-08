@@ -1,7 +1,7 @@
-import type { ApiChat, ApiReaction } from '../../types';
+import type { ApiChat, ApiUser } from '../../types';
 import { invokeRequest } from './client';
 import { Api as GramJs } from '../../../lib/gramjs';
-import { buildInputPeer, buildInputReaction } from '../gramjsBuilders';
+import { buildInputPeer } from '../gramjsBuilders';
 import localDb from '../localDb';
 import { buildApiAvailableReaction, buildMessagePeerReaction } from '../apiBuilders/messages';
 import { REACTION_LIST_LIMIT } from '../../../config';
@@ -74,12 +74,12 @@ export async function getAvailableReactions() {
 }
 
 export function sendReaction({
-  chat, messageId, reactions,
+  chat, messageId, reaction,
 }: {
-  chat: ApiChat; messageId: number; reactions?: ApiReaction[];
+  chat: ApiChat; messageId: number; reaction?: string;
 }) {
   return invokeRequest(new GramJs.messages.SendReaction({
-    reaction: reactions?.map((r) => buildInputReaction(r)),
+    ...(reaction && { reaction }),
     peer: buildInputPeer(chat.id, chat.accessHash),
     msgId: messageId,
   }), true);
@@ -99,12 +99,12 @@ export function fetchMessageReactions({
 export async function fetchMessageReactionsList({
   chat, messageId, reaction, offset,
 }: {
-  chat: ApiChat; messageId: number; reaction?: ApiReaction; offset?: string;
+  chat: ApiChat; messageId: number; reaction?: string; offset?: string;
 }) {
   const result = await invokeRequest(new GramJs.messages.GetMessageReactionsList({
     peer: buildInputPeer(chat.id, chat.accessHash),
     id: messageId,
-    ...(reaction && { reaction: buildInputReaction(reaction) }),
+    ...(reaction && { reaction }),
     limit: REACTION_LIST_LIMIT,
     ...(offset && { offset }),
   }));
@@ -118,9 +118,9 @@ export async function fetchMessageReactionsList({
   const { nextOffset, reactions, count } = result;
 
   return {
-    users: result.users.map(buildApiUser).filter(Boolean),
+    users: result.users.map(buildApiUser).filter<ApiUser>(Boolean as any),
     nextOffset,
-    reactions: reactions.map(buildMessagePeerReaction).filter(Boolean),
+    reactions: reactions.map(buildMessagePeerReaction),
     count,
   };
 }
@@ -128,9 +128,9 @@ export async function fetchMessageReactionsList({
 export function setDefaultReaction({
   reaction,
 }: {
-  reaction: ApiReaction;
+  reaction: string;
 }) {
   return invokeRequest(new GramJs.messages.SetDefaultReaction({
-    reaction: buildInputReaction(reaction),
+    reaction,
   }));
 }

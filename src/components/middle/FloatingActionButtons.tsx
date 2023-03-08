@@ -93,27 +93,24 @@ const FloatingActionButtons: FC<OwnProps & StateProps> = ({
 
   return (
     <div ref={elementRef} className={fabClassName}>
-      <ScrollDownButton
-        icon="heart-outline"
-        ariaLabelLang="AccDescrReactionMentionDown"
-        onClick={focusNextReaction}
-        onReadAll={readAllReactions}
-        unreadCount={reactionsCount}
-        className={buildClassName(
-          styles.reactions,
-          !hasUnreadReactions && styles.hidden,
-          !hasUnreadMentions && styles.transformDown,
-        )}
-      />
-
-      <ScrollDownButton
-        icon="mention"
-        ariaLabelLang="AccDescrMentionDown"
-        onClick={focusNextMention}
-        onReadAll={readAllMentions}
-        unreadCount={mentionsCount}
-        className={!hasUnreadMentions && styles.hidden}
-      />
+      {hasUnreadReactions && (
+        <ScrollDownButton
+          icon="heart-outline"
+          ariaLabelLang="AccDescrReactionMentionDown"
+          onClick={focusNextReaction}
+          onReadAll={readAllReactions}
+          unreadCount={reactionsCount}
+        />
+      )}
+      {hasUnreadMentions && (
+        <ScrollDownButton
+          icon="mention"
+          ariaLabelLang="AccDescrMentionDown"
+          onClick={focusNextMention}
+          onReadAll={readAllMentions}
+          unreadCount={mentionsCount}
+        />
+      )}
 
       <ScrollDownButton
         icon="arrow-down"

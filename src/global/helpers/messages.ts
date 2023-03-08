@@ -1,5 +1,5 @@
 import type {
-  ApiChat, ApiMessage, ApiMessageEntityTextUrl, ApiUser,
+  ApiChat, ApiMessage, ApiReactions, ApiUser,
 } from '../../api/types';
 import { ApiMessageEntityTypes } from '../../api/types';
 import type { LangFn } from '../../hooks/useLang';
@@ -13,6 +13,7 @@ import {
 import { getUserFullName } from './users';
 import { IS_OPUS_SUPPORTED, isWebpSupported } from '../../util/environment';
 import { getChatTitle, isUserId } from './chats';
+import parseEmojiOnlyString from '../../components/common/helpers/parseEmojiOnlyString';
 import { getGlobal } from '../index';
 
 const RE_LINK = new RegExp(RE_LINK_TEMPLATE, 'i');
@@ -45,67 +46,57 @@ export function getMessageOriginalId(message: ApiMessage) {
 
 export function getMessageTranscription(message: ApiMessage) {
   const { transcriptionId } = message;
-  // eslint-disable-next-line eslint-multitab-tt/no-immediate-global
   const global = getGlobal();
 
   return transcriptionId && global.transcriptions[transcriptionId]?.text;
 }
 
-export function hasMessageText(message: ApiMessage) {
+export function getMessageText(message: ApiMessage) {
   const {
     text, sticker, photo, video, audio, voice, document, poll, webPage, contact, invoice, location,
     game, action,
   } = message.content;
 
-  return Boolean(text) || !(
-    sticker || photo || video || audio || voice || document || contact || poll || webPage || invoice || location
-    || game || action?.phoneCall
-  );
+  if (text) {
+    return text.text;
+  }
+
+  if (sticker || photo || video || audio || voice || document
+    || contact || poll || webPage || invoice || location || game || action?.phoneCall) {
+    return undefined;
+  }
+
+  return CONTENT_NOT_SUPPORTED;
 }
 
-export function getMessageText(message: ApiMessage) {
-  return hasMessageText(message) ? message.content.text?.text || CONTENT_NOT_SUPPORTED : undefined;
-}
-
-export function getMessageCustomShape(message: ApiMessage): boolean {
+export function getMessageCustomShape(message: ApiMessage): boolean | number {
   const {
-    text, sticker, photo, video, audio, voice, document, poll, webPage, contact, action, game, invoice, location,
+    text, sticker, photo, video, audio, voice, document, poll, webPage, contact,
   } = message.content;
 
   if (sticker || (video?.isRound)) {
     return true;
   }
 
-  if (!text || photo || video || audio || voice || document || poll || webPage || contact || action || game || invoice
-    || location) {
+  if (!text || photo || video || audio || voice || document || poll || webPage || contact) {
     return false;
   }
 
-  const hasOtherFormatting = text?.entities?.some((entity) => entity.type !== ApiMessageEntityTypes.CustomEmoji);
-
-  return Boolean(message.emojiOnlyCount && !hasOtherFormatting);
+  // This is a "dual-intent" method used to limit calls of `parseEmojiOnlyString`.
+  return parseEmojiOnlyString(text.text) || false;
 }
 
-export function getMessageSingleRegularEmoji(message: ApiMessage) {
+export function getMessageSingleEmoji(message: ApiMessage) {
   const { text } = message.content;
-
-  if (text?.entities?.length || message.emojiOnlyCount !== 1) {
+  if (!(text && text.text.length <= 6)) {
     return undefined;
   }
 
-  return text!.text;
-}
-
-export function getMessageSingleCustomEmoji(message: ApiMessage): string | undefined {
-  const { text } = message.content;
-
-  if (text?.entities?.length !== 1
-    || text.entities[0].type !== ApiMessageEntityTypes.CustomEmoji
-    || message.emojiOnlyCount !== 1) {
+  if (getMessageCustomShape(message) !== 1) {
     return undefined;
   }
 
-  return text.entities[0].documentId;
+  return text.text;
 }
 
 export function getFirstLinkInMessage(message: ApiMessage) {
@@ -113,17 +104,15 @@ export function getFirstLinkInMessage(message: ApiMessage) {
 
   let match: RegExpMatchArray | null | undefined;
   if (text?.entities) {
-    const firstTextUrl = text.entities.find((entity): entity is ApiMessageEntityTextUrl => (
-      entity.type === ApiMessageEntityTypes.TextUrl
-    ));
-    if (firstTextUrl) {
-      match = firstTextUrl.url.match(RE_LINK);
+    let link = text.entities.find((entity) => entity.type === ApiMessageEntityTypes.TextUrl);
+    if (link) {
+      match = link.url!.match(RE_LINK);
     }
 
     if (!match) {
-      const firstUrl = text.entities.find((entity) => entity.type === ApiMessageEntityTypes.Url);
-      if (firstUrl) {
-        const { offset, length } = firstUrl;
+      link = text.entities.find((entity) => entity.type === ApiMessageEntityTypes.Url);
+      if (link) {
+        const { offset, length } = link;
         match = text.text.substring(offset, offset + length).match(RE_LINK);
       }
     }
@@ -194,11 +183,7 @@ export function getSendingState(message: ApiMessage) {
 }
 
 export function isMessageLocal(message: ApiMessage) {
-  return isLocalMessageId(message.id);
-}
-
-export function isLocalMessageId(id: number) {
-  return id > LOCAL_MESSAGE_MIN_ID;
+  return message.id > LOCAL_MESSAGE_MIN_ID;
 }
 
 export function isHistoryClearMessage(message: ApiMessage) {
@@ -240,6 +225,10 @@ export function getMessageContentFilename(message: ApiMessage) {
   }
 
   return baseFilename;
+}
+
+export function areReactionsEmpty(reactions: ApiReactions) {
+  return !reactions.results.some((l) => l.count > 0);
 }
 
 export function isGeoLiveExpired(message: ApiMessage, timestamp = Date.now() / 1000) {

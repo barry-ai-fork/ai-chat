@@ -30,12 +30,10 @@ const UnpinAllMessagesModal: FC<OwnProps> = ({
       title={lang('Chat.PanelUnpinAllMessages')}
     >
       <p>{lang('Chat.UnpinAllMessagesConfirmation', pinnedMessagesCount, 'i')}</p>
-      <div className="dialog-buttons mt-2">
-        <Button className="confirm-dialog-button" isText onClick={onUnpin}>
-          {lang('DialogUnpin')}
-        </Button>
-        <Button className="confirm-dialog-button" isText onClick={onClose}>{lang('Cancel')}</Button>
-      </div>
+      <Button className="confirm-dialog-button" isText onClick={onUnpin}>
+        {lang('DialogUnpin')}
+      </Button>
+      <Button className="confirm-dialog-button" isText onClick={onClose}>{lang('Cancel')}</Button>
     </Modal>
   );
 };

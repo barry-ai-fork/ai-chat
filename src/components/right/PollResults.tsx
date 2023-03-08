@@ -3,7 +3,7 @@ import React, { memo } from '../../lib/teact/teact';
 import { withGlobal } from '../../global';
 
 import type { ApiMessage, ApiChat } from '../../api/types';
-import { selectChat, selectChatMessage, selectTabState } from '../../global/selectors';
+import { selectChat, selectChatMessage } from '../../global/selectors';
 import { buildCollectionByKey } from '../../util/iteratees';
 import { getMessagePoll } from '../../global/helpers';
 import renderText from '../common/helpers/renderText';
@@ -54,7 +54,7 @@ const PollResults: FC<OwnProps & StateProps> = ({
     <div className="PollResults" dir={lang.isRtl ? 'rtl' : undefined}>
       <h3 className="poll-question" dir="auto">{renderText(summary.question, ['emoji', 'br'])}</h3>
       <div className="poll-results-list custom-scroll">
-        {Boolean(lastSyncTime) && summary.answers.map((answer) => (
+        {lastSyncTime && summary.answers.map((answer) => (
           <PollAnswerResults
             key={`${message.id}-${answer.option}`}
             chat={chat}
@@ -74,8 +74,8 @@ export default memo(withGlobal(
   (global): StateProps => {
     const {
       pollResults: { chatId, messageId },
-    } = selectTabState(global);
-    const { lastSyncTime } = global;
+      lastSyncTime,
+    } = global;
 
     if (!chatId || !messageId) {
       return {};

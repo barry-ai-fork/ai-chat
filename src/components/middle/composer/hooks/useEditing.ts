@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useState } from '../../../../lib/teact/teact';
+import { useCallback, useEffect } from '../../../../lib/teact/teact';
 import { getActions } from '../../../../global';
 
 import type { ApiFormattedText, ApiMessage } from '../../../../api/types';
 import type { MessageListType } from '../../../../global/types';
-import type { Signal } from '../../../../util/signals';
 
 import useEffectWithPrevDeps from '../../../../hooks/useEffectWithPrevDeps';
 import { EDITABLE_INPUT_CSS_SELECTOR } from '../../../../config';
@@ -16,7 +15,7 @@ import useBackgroundMode from '../../../../hooks/useBackgroundMode';
 import useBeforeUnload from '../../../../hooks/useBeforeUnload';
 
 const useEditing = (
-  getHtml: Signal<string>,
+  htmlRef: { current: string },
   setHtml: (html: string) => void,
   editedMessage: ApiMessage | undefined,
   resetComposer: (shouldPreserveInput?: boolean) => void,
@@ -26,31 +25,19 @@ const useEditing = (
   type: MessageListType,
   draft?: ApiFormattedText,
   editingDraft?: ApiFormattedText,
-  replyingToId?: number,
-): [VoidFunction, VoidFunction, boolean] => {
+) => {
   const { editMessage, setEditingDraft } = getActions();
-  const [shouldForceShowEditing, setShouldForceShowEditing] = useState<boolean>();
 
-  useEffectWithPrevDeps(([prevEditedMessage, prevReplyingToId]) => {
+  useEffectWithPrevDeps(([prevEditedMessage]) => {
     if (!editedMessage) {
       return;
     }
-
-    if (replyingToId && prevReplyingToId !== replyingToId) {
-      setHtml('');
-      setShouldForceShowEditing(false);
+    if (prevEditedMessage?.id === editedMessage.id) {
       return;
     }
 
-    if (prevEditedMessage?.id === editedMessage.id && replyingToId === prevReplyingToId) {
-      return;
-    }
-
-    const text = !prevEditedMessage && editingDraft?.text.length ? editingDraft : editedMessage.content.text;
-    const html = getTextWithEntitiesAsHtml(text);
-
+    const html = getTextWithEntitiesAsHtml(editingDraft?.text.length ? editingDraft : editedMessage.content.text);
     setHtml(html);
-    setShouldForceShowEditing(true);
     // `fastRaf` would execute syncronously in this case
     requestAnimationFrame(() => {
       const messageInput = document.querySelector<HTMLDivElement>(EDITABLE_INPUT_CSS_SELECTOR);
@@ -58,20 +45,19 @@ const useEditing = (
         focusEditableElement(messageInput, true);
       }
     });
-    // eslint-disable-next-line react-hooks-static-deps/exhaustive-deps -- `as const` not yet supported by linter
-  }, [editedMessage, replyingToId, setHtml] as const);
+  }, [editedMessage, setHtml] as const);
 
   useEffect(() => {
     if (!editedMessage) return undefined;
     return () => {
-      const edited = parseMessageInput(getHtml());
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      const edited = parseMessageInput(htmlRef.current!);
       const update = edited.text.length ? edited : undefined;
-
       setEditingDraft({
         chatId, threadId, type, text: update,
       });
     };
-  }, [chatId, editedMessage, getHtml, setEditingDraft, threadId, type]);
+  }, [chatId, editedMessage, htmlRef, setEditingDraft, threadId, type]);
 
   const restoreNewDraftAfterEditing = useCallback(() => {
     if (!draft) return;
@@ -93,7 +79,7 @@ const useEditing = (
   }, [resetComposer, restoreNewDraftAfterEditing]);
 
   const handleEditComplete = useCallback(() => {
-    const { text, entities } = parseMessageInput(getHtml());
+    const { text, entities } = parseMessageInput(htmlRef.current!);
 
     if (!editedMessage) {
       return;
@@ -105,28 +91,28 @@ const useEditing = (
     }
 
     editMessage({
+      messageId: editedMessage.id,
       text,
       entities,
     });
 
     resetComposer();
     restoreNewDraftAfterEditing();
-  }, [editMessage, editedMessage, getHtml, openDeleteModal, resetComposer, restoreNewDraftAfterEditing]);
+  }, [editMessage, editedMessage, htmlRef, openDeleteModal, resetComposer, restoreNewDraftAfterEditing]);
 
   const handleBlur = useCallback(() => {
     if (!editedMessage) return;
-    const edited = parseMessageInput(getHtml());
+    const edited = parseMessageInput(htmlRef.current!);
     const update = edited.text.length ? edited : undefined;
-
     setEditingDraft({
       chatId, threadId, type, text: update,
     });
-  }, [chatId, editedMessage, getHtml, setEditingDraft, threadId, type]);
+  }, [chatId, editedMessage, htmlRef, setEditingDraft, threadId, type]);
 
   useBackgroundMode(handleBlur);
   useBeforeUnload(handleBlur);
 
-  return [handleEditComplete, handleEditCancel, shouldForceShowEditing];
+  return [handleEditComplete, handleEditCancel];
 };
 
 export default useEditing;

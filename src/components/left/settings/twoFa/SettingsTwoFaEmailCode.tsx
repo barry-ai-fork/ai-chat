@@ -6,11 +6,10 @@ import { withGlobal } from '../../../../global';
 
 import type { ApiSticker } from '../../../../api/types';
 
-import { IS_TOUCH_ENV } from '../../../../util/environment';
+import { IS_SINGLE_COLUMN_LAYOUT, IS_TOUCH_ENV } from '../../../../util/environment';
 import { selectAnimatedEmoji } from '../../../../global/selectors';
 import useLang from '../../../../hooks/useLang';
 import useHistoryBack from '../../../../hooks/useHistoryBack';
-import useAppLayout from '../../../../hooks/useAppLayout';
 
 import InputText from '../../../ui/InputText';
 import Loading from '../../../ui/Loading';
@@ -30,6 +29,7 @@ type StateProps = {
   codeLength: number;
 };
 
+const FOCUS_DELAY_TIMEOUT_MS = IS_SINGLE_COLUMN_LAYOUT ? 550 : 400;
 const ICON_SIZE = 160;
 
 const SettingsTwoFaEmailCode: FC<OwnProps & StateProps> = ({
@@ -44,8 +44,6 @@ const SettingsTwoFaEmailCode: FC<OwnProps & StateProps> = ({
 }) => {
   // eslint-disable-next-line no-null/no-null
   const inputRef = useRef<HTMLInputElement>(null);
-  const { isMobile } = useAppLayout();
-  const focusDelayTimeoutMs = isMobile ? 550 : 400;
 
   const [value, setValue] = useState<string>('');
 
@@ -53,9 +51,9 @@ const SettingsTwoFaEmailCode: FC<OwnProps & StateProps> = ({
     if (!IS_TOUCH_ENV) {
       setTimeout(() => {
         inputRef.current!.focus();
-      }, focusDelayTimeoutMs);
+      }, FOCUS_DELAY_TIMEOUT_MS);
     }
-  }, [focusDelayTimeoutMs]);
+  }, []);
 
   const lang = useLang();
 

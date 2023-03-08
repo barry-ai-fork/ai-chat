@@ -9,7 +9,6 @@ import useCanvasBlur from '../../../../hooks/useCanvasBlur';
 import useMediaTransition from '../../../../hooks/useMediaTransition';
 
 import DeviceFrame from '../../../../assets/premium/DeviceFrame.svg';
-import OptimizedVideo from '../../../ui/OptimizedVideo';
 
 import styles from './PremiumFeaturePreviewVideo.module.scss';
 
@@ -19,7 +18,6 @@ type OwnProps = {
   isDown: boolean;
   videoThumbnail: ApiThumbnail;
   index: number;
-  isActive: boolean;
 };
 
 const PremiumFeaturePreviewVideo: FC<OwnProps> = ({
@@ -28,7 +26,6 @@ const PremiumFeaturePreviewVideo: FC<OwnProps> = ({
   isDown,
   videoThumbnail,
   index,
-  isActive,
 }) => {
   const mediaData = useMedia(`document${videoId}`);
   const thumbnailRef = useCanvasBlur(videoThumbnail.dataUri);
@@ -46,11 +43,13 @@ const PremiumFeaturePreviewVideo: FC<OwnProps> = ({
       >
         <img src={DeviceFrame} alt="" className={styles.frame} />
         <canvas ref={thumbnailRef} className={styles.video} />
-        <OptimizedVideo
-          canPlay={isActive}
-          className={buildClassName(styles.video, transitionClassNames)}
+        <video
+          className={buildClassName(
+            styles.video,
+            transitionClassNames,
+          )}
           src={mediaData}
-          disablePictureInPicture
+          autoPlay
           playsInline
           muted
           loop

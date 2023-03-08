@@ -1,14 +1,13 @@
 import type { ApiMessageEntity, ApiFormattedText } from '../api/types';
 import { ApiMessageEntityTypes } from '../api/types';
-import { RE_LINK_TEMPLATE } from '../config';
 import { IS_EMOJI_SUPPORTED } from './environment';
+import { RE_LINK_TEMPLATE } from '../config';
 
-export const ENTITY_CLASS_BY_NODE_NAME: Record<string, ApiMessageEntityTypes> = {
+const ENTITY_CLASS_BY_NODE_NAME: Record<string, string> = {
   B: ApiMessageEntityTypes.Bold,
   STRONG: ApiMessageEntityTypes.Bold,
   I: ApiMessageEntityTypes.Italic,
   EM: ApiMessageEntityTypes.Italic,
-  INS: ApiMessageEntityTypes.Underline,
   U: ApiMessageEntityTypes.Underline,
   S: ApiMessageEntityTypes.Strike,
   STRIKE: ApiMessageEntityTypes.Strike,
@@ -20,21 +19,15 @@ export const ENTITY_CLASS_BY_NODE_NAME: Record<string, ApiMessageEntityTypes> = 
 
 const MAX_TAG_DEEPNESS = 3;
 
-export default function parseMessageInput(
-  html: string, withMarkdownLinks = false, skipMarkdown = false,
-): ApiFormattedText {
+export default function parseMessageInput(html: string, withMarkdownLinks = false): ApiFormattedText {
   const fragment = document.createElement('div');
-  fragment.innerHTML = skipMarkdown ? html
-    : withMarkdownLinks ? parseMarkdown(parseMarkdownLinks(html)) : parseMarkdown(html);
-  fixImageContent(fragment);
+  fragment.innerHTML = withMarkdownLinks ? parseMarkdown(parseMarkdownLinks(html)) : parseMarkdown(html);
   const text = fragment.innerText.trim().replace(/\u200b+/g, '');
-  const trimShift = fragment.innerText.indexOf(text[0]);
-  let textIndex = -trimShift;
+  let textIndex = 0;
   let recursionDeepness = 0;
   const entities: ApiMessageEntity[] = [];
 
   function addEntity(node: ChildNode) {
-    if (node.nodeType === Node.COMMENT_NODE) return;
     const { index, entity } = getEntityDataFromNode(node, text, textIndex);
 
     if (entity) {
@@ -65,18 +58,13 @@ export default function parseMessageInput(
   };
 }
 
-export function fixImageContent(fragment: HTMLDivElement) {
-  fragment.querySelectorAll('img').forEach((node) => {
-    if (node.dataset.documentId) { // Custom Emoji
-      node.textContent = (node as HTMLImageElement).alt || '';
-    } else { // Regular emoji with image fallback
-      node.replaceWith(node.alt || '');
-    }
-  });
-}
-
 function parseMarkdown(html: string) {
   let parsedHtml = html.slice(0);
+
+  if (!IS_EMOJI_SUPPORTED) {
+    // Emojis
+    parsedHtml = parsedHtml.replace(/<img[^>]+alt="([^"]+)"[^>]*>/gm, '$1');
+  }
 
   // Strip redundant nbsp's
   parsedHtml = parsedHtml.replace(/&nbsp;/g, ' ');
@@ -97,37 +85,24 @@ function parseMarkdown(html: string) {
   parsedHtml = parsedHtml.replace(/[`]{3}([^`]+)[`]{3}/g, '<pre>$1</pre>');
 
   // Code
-  parsedHtml = parsedHtml.replace(
-    /(?!<(code|pre)[^<]*|<\/)[`]{1}([^`\n]+)[`]{1}(?![^<]*<\/(code|pre)>)/g,
-    '<code>$2</code>',
-  );
-
-  // Custom Emoji markdown tag
-  if (!IS_EMOJI_SUPPORTED) {
-    // Prepare alt text for custom emoji
-    parsedHtml = parsedHtml.replace(/\[<img[^>]+alt="([^"]+)"[^>]*>]/gm, '[$1]');
-  }
-  parsedHtml = parsedHtml.replace(
-    /(?!<(?:code|pre)[^<]*|<\/)\[([^\]\n]+)\]\(customEmoji:(\d+)\)(?![^<]*<\/(?:code|pre)>)/g,
-    '<img alt="$1" data-document-id="$2">',
-  );
+  parsedHtml = parsedHtml.replace(/[`]{1}([^`\n]+)[`]{1}/g, '<code>$1</code>');
 
   // Other simple markdown
   parsedHtml = parsedHtml.replace(
-    /(^|\s)(?!<(code|pre)[^<]*|<\/)[*]{2}([^*\n]+)[*]{2}(?![^<]*<\/(code|pre)>)(\s|$)/g,
-    '$1<b>$3</b>$5',
+    /(^|\s)(?!<code[^<]*|<\/)[*]{2}([^*\n]+)[*]{2}(?![^<]*<\/code>)(\s|$)/g,
+    '$1<b>$2</b>$3',
   );
   parsedHtml = parsedHtml.replace(
-    /(^|\s)(?!<(code|pre)[^<]*|<\/)[_]{2}([^_\n]+)[_]{2}(?![^<]*<\/(code|pre)>)(\s|$)/g,
-    '$1<i>$3</i>$5',
+    /(^|\s)(?!<code[^<]*|<\/)[_]{2}([^_\n]+)[_]{2}(?![^<]*<\/code>)(\s|$)/g,
+    '$1<i>$2</i>$3',
   );
   parsedHtml = parsedHtml.replace(
-    /(^|\s)(?!<(code|pre)[^<]*|<\/)[~]{2}([^~\n]+)[~]{2}(?![^<]*<\/(code|pre)>)(\s|$)/g,
-    '$1<s>$3</s>$5',
+    /(^|\s)(?!<code[^<]*|<\/)[~]{2}([^~\n]+)[~]{2}(?![^<]*<\/code>)(\s|$)/g,
+    '$1<s>$2</s>$3',
   );
   parsedHtml = parsedHtml.replace(
-    /(^|\s)(?!<(code|pre)[^<]*|<\/)[|]{2}([^|\n]+)[|]{2}(?![^<]*<\/(code|pre)>)(\s|$)/g,
-    `$1<span data-entity-type="${ApiMessageEntityTypes.Spoiler}">$3</span>$5`,
+    /(^|\s)(?!<code[^<]*|<\/)[|]{2}([^|\n]+)[|]{2}(?![^<]*<\/code>)(\s|$)/g,
+    `$1<span data-entity-type="${ApiMessageEntityTypes.Spoiler}">$2</span>$3`,
   );
 
   return parsedHtml;
@@ -146,7 +121,6 @@ function getEntityDataFromNode(
   textIndex: number,
 ): { index: number; entity?: ApiMessageEntity } {
   const type = getEntityTypeFromNode(node);
-
   if (!type || !node.textContent) {
     return {
       index: textIndex,
@@ -161,51 +135,18 @@ function getEntityDataFromNode(
   const offset = rawText.substring(0, index).length;
   const { length } = rawText.substring(index, index + node.textContent.length);
 
+  let url: string | undefined;
+  let userId: string | undefined;
+  let language: string | undefined;
   if (type === ApiMessageEntityTypes.TextUrl) {
-    return {
-      index,
-      entity: {
-        type,
-        offset,
-        length,
-        url: (node as HTMLAnchorElement).href,
-      },
-    };
+    url = (node as HTMLAnchorElement).href;
   }
   if (type === ApiMessageEntityTypes.MentionName) {
-    return {
-      index,
-      entity: {
-        type,
-        offset,
-        length,
-        userId: (node as HTMLAnchorElement).dataset.userId!,
-      },
-    };
+    userId = (node as HTMLAnchorElement).dataset.userId;
   }
 
   if (type === ApiMessageEntityTypes.Pre) {
-    return {
-      index,
-      entity: {
-        type,
-        offset,
-        length,
-        language: (node as HTMLPreElement).dataset.language,
-      },
-    };
-  }
-
-  if (type === ApiMessageEntityTypes.CustomEmoji) {
-    return {
-      index,
-      entity: {
-        type,
-        offset,
-        length,
-        documentId: (node as HTMLImageElement).dataset.documentId!,
-      },
-    };
+    language = (node as HTMLPreElement).dataset.language;
   }
 
   return {
@@ -214,15 +155,14 @@ function getEntityDataFromNode(
       type,
       offset,
       length,
+      ...(url && { url }),
+      ...(userId && { userId }),
+      ...(language && { language }),
     },
   };
 }
 
-function getEntityTypeFromNode(node: ChildNode): ApiMessageEntityTypes | undefined {
-  if (node instanceof HTMLElement && node.dataset.entityType) {
-    return node.dataset.entityType as ApiMessageEntityTypes;
-  }
-
+function getEntityTypeFromNode(node: ChildNode) {
   if (ENTITY_CLASS_BY_NODE_NAME[node.nodeName]) {
     return ENTITY_CLASS_BY_NODE_NAME[node.nodeName];
   }
@@ -249,13 +189,7 @@ function getEntityTypeFromNode(node: ChildNode): ApiMessageEntityTypes | undefin
   }
 
   if (node.nodeName === 'SPAN') {
-    return (node as HTMLElement).dataset.entityType as any;
-  }
-
-  if (node.nodeName === 'IMG') {
-    if ((node as HTMLImageElement).dataset.documentId) {
-      return ApiMessageEntityTypes.CustomEmoji;
-    }
+    return (node as HTMLElement).dataset.entityType;
   }
 
   return undefined;

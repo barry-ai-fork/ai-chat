@@ -8,11 +8,9 @@ import type { ApiAudio, ApiMessage, ApiVoice } from '../../api/types';
 import { ApiMediaFormat } from '../../api/types';
 import type { ISettings } from '../../types';
 import { AudioOrigin } from '../../types';
-import type { LangFn } from '../../hooks/useLang';
 
-import { MAX_EMPTY_WAVEFORM_POINTS, renderWaveform } from './helpers/waveform';
-import renderText from './helpers/renderText';
-import { getFileSizeString } from './helpers/documentInfo';
+import { IS_SINGLE_COLUMN_LAYOUT } from '../../util/environment';
+import { formatMediaDateTime, formatMediaDuration, formatPastTimeShort } from '../../util/dateFormat';
 import {
   getMediaDuration,
   getMediaTransferState,
@@ -21,19 +19,22 @@ import {
   isMessageLocal,
   isOwnMessage,
 } from '../../global/helpers';
+import { MAX_EMPTY_WAVEFORM_POINTS, renderWaveform } from './helpers/waveform';
 import buildClassName from '../../util/buildClassName';
-import { formatMediaDateTime, formatMediaDuration, formatPastTimeShort } from '../../util/dateFormat';
+import renderText from './helpers/renderText';
+import { getFileSizeString } from './helpers/documentInfo';
 import { decodeWaveform, interpolateArray } from '../../util/waveform';
-import { makeTrackId } from '../../util/audioPlayer';
 import useMediaWithLoadProgress from '../../hooks/useMediaWithLoadProgress';
 import useShowTransition from '../../hooks/useShowTransition';
 import type { BufferedRange } from '../../hooks/useBuffering';
 import useBuffering from '../../hooks/useBuffering';
 import useAudioPlayer from '../../hooks/useAudioPlayer';
+import type { LangFn } from '../../hooks/useLang';
 import useLang from '../../hooks/useLang';
 import { captureEvents } from '../../util/captureEvents';
 import useMedia from '../../hooks/useMedia';
-import useAppLayout from '../../hooks/useAppLayout';
+import { makeTrackId } from '../../util/audioPlayer';
+import { getTranslation } from '../../util/langProvider';
 
 import Button from '../ui/Button';
 import ProgressSpinner from '../ui/ProgressSpinner';
@@ -110,7 +111,6 @@ const Audio: FC<OwnProps> = ({
   const lang = useLang();
   const { isRtl } = lang;
 
-  const { isMobile } = useAppLayout();
   const [isActivated, setIsActivated] = useState(false);
   const shouldLoad = (isActivated || PRELOAD) && lastSyncTime;
   const coverHash = getMessageMediaHash(message, 'pictogram');
@@ -125,7 +125,6 @@ const Audio: FC<OwnProps> = ({
   const { loadProgress: downloadProgress } = useMediaWithLoadProgress(
     getMessageMediaHash(message, 'download'),
     !isDownloading,
-    getMessageMediaFormat(message, 'download'),
   );
 
   const handleForcePlay = useCallback(() => {
@@ -159,7 +158,7 @@ const Audio: FC<OwnProps> = ({
 
   const isOwn = isOwnMessage(message);
   const waveformCanvasRef = useWaveformCanvas(
-    theme, voice, (isMediaUnread && !isOwn) ? 1 : playProgress, isOwn, !noAvatars, isMobile,
+    theme, voice, (isMediaUnread && !isOwn) ? 1 : playProgress, isOwn, !noAvatars,
   );
 
   const withSeekline = isPlaying || (playProgress > 0 && playProgress < 1);
@@ -312,7 +311,7 @@ const Audio: FC<OwnProps> = ({
           <p className="title" dir="auto" title={renderFirstLine()}>{renderText(renderFirstLine())}</p>
 
           <div className="message-date">
-            {Boolean(date) && (
+            {date && (
               <Link
                 className="date"
                 onClick={handleDateClick}
@@ -345,7 +344,7 @@ const Audio: FC<OwnProps> = ({
       )}
       <Button
         round
-        ripple={!isMobile}
+        ripple={!IS_SINGLE_COLUMN_LAYOUT}
         size="smaller"
         color={coverBlobUrl ? 'translucent-white' : 'primary'}
         className={buttonClassNames.join(' ')}
@@ -414,10 +413,10 @@ const Audio: FC<OwnProps> = ({
   );
 };
 
-function getSeeklineSpikeAmounts(isMobile?: boolean, withAvatar?: boolean) {
+function getSeeklineSpikeAmounts(withAvatar?: boolean) {
   return {
-    MIN_SPIKES: isMobile ? (TINY_SCREEN_WIDTH_MQL.matches ? 16 : 20) : 25,
-    MAX_SPIKES: isMobile
+    MIN_SPIKES: IS_SINGLE_COLUMN_LAYOUT ? (TINY_SCREEN_WIDTH_MQL.matches ? 16 : 20) : 25,
+    MAX_SPIKES: IS_SINGLE_COLUMN_LAYOUT
       ? (TINY_SCREEN_WIDTH_MQL.matches
         ? 35
         : (withAvatar && WITH_AVATAR_TINY_SCREEN_WIDTH_MQL.matches ? 40 : 45))
@@ -442,7 +441,7 @@ function renderAudio(
     title, performer, fileName,
   } = audio;
   const showSeekline = isPlaying || (playProgress > 0 && playProgress < 1);
-  const { isRtl } = lang;
+  const { isRtl } = getTranslation;
 
   return (
     <div className="content">
@@ -469,7 +468,7 @@ function renderAudio(
               <span className="performer" dir="auto" title={performer}>{renderText(performer)}</span>
             </>
           )}
-          {Boolean(date) && (
+          {date && (
             <>
               <span className="bullet">&bull;</span>
               <Link className="date" onClick={handleDateClick}>
@@ -540,7 +539,6 @@ function useWaveformCanvas(
   playProgress = 0,
   isOwn = false,
   withAvatar = false,
-  isMobile = false,
 ) {
   // eslint-disable-next-line no-null/no-null
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -558,13 +556,13 @@ function useWaveformCanvas(
       };
     }
 
-    const { MIN_SPIKES, MAX_SPIKES } = getSeeklineSpikeAmounts(isMobile, withAvatar);
+    const { MIN_SPIKES, MAX_SPIKES } = getSeeklineSpikeAmounts(withAvatar);
     const durationFactor = Math.min(duration / AVG_VOICE_DURATION, 1);
     const spikesCount = Math.round(MIN_SPIKES + (MAX_SPIKES - MIN_SPIKES) * durationFactor);
     const decodedWaveform = decodeWaveform(new Uint8Array(waveform));
 
     return interpolateArray(decodedWaveform, spikesCount);
-  }, [isMobile, voice, withAvatar]) || {};
+  }, [voice, withAvatar]) || {};
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;

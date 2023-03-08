@@ -1,9 +1,6 @@
 import type { Api as GramJs } from '../../../lib/gramjs';
 
-import type {
-  ApiInvoice, ApiPaymentSavedInfo, ApiPremiumPromo, ApiPremiumSubscriptionOption,
-  ApiPaymentForm, ApiReceipt, ApiLabeledPrice, ApiPaymentCredentials,
-} from '../../types';
+import type { ApiInvoice, ApiPaymentSavedInfo, ApiPremiumPromo } from '../../types';
 
 import { buildApiDocument, buildApiMessageEntity, buildApiWebDocument } from './messages';
 import { omitVirtualClassFields } from './helpers';
@@ -12,7 +9,6 @@ export function buildShippingOptions(shippingOptions: GramJs.ShippingOption[] | 
   if (!shippingOptions) {
     return undefined;
   }
-
   return Object.values(shippingOptions).map((option) => {
     return {
       id: option.id,
@@ -28,7 +24,7 @@ export function buildShippingOptions(shippingOptions: GramJs.ShippingOption[] | 
   });
 }
 
-export function buildApiReceipt(receipt: GramJs.payments.PaymentReceipt): ApiReceipt {
+export function buildReceipt(receipt: GramJs.payments.PaymentReceipt) {
   const {
     invoice,
     info,
@@ -36,19 +32,18 @@ export function buildApiReceipt(receipt: GramJs.payments.PaymentReceipt): ApiRec
     currency,
     totalAmount,
     credentialsTitle,
-    tipAmount,
   } = receipt;
 
   const { shippingAddress, phone, name } = (info || {});
 
   const { prices } = invoice;
-  const mappedPrices: ApiLabeledPrice[] = prices.map(({ label, amount }) => ({
+  const mapedPrices = prices.map(({ label, amount }) => ({
     label,
     amount: amount.toJSNumber(),
   }));
 
-  let shippingPrices: ApiLabeledPrice[] | undefined;
-  let shippingMethod: string | undefined;
+  let shippingPrices;
+  let shippingMethod;
 
   if (shipping) {
     shippingPrices = shipping.prices.map(({ label, amount }) => {
@@ -62,43 +57,41 @@ export function buildApiReceipt(receipt: GramJs.payments.PaymentReceipt): ApiRec
 
   return {
     currency,
-    prices: mappedPrices,
+    prices: mapedPrices,
     info: { shippingAddress, phone, name },
     totalAmount: totalAmount.toJSNumber(),
     credentialsTitle,
     shippingPrices,
     shippingMethod,
-    tipAmount: tipAmount ? tipAmount.toJSNumber() : 0,
   };
 }
 
-export function buildApiPaymentForm(form: GramJs.payments.PaymentForm): ApiPaymentForm {
+export function buildPaymentForm(form: GramJs.payments.PaymentForm) {
   const {
     formId,
     canSaveCredentials,
-    passwordMissing: isPasswordMissing,
+    passwordMissing,
     providerId,
     nativeProvider,
     nativeParams,
     savedInfo,
     invoice,
-    savedCredentials,
   } = form;
 
   const {
-    test: isTest,
-    nameRequested: isNameRequested,
-    phoneRequested: isPhoneRequested,
-    emailRequested: isEmailRequested,
-    shippingAddressRequested: isShippingAddressRequested,
-    flexible: isFlexible,
-    phoneToProvider: shouldSendPhoneToProvider,
-    emailToProvider: shouldSendEmailToProvider,
+    test,
+    nameRequested,
+    phoneRequested,
+    emailRequested,
+    shippingAddressRequested,
+    flexible,
+    phoneToProvider,
+    emailToProvider,
     currency,
     prices,
   } = invoice;
 
-  const mappedPrices: ApiLabeledPrice[] = prices.map(({ label, amount }) => ({
+  const mappedPrices = prices.map(({ label, amount }) => ({
     label,
     amount: amount.toJSNumber(),
   }));
@@ -112,31 +105,30 @@ export function buildApiPaymentForm(form: GramJs.payments.PaymentForm): ApiPayme
 
   return {
     canSaveCredentials,
-    isPasswordMissing,
+    passwordMissing,
     formId: String(formId),
     providerId: String(providerId),
     nativeProvider,
     savedInfo: cleanedInfo,
-    invoiceContainer: {
-      isTest,
-      isNameRequested,
-      isPhoneRequested,
-      isEmailRequested,
-      isShippingAddressRequested,
-      isFlexible,
-      shouldSendPhoneToProvider,
-      shouldSendEmailToProvider,
+    invoice: {
+      test,
+      nameRequested,
+      phoneRequested,
+      emailRequested,
+      shippingAddressRequested,
+      flexible,
+      phoneToProvider,
+      emailToProvider,
       currency,
       prices: mappedPrices,
     },
     nativeParams: {
-      needCardholderName: Boolean(nativeData?.need_cardholder_name),
-      needCountry: Boolean(nativeData?.need_country),
-      needZip: Boolean(nativeData?.need_zip),
-      publishableKey: nativeData?.publishable_key,
+      needCardholderName: nativeData.need_cardholder_name,
+      needCountry: nativeData.need_country,
+      needZip: nativeData.need_zip,
+      publishableKey: nativeData.publishable_key,
       publicToken: nativeData?.public_token,
     },
-    ...(savedCredentials && { savedCredentials: buildApiPaymentCredentials(savedCredentials) }),
   };
 }
 
@@ -145,7 +137,7 @@ export function buildApiInvoiceFromForm(form: GramJs.payments.PaymentForm): ApiI
     invoice, description: text, title, photo,
   } = form;
   const {
-    test, currency, prices, recurring, recurringTermsUrl, maxTipAmount, suggestedTipAmounts,
+    test, currency, prices, recurring, recurringTermsUrl,
   } = invoice;
 
   const totalAmount = prices.reduce((ac, cur) => ac + cur.amount.toJSNumber(), 0);
@@ -159,40 +151,20 @@ export function buildApiInvoiceFromForm(form: GramJs.payments.PaymentForm): ApiI
     isTest: test,
     isRecurring: recurring,
     recurringTermsUrl,
-    maxTipAmount: maxTipAmount?.toJSNumber(),
-    ...(suggestedTipAmounts && { suggestedTipAmounts: suggestedTipAmounts.map((tip) => tip.toJSNumber()) }),
   };
 }
 
 export function buildApiPremiumPromo(promo: GramJs.help.PremiumPromo): ApiPremiumPromo {
   const {
-    statusText, statusEntities, videos, videoSections, periodOptions,
+    statusText, statusEntities, videos, videoSections, currency, monthlyAmount,
   } = promo;
 
   return {
     statusText,
-    statusEntities: statusEntities.map(buildApiMessageEntity),
+    statusEntities: statusEntities.map((l) => buildApiMessageEntity(l)),
     videoSections,
-    videos: videos.map(buildApiDocument).filter(Boolean),
-    options: periodOptions.map(buildApiPremiumSubscriptionOption),
-  };
-}
-
-function buildApiPremiumSubscriptionOption(option: GramJs.PremiumSubscriptionOption): ApiPremiumSubscriptionOption {
-  const {
-    current, canPurchaseUpgrade, currency, amount, botUrl, months,
-  } = option;
-
-  return {
-    isCurrent: current,
-    canPurchaseUpgrade,
     currency,
-    amount: amount.toString(),
-    botUrl,
-    months,
+    videos: videos.map(buildApiDocument).filter(Boolean),
+    monthlyAmount: monthlyAmount.toString(),
   };
-}
-
-export function buildApiPaymentCredentials(credentials: GramJs.PaymentSavedCredentialsCard[]): ApiPaymentCredentials[] {
-  return credentials.map(({ id, title }) => ({ id, title }));
 }

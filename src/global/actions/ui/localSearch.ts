@@ -6,66 +6,57 @@ import {
   updateLocalMediaSearchType,
 } from '../../reducers';
 import { MEMO_EMPTY_ARRAY } from '../../../util/memo';
-import { selectCurrentMessageList, selectTabState } from '../../selectors';
+import { selectCurrentMessageList } from '../../selectors';
 import { buildChatThreadKey } from '../../helpers';
-import type { ActionReturnType, GlobalState, TabArgs } from '../../types';
-import { getCurrentTabId } from '../../../util/establishMultitabRole';
+import type { GlobalState } from '../../types';
 
-addActionHandler('openLocalTextSearch', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  const { chatId, threadId } = selectCurrentMessageList(global, tabId) || {};
+addActionHandler('openLocalTextSearch', (global) => {
+  const { chatId, threadId } = selectCurrentMessageList(global) || {};
   if (!chatId || !threadId) {
     return undefined;
   }
 
-  return updateLocalTextSearch(global, chatId, threadId, true, undefined, tabId);
+  return updateLocalTextSearch(global, chatId, threadId, true);
 });
 
-addActionHandler('closeLocalTextSearch', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  return closeLocalTextSearch(global, tabId);
-});
+addActionHandler('closeLocalTextSearch', closeLocalTextSearch);
 
-addActionHandler('setLocalTextSearchQuery', (global, actions, payload): ActionReturnType => {
-  const { query, tabId = getCurrentTabId() } = payload!;
-
-  const { chatId, threadId } = selectCurrentMessageList(global, tabId) || {};
+addActionHandler('setLocalTextSearchQuery', (global, actions, payload) => {
+  const { chatId, threadId } = selectCurrentMessageList(global) || {};
   if (!chatId || !threadId) {
     return undefined;
   }
 
+  const { query } = payload!;
   const chatThreadKey = buildChatThreadKey(chatId, threadId);
-  const { query: currentQuery } = selectTabState(global, tabId).localTextSearch.byChatThreadKey[chatThreadKey] || {};
+  const { query: currentQuery } = global.localTextSearch.byChatThreadKey[chatThreadKey] || {};
 
   if (query !== currentQuery) {
-    global = replaceLocalTextSearchResults(global, chatId, threadId, MEMO_EMPTY_ARRAY, undefined, undefined, tabId);
+    global = replaceLocalTextSearchResults(global, chatId, threadId, MEMO_EMPTY_ARRAY);
   }
 
-  global = updateLocalTextSearch(global, chatId, threadId, true, query, tabId);
+  global = updateLocalTextSearch(global, chatId, threadId, true, query);
 
   return global;
 });
 
-addActionHandler('setLocalMediaSearchType', (global, actions, payload): ActionReturnType => {
-  const { mediaType, tabId = getCurrentTabId() } = payload;
-  const { chatId, threadId } = selectCurrentMessageList(global, tabId) || {};
-  if (!chatId || !threadId) {
+addActionHandler('setLocalMediaSearchType', (global, actions, payload) => {
+  const { chatId } = selectCurrentMessageList(global) || {};
+  if (!chatId) {
     return undefined;
   }
 
-  return updateLocalMediaSearchType(global, chatId, threadId, mediaType, tabId);
+  const { mediaType } = payload!;
+  return updateLocalMediaSearchType(global, chatId, mediaType);
 });
 
-export function closeLocalTextSearch<T extends GlobalState>(
-  global: T,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  const { chatId, threadId } = selectCurrentMessageList(global, tabId) || {};
+export function closeLocalTextSearch(global: GlobalState): GlobalState {
+  const { chatId, threadId } = selectCurrentMessageList(global) || {};
   if (!chatId || !threadId) {
     return global;
   }
 
-  global = updateLocalTextSearch(global, chatId, threadId, false, undefined, tabId);
-  global = replaceLocalTextSearchResults(global, chatId, threadId, undefined, undefined, undefined, tabId);
+  global = updateLocalTextSearch(global, chatId, threadId, false);
+  global = replaceLocalTextSearchResults(global, chatId, threadId, undefined);
   return global;
 }

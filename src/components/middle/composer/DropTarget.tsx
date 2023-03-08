@@ -8,13 +8,13 @@ import './DropTarget.scss';
 
 export type OwnProps = {
   isQuick?: boolean;
-  isGeneric?: boolean;
   onFileSelect: (e: React.DragEvent<HTMLDivElement>) => void;
 };
 
-const DropTarget: FC<OwnProps> = ({ isQuick, isGeneric, onFileSelect }) => {
+const DropTarget: FC<OwnProps> = ({ isQuick, onFileSelect }) => {
   const [isHovered, markHovered, unmarkHovered] = useFlag();
 
+  const handleDragEnter = () => { markHovered(); };
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     const { relatedTarget: toTarget } = e;
 
@@ -34,14 +34,13 @@ const DropTarget: FC<OwnProps> = ({ isQuick, isGeneric, onFileSelect }) => {
     <div
       className={className}
       onDrop={onFileSelect}
-      onDragEnter={markHovered}
+      onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
-      data-dropzone
     >
       <div className="target-content">
         <div className={`icon icon-${isQuick ? 'photo' : 'document'}`} />
         <div className="title">Drop files here to send them</div>
-        {!isGeneric && <div className="description">{isQuick ? 'in a quick way' : 'without compression'}</div>}
+        <div className="description">{isQuick ? 'in a quick way' : 'without compression'}</div>
       </div>
     </div>
   );

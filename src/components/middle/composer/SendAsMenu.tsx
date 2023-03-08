@@ -1,14 +1,13 @@
+import type { FC } from '../../../lib/teact/teact';
 import React, {
   useCallback, useEffect, useRef, memo,
 } from '../../../lib/teact/teact';
 
-import type { FC } from '../../../lib/teact/teact';
-import type { ApiSendAsPeerId } from '../../../api/types';
-
 import setTooltipItemVisible from '../../../util/setTooltipItemVisible';
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
 import { IS_TOUCH_ENV } from '../../../util/environment';
-import { isUserId } from '../../../global/helpers';
+import renderText from '../../common/helpers/renderText';
+import { getUserFullName, isUserId } from '../../../global/helpers';
 import useMouseInside from '../../../hooks/useMouseInside';
 import useLang from '../../../hooks/useLang';
 import buildClassName from '../../../util/buildClassName';
@@ -17,28 +16,25 @@ import { getActions, getGlobal } from '../../../global';
 import ListItem from '../../ui/ListItem';
 import Avatar from '../../common/Avatar';
 import Menu from '../../ui/Menu';
-import FullNameTitle from '../../common/FullNameTitle';
 
 import './SendAsMenu.scss';
 
 export type OwnProps = {
   isOpen: boolean;
+  onClose: () => void;
   chatId?: string;
   selectedSendAsId?: string;
-  sendAsPeerIds?: ApiSendAsPeerId[];
-  isCurrentUserPremium?: boolean;
-  onClose: () => void;
+  sendAsIds?: string[];
 };
 
 const SendAsMenu: FC<OwnProps> = ({
   isOpen,
+  onClose,
   chatId,
   selectedSendAsId,
-  sendAsPeerIds,
-  isCurrentUserPremium,
-  onClose,
+  sendAsIds,
 }) => {
-  const { saveDefaultSendAs, showNotification } = getActions();
+  const { saveDefaultSendAs } = getActions();
 
   // No need for expensive global updates on users and chats, so we avoid them
   const usersById = getGlobal().users.byId;
@@ -58,12 +54,12 @@ const SendAsMenu: FC<OwnProps> = ({
 
   const handleUserSelect = useCallback((id: string) => {
     onClose();
-    saveDefaultSendAs({ chatId: chatId!, sendAsId: id });
+    saveDefaultSendAs({ chatId, sendAsId: id });
   }, [chatId, onClose, saveDefaultSendAs]);
 
   const selectedSendAsIndex = useKeyboardNavigation({
     isActive: isOpen,
-    items: sendAsPeerIds,
+    items: sendAsIds,
     onSelect: handleUserSelect,
     shouldSelectOnTab: true,
     shouldSaveSelectionOnUpdateItems: true,
@@ -75,10 +71,10 @@ const SendAsMenu: FC<OwnProps> = ({
   }, [selectedSendAsIndex]);
 
   useEffect(() => {
-    if (sendAsPeerIds && !sendAsPeerIds.length) {
+    if (sendAsIds && !sendAsIds.length) {
       onClose();
     }
-  }, [sendAsPeerIds, onClose]);
+  }, [sendAsIds, onClose]);
 
   return (
     <Menu
@@ -94,34 +90,18 @@ const SendAsMenu: FC<OwnProps> = ({
       noCompact
     >
       <div className="send-as-title" dir="auto">{lang('SendMessageAsTitle')}</div>
-      {usersById && chatsById && sendAsPeerIds?.map(({ id, isPremium }, index) => {
+      {usersById && chatsById && sendAsIds?.map((id, index) => {
         const user = isUserId(id) ? usersById[id] : undefined;
         const chat = !user ? chatsById[id] : undefined;
-        const userOrChat = user || chat;
-
-        const handleClick = () => {
-          if (!isPremium || isCurrentUserPremium) {
-            handleUserSelect(id);
-          } else {
-            showNotification({
-              message: lang('SelectSendAsPeerPremiumHint'),
-              actionText: lang('Open'),
-              action: {
-                action: 'openPremiumModal',
-                payload: {},
-              },
-            });
-          }
-        };
+        const fullName = user ? getUserFullName(user) : chat?.title;
 
         return (
           <ListItem
             key={id}
             className="SendAsItem chat-item-clickable scroll-item with-avatar"
             // eslint-disable-next-line react/jsx-no-bind
-            onClick={handleClick}
+            onClick={() => handleUserSelect(id)}
             focus={selectedSendAsIndex === index}
-            rightElement={!isCurrentUserPremium && isPremium && <i className="icon-lock-badge send-as-icon-locked" />}
           >
             <Avatar
               size="small"
@@ -130,7 +110,9 @@ const SendAsMenu: FC<OwnProps> = ({
               className={buildClassName(selectedSendAsId === id && 'selected')}
             />
             <div className="info">
-              {userOrChat && <FullNameTitle peer={userOrChat} noFake />}
+              <div className="title">
+                <h3 dir="auto">{fullName && renderText(fullName)}</h3>
+              </div>
               <span className="subtitle">{user
                 ? lang('VoipGroupPersonalAccount')
                 : lang('Subscribers', chat?.membersCount, 'i')}

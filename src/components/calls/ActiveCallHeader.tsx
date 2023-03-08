@@ -5,7 +5,6 @@ import { getActions, withGlobal } from '../../global';
 import type { ApiGroupCall, ApiUser } from '../../api/types';
 
 import { selectActiveGroupCall, selectPhoneCallUser } from '../../global/selectors/calls';
-import { selectTabState } from '../../global/selectors';
 import buildClassName from '../../util/buildClassName';
 import useLang from '../../hooks/useLang';
 
@@ -34,10 +33,6 @@ const ActiveCallHeader: FC<StateProps> = ({
     };
   }, [isCallPanelVisible]);
 
-  function handleToggleGroupCallPanel() {
-    toggleGroupCallPanel();
-  }
-
   if (!groupCall && !phoneCallUser) return undefined;
 
   return (
@@ -46,7 +41,7 @@ const ActiveCallHeader: FC<StateProps> = ({
         'ActiveCallHeader',
         isCallPanelVisible && 'open',
       )}
-      onClick={handleToggleGroupCallPanel}
+      onClick={toggleGroupCallPanel}
     >
       <span className="title">{phoneCallUser?.firstName || groupCall?.title || lang('VoipGroupVoiceChat')}</span>
     </div>
@@ -55,11 +50,10 @@ const ActiveCallHeader: FC<StateProps> = ({
 
 export default memo(withGlobal(
   (global): StateProps => {
-    const tabState = selectTabState(global);
     return {
-      groupCall: tabState.isMasterTab ? selectActiveGroupCall(global) : undefined,
-      isCallPanelVisible: tabState.isCallPanelVisible,
-      phoneCallUser: tabState.isMasterTab ? selectPhoneCallUser(global) : undefined,
+      groupCall: selectActiveGroupCall(global),
+      isCallPanelVisible: global.isCallPanelVisible,
+      phoneCallUser: selectPhoneCallUser(global),
     };
   },
 )(ActiveCallHeader));

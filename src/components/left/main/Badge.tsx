@@ -1,89 +1,49 @@
-import React, { memo, useMemo } from '../../../lib/teact/teact';
-
-import type { ApiChat, ApiTopic } from '../../../api/types';
 import type { FC } from '../../../lib/teact/teact';
+import React, { memo } from '../../../lib/teact/teact';
+
+import type { ApiChat } from '../../../api/types';
 
 import { formatIntegerCompact } from '../../../util/textFormat';
 import buildClassName from '../../../util/buildClassName';
 
 import ShowTransition from '../../ui/ShowTransition';
-import AnimatedCounter from '../../common/AnimatedCounter';
 
 import './Badge.scss';
 
 type OwnProps = {
   chat: ApiChat;
-  topic?: ApiTopic;
-  wasTopicOpened?: boolean;
   isPinned?: boolean;
   isMuted?: boolean;
-  shouldShowOnlyMostImportant?: boolean;
-  forceHidden?: boolean;
 };
 
-const Badge: FC<OwnProps> = ({
-  topic, chat, isPinned, isMuted, shouldShowOnlyMostImportant, wasTopicOpened, forceHidden,
-}) => {
-  const {
-    unreadMentionsCount = 0, unreadReactionsCount = 0,
-  } = !chat.isForum ? chat : {}; // TODO[forums] Unread mentions and reactions temporarily disabled for forums
-
-  const isTopicUnopened = !isPinned && topic && !wasTopicOpened;
-  const isForum = chat.isForum && !topic;
-  const topicsWithUnread = useMemo(() => (
-    isForum && chat?.topics ? Object.values(chat.topics).filter(({ unreadCount }) => unreadCount) : undefined
-  ), [chat, isForum]);
-
-  const unreadCount = useMemo(() => (
-    isForum
-      // If we have unmuted topics, display the count of those. Otherwise, display the count of all topics.
-      ? ((isMuted && topicsWithUnread?.filter((acc) => acc.isMuted === false).length)
-        || topicsWithUnread?.length)
-      : (topic || chat).unreadCount
-  ), [chat, topic, topicsWithUnread, isForum, isMuted]);
-
-  const shouldBeMuted = useMemo(() => {
-    const hasUnmutedUnreadTopics = chat.topics
-      && Object.values(chat.topics).some((acc) => acc.isMuted && acc.unreadCount);
-
-    return isMuted || (chat.topics && !hasUnmutedUnreadTopics);
-  }, [chat, isMuted]);
-
-  const hasUnreadMark = topic ? false : chat.hasUnreadMark;
-
-  const isShown = !forceHidden && Boolean(
-    unreadCount || unreadMentionsCount || hasUnreadMark || isPinned || unreadReactionsCount
-    || isTopicUnopened,
+const Badge: FC<OwnProps> = ({ chat, isPinned, isMuted }) => {
+  const isShown = Boolean(
+    chat.unreadCount || chat.unreadMentionsCount || chat.hasUnreadMark || isPinned || chat.unreadReactionsCount,
   );
-
-  const isUnread = Boolean(unreadCount || hasUnreadMark);
+  const isUnread = Boolean(chat.unreadCount || chat.hasUnreadMark);
   const className = buildClassName(
     'Badge',
-    shouldBeMuted && 'muted',
+    isMuted && 'muted',
     !isUnread && isPinned && 'pinned',
     isUnread && 'unread',
   );
 
   function renderContent() {
-    const unreadReactionsElement = unreadReactionsCount && (
-      <div className={buildClassName('Badge reaction', shouldBeMuted && 'muted')}>
+    const unreadReactionsElement = chat.unreadReactionsCount && (
+      <div className={buildClassName('Badge reaction', isMuted && 'muted')}>
         <i className="icon-heart" />
       </div>
     );
 
-    const unreadMentionsElement = unreadMentionsCount && (
+    const unreadMentionsElement = chat.unreadMentionsCount && (
       <div className="Badge mention">
         <i className="icon-mention" />
       </div>
     );
 
-    const unopenedTopicElement = isTopicUnopened && (
-      <div className={buildClassName('Badge unopened', shouldBeMuted && 'muted')} />
-    );
-
-    const unreadCountElement = (hasUnreadMark || unreadCount) ? (
+    const unreadCountElement = (chat.hasUnreadMark || chat.unreadCount) ? (
       <div className={className}>
-        {!hasUnreadMark && <AnimatedCounter text={formatIntegerCompact(unreadCount!)} />}
+        {!chat.hasUnreadMark && formatIntegerCompact(chat.unreadCount!)}
       </div>
     ) : undefined;
 
@@ -93,20 +53,11 @@ const Badge: FC<OwnProps> = ({
       </div>
     );
 
-    const elements = [
-      unopenedTopicElement, unreadReactionsElement, unreadMentionsElement, unreadCountElement, pinnedElement,
-    ].filter(Boolean);
+    const elements = [unreadReactionsElement, unreadMentionsElement, unreadCountElement, pinnedElement].filter(Boolean);
 
     if (elements.length === 0) return undefined;
 
     if (elements.length === 1) return elements[0];
-
-    if (shouldShowOnlyMostImportant) {
-      const importanceOrderedElements = [
-        unreadMentionsElement, unreadCountElement, unreadReactionsElement, pinnedElement,
-      ].filter(Boolean);
-      return importanceOrderedElements[0];
-    }
 
     return (
       <div className="Badge-wrapper">

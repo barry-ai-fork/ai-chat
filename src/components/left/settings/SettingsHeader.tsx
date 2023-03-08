@@ -6,9 +6,9 @@ import { getActions } from '../../../global';
 
 import { SettingsScreens } from '../../../types';
 
+import { IS_SINGLE_COLUMN_LAYOUT } from '../../../util/environment';
 import useLang from '../../../hooks/useLang';
 import useMultiClick from '../../../hooks/useMultiClick';
-import useAppLayout from '../../../hooks/useAppLayout';
 
 import DropdownMenu from '../../ui/DropdownMenu';
 import MenuItem from '../../ui/MenuItem';
@@ -35,7 +35,6 @@ const SettingsHeader: FC<OwnProps> = ({
     openDeleteChatFolderModal,
   } = getActions();
 
-  const { isMobile } = useAppLayout();
   const [isSignOutDialogOpen, setIsSignOutDialogOpen] = useState(false);
 
   const handleMultiClick = useMultiClick(5, () => {
@@ -58,14 +57,14 @@ const SettingsHeader: FC<OwnProps> = ({
 
   const handleSignOutMessage = useCallback(() => {
     closeSignOutConfirmation();
-    signOut({ forceInitApi: true });
+    signOut();
   }, [closeSignOutConfirmation, signOut]);
 
   const SettingsMenuButton: FC<{ onTrigger: () => void; isOpen?: boolean }> = useMemo(() => {
     return ({ onTrigger, isOpen }) => (
       <Button
         round
-        ripple={!isMobile}
+        ripple={!IS_SINGLE_COLUMN_LAYOUT}
         size="smaller"
         color="translucent"
         className={isOpen ? 'active' : ''}
@@ -75,7 +74,7 @@ const SettingsHeader: FC<OwnProps> = ({
         <i className="icon-more" />
       </Button>
     );
-  }, [isMobile]);
+  }, []);
 
   const lang = useLang();
 
@@ -87,8 +86,6 @@ const SettingsHeader: FC<OwnProps> = ({
         return <h3>{lang('General')}</h3>;
       case SettingsScreens.QuickReaction:
         return <h3>{lang('DoubleTapSetting')}</h3>;
-      case SettingsScreens.CustomEmoji:
-        return <h3>{lang('Emoji')}</h3>;
       case SettingsScreens.Notifications:
         return <h3>{lang('Notifications')}</h3>;
       case SettingsScreens.DataStorage:
@@ -97,10 +94,6 @@ const SettingsHeader: FC<OwnProps> = ({
         return <h3>{lang('PrivacySettings')}</h3>;
       case SettingsScreens.Language:
         return <h3>{lang('Language')}</h3>;
-      case SettingsScreens.DoNotTranslate:
-        return <h3>{lang('DoNotTranslate')}</h3>;
-      case SettingsScreens.Stickers:
-        return <h3>{lang('StickersName')}</h3>;
       case SettingsScreens.Experimental:
         return <h3>{lang('lng_settings_experimental')}</h3>;
 
@@ -117,22 +110,18 @@ const SettingsHeader: FC<OwnProps> = ({
         return <h3>{lang('Privacy.ProfilePhoto')}</h3>;
       case SettingsScreens.PrivacyForwarding:
         return <h3>{lang('PrivacyForwards')}</h3>;
-      case SettingsScreens.PrivacyVoiceMessages:
-        return <h3>{lang('PrivacyVoiceMessages')}</h3>;
       case SettingsScreens.PrivacyGroupChats:
         return <h3>{lang('AutodownloadGroupChats')}</h3>;
       case SettingsScreens.PrivacyPhoneNumberAllowedContacts:
       case SettingsScreens.PrivacyLastSeenAllowedContacts:
       case SettingsScreens.PrivacyProfilePhotoAllowedContacts:
       case SettingsScreens.PrivacyForwardingAllowedContacts:
-      case SettingsScreens.PrivacyVoiceMessagesAllowedContacts:
       case SettingsScreens.PrivacyGroupChatsAllowedContacts:
         return <h3>{lang('AlwaysShareWith')}</h3>;
       case SettingsScreens.PrivacyPhoneNumberDeniedContacts:
       case SettingsScreens.PrivacyLastSeenDeniedContacts:
       case SettingsScreens.PrivacyProfilePhotoDeniedContacts:
       case SettingsScreens.PrivacyForwardingDeniedContacts:
-      case SettingsScreens.PrivacyVoiceMessagesDeniedContacts:
       case SettingsScreens.PrivacyGroupChatsDeniedContacts:
         return <h3>{lang('NeverShareWith')}</h3>;
 
@@ -194,7 +183,8 @@ const SettingsHeader: FC<OwnProps> = ({
         return (
           <div className="settings-main-header">
             <h3>{lang('FilterEdit')}</h3>
-            {Boolean(editedFolderId) && (
+
+            {editedFolderId && (
               <DropdownMenu
                 className="settings-more-menu"
                 trigger={SettingsMenuButton}
@@ -243,7 +233,7 @@ const SettingsHeader: FC<OwnProps> = ({
 
             <Button
               round
-              ripple={!isMobile}
+              ripple={!IS_SINGLE_COLUMN_LAYOUT}
               size="smaller"
               color="translucent"
               // eslint-disable-next-line react/jsx-no-bind

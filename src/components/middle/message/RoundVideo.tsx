@@ -11,7 +11,7 @@ import type { ApiMessage } from '../../../api/types';
 import { ApiMediaFormat } from '../../../api/types';
 
 import { ROUND_VIDEO_DIMENSIONS_PX } from '../../common/helpers/mediaDimensions';
-import { getMessageMediaFormat, getMessageMediaHash, getMessageMediaThumbDataUri } from '../../../global/helpers';
+import { getMessageMediaFormat, getMessageMediaHash } from '../../../global/helpers';
 import { formatMediaDuration } from '../../../util/dateFormat';
 import buildClassName from '../../../util/buildClassName';
 import { stopCurrentAudio } from '../../../util/audioPlayer';
@@ -23,11 +23,12 @@ import useMediaWithLoadProgress from '../../../hooks/useMediaWithLoadProgress';
 import useShowTransition from '../../../hooks/useShowTransition';
 import useMediaTransition from '../../../hooks/useMediaTransition';
 import usePrevious from '../../../hooks/usePrevious';
-import useFlag from '../../../hooks/useFlag';
+import useBuffering from '../../../hooks/useBuffering';
+import useVideoCleanup from '../../../hooks/useVideoCleanup';
+import useVideoAutoPause from './hooks/useVideoAutoPause';
 import useBlurredMediaThumbRef from './hooks/useBlurredMediaThumbRef';
 
 import ProgressSpinner from '../../ui/ProgressSpinner';
-import OptimizedVideo from '../../ui/OptimizedVideo';
 
 import './RoundVideo.scss';
 
@@ -74,20 +75,17 @@ const RoundVideo: FC<OwnProps> = ({
     ApiMediaFormat.BlobUrl,
     lastSyncTime,
   );
+  const thumbRef = useBlurredMediaThumbRef(message, mediaData);
 
-  const [isPlayerReady, markPlayerReady] = useFlag();
-  const hasThumb = Boolean(getMessageMediaThumbDataUri(message));
-  const noThumb = !hasThumb || isPlayerReady;
-  const thumbRef = useBlurredMediaThumbRef(message, noThumb);
-  const thumbClassNames = useMediaTransition(!noThumb);
-
-  const isTransferring = (isLoadAllowed && !isPlayerReady) || isDownloading;
+  const { isBuffered, bufferingHandlers } = useBuffering();
+  const isTransferring = (isLoadAllowed && !isBuffered) || isDownloading;
   const wasLoadDisabled = usePrevious(isLoadAllowed) === false;
 
+  const transitionClassNames = useMediaTransition(mediaData);
   const {
     shouldRender: shouldSpinnerRender,
     transitionClassNames: spinnerClassNames,
-  } = useShowTransition(isTransferring, undefined, wasLoadDisabled);
+  } = useShowTransition(isTransferring || !isBuffered, undefined, wasLoadDisabled);
 
   const [isActivated, setIsActivated] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
@@ -143,6 +141,21 @@ const RoundVideo: FC<OwnProps> = ({
     stopPrevious = stopPlaying;
   }, [stopPlaying]);
 
+  useEffect(() => {
+    if (!playerRef.current) {
+      return;
+    }
+
+    if (shouldPlay) {
+      safePlay(playerRef.current);
+    } else {
+      playerRef.current.pause();
+    }
+  }, [shouldPlay]);
+
+  useVideoAutoPause(playerRef, shouldPlay);
+  useVideoCleanup(playerRef, [mediaData]);
+
   const handleClick = useCallback(() => {
     if (!mediaData) {
       setIsLoadAllowed((isAllowed) => !isAllowed);
@@ -181,37 +194,42 @@ const RoundVideo: FC<OwnProps> = ({
     setProgress(playerEl.currentTime / playerEl.duration);
   }, []);
 
+  const videoClassName = buildClassName('full-media', transitionClassNames);
+
   return (
     <div
       ref={ref}
       className="RoundVideo media-inner"
       onClick={handleClick}
     >
+      <div className="thumbnail-wrapper">
+        <canvas
+          ref={thumbRef}
+          className="thumbnail"
+          style={`width: ${ROUND_VIDEO_DIMENSIONS_PX}px; height: ${ROUND_VIDEO_DIMENSIONS_PX}px`}
+        />
+      </div>
       {mediaData && (
         <div className="video-wrapper">
-          <OptimizedVideo
-            canPlay={shouldPlay}
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <video
             ref={playerRef}
-            src={mediaData}
-            className="full-media"
+            className={videoClassName}
             width={ROUND_VIDEO_DIMENSIONS_PX}
             height={ROUND_VIDEO_DIMENSIONS_PX}
             autoPlay
-            disablePictureInPicture
             muted={!isActivated}
             loop={!isActivated}
             playsInline
             onEnded={isActivated ? stopPlaying : undefined}
+            // eslint-disable-next-line react/jsx-props-no-spreading
+            {...bufferingHandlers}
             onTimeUpdate={isActivated ? handleTimeUpdate : undefined}
-            onReady={markPlayerReady}
-          />
+          >
+            <source src={mediaData} />
+          </video>
         </div>
       )}
-      <canvas
-        ref={thumbRef}
-        className={buildClassName('thumbnail', thumbClassNames)}
-        style={`width: ${ROUND_VIDEO_DIMENSIONS_PX}px; height: ${ROUND_VIDEO_DIMENSIONS_PX}px`}
-      />
       <div className="progress" ref={playingProgressRef} />
       {shouldSpinnerRender && (
         <div className={`media-loading ${spinnerClassNames}`}>

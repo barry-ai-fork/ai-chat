@@ -4,29 +4,28 @@ import React, {
 } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
-import type { ApiExportedInvite } from '../../api/types';
 import { ManagementScreens, ProfileState } from '../../types';
-import { MAIN_THREAD_ID } from '../../api/types';
+import type { ApiExportedInvite } from '../../api/types';
 
 import { ANIMATION_END_DELAY } from '../../config';
+import { IS_SINGLE_COLUMN_LAYOUT } from '../../util/environment';
 import { debounce } from '../../util/schedulers';
 import buildClassName from '../../util/buildClassName';
 import {
   selectChat,
   selectCurrentGifSearch,
-  selectCurrentStickerSearch, selectTabState,
+  selectCurrentStickerSearch,
   selectCurrentTextSearch,
   selectIsChatWithSelf,
   selectUser,
 } from '../../global/selectors';
 import {
-  getCanAddContact, getCanManageTopic, isChatAdmin, isChatChannel, isUserBot, isUserId,
+  getCanAddContact, isChatAdmin, isChatChannel, isUserId,
 } from '../../global/helpers';
-import { getDayStartAt } from '../../util/dateFormat';
 import useCurrentOrPrev from '../../hooks/useCurrentOrPrev';
 import useLang from '../../hooks/useLang';
 import useFlag from '../../hooks/useFlag';
-import useAppLayout from '../../hooks/useAppLayout';
+import { getDayStartAt } from '../../util/dateFormat';
 
 import SearchInput from '../ui/SearchInput';
 import Button from '../ui/Button';
@@ -37,7 +36,6 @@ import './RightHeader.scss';
 
 type OwnProps = {
   chatId?: string;
-  threadId?: number;
   isColumnOpen?: boolean;
   isProfile?: boolean;
   isSearch?: boolean;
@@ -47,8 +45,6 @@ type OwnProps = {
   isStickerSearch?: boolean;
   isGifSearch?: boolean;
   isPollResults?: boolean;
-  isCreatingTopic?: boolean;
-  isEditingTopic?: boolean;
   isAddingChatMembers?: boolean;
   profileState?: ProfileState;
   managementScreen?: ManagementScreens;
@@ -68,9 +64,6 @@ type StateProps = {
   isEditingInvite?: boolean;
   currentInviteInfo?: ApiExportedInvite;
   shouldSkipHistoryAnimations?: boolean;
-  isBot?: boolean;
-  isInsideTopic?: boolean;
-  canEditTopic?: boolean;
 };
 
 const COLUMN_ANIMATION_DURATION = 450 + ANIMATION_END_DELAY;
@@ -108,13 +101,10 @@ enum HeaderContent {
   ManageReactions,
   ManageInviteInfo,
   ManageJoinRequests,
-  CreateTopic,
-  EditTopic,
 }
 
 const RightHeader: FC<OwnProps & StateProps> = ({
   chatId,
-  threadId,
   isColumnOpen,
   isProfile,
   isSearch,
@@ -124,8 +114,6 @@ const RightHeader: FC<OwnProps & StateProps> = ({
   isStickerSearch,
   isGifSearch,
   isPollResults,
-  isCreatingTopic,
-  isEditingTopic,
   isAddingChatMembers,
   profileState,
   managementScreen,
@@ -142,9 +130,6 @@ const RightHeader: FC<OwnProps & StateProps> = ({
   canViewStatistics,
   currentInviteInfo,
   shouldSkipHistoryAnimations,
-  isBot,
-  isInsideTopic,
-  canEditTopic,
 }) => {
   const {
     setLocalTextSearchQuery,
@@ -157,11 +142,9 @@ const RightHeader: FC<OwnProps & StateProps> = ({
     toggleStatistics,
     setEditingExportedInvite,
     deleteExportedChatInvite,
-    openEditTopicPanel,
   } = getActions();
 
   const [isDeleteDialogOpen, openDeleteDialog, closeDeleteDialog] = useFlag();
-  const { isMobile } = useAppLayout();
 
   const handleEditInviteClick = useCallback(() => {
     setEditingExportedInvite({ chatId: chatId!, invite: currentInviteInfo! });
@@ -193,19 +176,6 @@ const RightHeader: FC<OwnProps & StateProps> = ({
   const handleAddContact = useCallback(() => {
     openAddContactDialog({ userId });
   }, [openAddContactDialog, userId]);
-
-  const toggleEditTopic = useCallback(() => {
-    if (!chatId || !threadId) return;
-    openEditTopicPanel({ chatId, topicId: threadId });
-  }, [chatId, openEditTopicPanel, threadId]);
-
-  const handleToggleManagement = useCallback(() => {
-    toggleManagement();
-  }, [toggleManagement]);
-
-  const handleToggleStatistics = useCallback(() => {
-    toggleStatistics();
-  }, [toggleStatistics]);
 
   const [shouldSkipTransition, setShouldSkipTransition] = useState(!isColumnOpen);
 
@@ -280,29 +250,9 @@ const RightHeader: FC<OwnProps & StateProps> = ({
     HeaderContent.Statistics
   ) : isMessageStatistics ? (
     HeaderContent.MessageStatistics
-  ) : isCreatingTopic ? (
-    HeaderContent.CreateTopic
-  ) : isEditingTopic ? (
-    HeaderContent.EditTopic
   ) : undefined; // When column is closed
 
   const renderingContentKey = useCurrentOrPrev(contentKey, true) ?? -1;
-
-  function getHeaderTitle() {
-    if (isInsideTopic) {
-      return lang('AccDescrTopic');
-    }
-
-    if (isChannel) {
-      return lang('Channel.TitleInfo');
-    }
-
-    if (userId) {
-      return lang(isBot ? 'lng_info_bot_title' : 'lng_info_user_title');
-    }
-
-    return lang('GroupInfo.Title');
-  }
 
   function renderHeaderContent() {
     if (renderingContentKey === -1) {
@@ -438,15 +388,10 @@ const RightHeader: FC<OwnProps & StateProps> = ({
         return <h3>{lang('GroupMembers')}</h3>;
       case HeaderContent.ManageReactions:
         return <h3>{lang('Reactions')}</h3>;
-      case HeaderContent.CreateTopic:
-        return <h3>{lang('NewTopic')}</h3>;
-      case HeaderContent.EditTopic:
-        return <h3>{lang('EditTopic')}</h3>;
       default:
         return (
           <>
-            <h3>{getHeaderTitle()}
-            </h3>
+            <h3>Profile</h3>
             <section className="tools">
               {canAddContact && (
                 <Button
@@ -459,24 +404,13 @@ const RightHeader: FC<OwnProps & StateProps> = ({
                   <i className="icon-add-user" />
                 </Button>
               )}
-              {canManage && !isInsideTopic && (
+              {canManage && (
                 <Button
                   round
                   color="translucent"
                   size="smaller"
                   ariaLabel={lang('Edit')}
-                  onClick={handleToggleManagement}
-                >
-                  <i className="icon-edit" />
-                </Button>
-              )}
-              {canEditTopic && (
-                <Button
-                  round
-                  color="translucent"
-                  size="smaller"
-                  ariaLabel={lang('EditTopic')}
-                  onClick={toggleEditTopic}
+                  onClick={toggleManagement}
                 >
                   <i className="icon-edit" />
                 </Button>
@@ -487,7 +421,7 @@ const RightHeader: FC<OwnProps & StateProps> = ({
                   color="translucent"
                   size="smaller"
                   ariaLabel={lang('Statistics')}
-                  onClick={handleToggleStatistics}
+                  onClick={toggleStatistics}
                 >
                   <i className="icon-stats" />
                 </Button>
@@ -499,7 +433,7 @@ const RightHeader: FC<OwnProps & StateProps> = ({
   }
 
   const isBackButton = (
-    isMobile
+    IS_SINGLE_COLUMN_LAYOUT
     || contentKey === HeaderContent.SharedMedia
     || contentKey === HeaderContent.MemberList
     || contentKey === HeaderContent.AddingMembers
@@ -536,20 +470,13 @@ const RightHeader: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, {
-    chatId, isProfile, isManagement, threadId,
-  }): StateProps => {
-    const tabState = selectTabState(global);
+  (global, { chatId, isProfile, isManagement }): StateProps => {
     const { query: messageSearchQuery } = selectCurrentTextSearch(global) || {};
     const { query: stickerSearchQuery } = selectCurrentStickerSearch(global) || {};
     const { query: gifSearchQuery } = selectCurrentGifSearch(global) || {};
     const chat = chatId ? selectChat(global, chatId) : undefined;
-    const user = isProfile && chatId && isUserId(chatId) ? selectUser(global, chatId) : undefined;
     const isChannel = chat && isChatChannel(chat);
-    const isInsideTopic = chat?.isForum && Boolean(threadId && threadId !== MAIN_THREAD_ID);
-    const topic = isInsideTopic ? chat.topics?.[threadId!] : undefined;
-    const canEditTopic = isInsideTopic && topic && getCanManageTopic(chat, topic);
-    const isBot = user && isUserBot(user);
+    const user = isProfile && chatId && isUserId(chatId) ? selectUser(global, chatId) : undefined;
 
     const canAddContact = user && getCanAddContact(user);
     const canManage = Boolean(
@@ -561,26 +488,22 @@ export default memo(withGlobal<OwnProps>(
       // chat.isCreator is for Basic Groups
       && (isUserId(chat.id) || ((isChatAdmin(chat) || chat.isCreator) && !chat.isNotJoined)),
     );
-    const isEditingInvite = Boolean(chatId && tabState.management.byChatId[chatId]?.editingInvite);
-    const canViewStatistics = !isInsideTopic && chat?.fullInfo?.canViewStatistics;
-    const currentInviteInfo = chatId
-      ? tabState.management.byChatId[chatId]?.inviteInfo?.invite : undefined;
+    const isEditingInvite = Boolean(chatId && global.management.byChatId[chatId]?.editingInvite);
+    const canViewStatistics = chat?.fullInfo?.canViewStatistics;
+    const currentInviteInfo = chatId ? global.management.byChatId[chatId]?.inviteInfo?.invite : undefined;
 
     return {
       canManage,
       canAddContact,
       canViewStatistics,
       isChannel,
-      isBot,
-      isInsideTopic,
-      canEditTopic,
       userId: user?.id,
       messageSearchQuery,
       stickerSearchQuery,
       gifSearchQuery,
       isEditingInvite,
       currentInviteInfo,
-      shouldSkipHistoryAnimations: tabState.shouldSkipHistoryAnimations,
+      shouldSkipHistoryAnimations: global.shouldSkipHistoryAnimations,
     };
   },
 )(RightHeader));

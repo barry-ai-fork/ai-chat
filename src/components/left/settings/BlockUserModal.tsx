@@ -1,12 +1,11 @@
 import type { FC } from '../../../lib/teact/teact';
 import React, {
-  useMemo, useState, memo, useCallback, useEffect,
+  useMemo, useState, memo, useRef, useCallback, useEffect,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiUser } from '../../../api/types';
 
-import { selectTabState } from '../../../global/selectors';
 import { filterUsersByName, getUserFullName } from '../../../global/helpers';
 import { unique } from '../../../util/iteratees';
 import useLang from '../../../hooks/useLang';
@@ -41,11 +40,13 @@ const BlockUserModal: FC<OwnProps & StateProps> = ({
   } = getActions();
 
   const lang = useLang();
-  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('');
+  // eslint-disable-next-line no-null/no-null
+  const filterRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setUserSearchQuery({ query: search });
-  }, [search, setUserSearchQuery]);
+    setUserSearchQuery({ query: filter });
+  }, [filter, setUserSearchQuery]);
 
   const filteredContactIds = useMemo(() => {
     const availableContactIds = unique([
@@ -55,14 +56,14 @@ const BlockUserModal: FC<OwnProps & StateProps> = ({
       return contactId !== currentUserId && !blockedIds.includes(contactId);
     }));
 
-    return filterUsersByName(availableContactIds, usersById, search)
+    return filterUsersByName(availableContactIds, usersById, filter)
       .sort((firstId, secondId) => {
         const firstName = getUserFullName(usersById[firstId]) || '';
         const secondName = getUserFullName(usersById[secondId]) || '';
 
         return firstName.localeCompare(secondName);
       });
-  }, [blockedIds, contactIds, currentUserId, search, localContactIds, usersById]);
+  }, [blockedIds, contactIds, currentUserId, filter, localContactIds, usersById]);
 
   const handleRemoveUser = useCallback((userId: string) => {
     const { id: contactId, accessHash } = usersById[userId] || {};
@@ -77,9 +78,10 @@ const BlockUserModal: FC<OwnProps & StateProps> = ({
     <ChatOrUserPicker
       isOpen={isOpen}
       chatOrUserIds={filteredContactIds}
-      searchPlaceholder={lang('BlockedUsers.BlockUser')}
-      search={search}
-      onSearchChange={setSearch}
+      filterRef={filterRef}
+      filterPlaceholder={lang('BlockedUsers.BlockUser')}
+      filter={filter}
+      onFilterChange={setFilter}
       onSelectChatOrUser={handleRemoveUser}
       onClose={onClose}
     />
@@ -103,7 +105,7 @@ export default memo(withGlobal<OwnProps>(
       usersById,
       blockedIds,
       contactIds: contactList?.userIds,
-      localContactIds: selectTabState(global).userSearch.localUserIds,
+      localContactIds: global.userSearch.localUserIds,
       currentUserId,
     };
   },

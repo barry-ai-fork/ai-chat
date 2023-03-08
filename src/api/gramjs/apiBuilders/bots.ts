@@ -1,7 +1,7 @@
 import { Api as GramJs } from '../../../lib/gramjs';
 import type {
-  ApiAttachBot,
-  ApiAttachBotIcon,
+  ApiAttachMenuBot,
+  ApiAttachMenuBotIcon,
   ApiAttachMenuPeerType,
   ApiBotCommand,
   ApiBotInfo,
@@ -62,11 +62,10 @@ export function buildBotSwitchPm(switchPm?: GramJs.InlineBotSwitchPM) {
   return switchPm ? pick(switchPm, ['text', 'startParam']) as ApiBotInlineSwitchPm : undefined;
 }
 
-export function buildApiAttachBot(bot: GramJs.AttachMenuBot): ApiAttachBot {
+export function buildApiAttachMenuBot(bot: GramJs.AttachMenuBot): ApiAttachMenuBot {
   return {
     id: bot.botId.toString(),
     hasSettings: bot.hasSettings,
-    shouldRequestWriteAccess: bot.requestWriteAccess,
     shortName: bot.shortName,
     peerTypes: bot.peerTypes.map(buildApiAttachMenuPeerType),
     icons: bot.icons.map(buildApiAttachMenuIcon).filter(Boolean),
@@ -74,15 +73,15 @@ export function buildApiAttachBot(bot: GramJs.AttachMenuBot): ApiAttachBot {
 }
 
 function buildApiAttachMenuPeerType(peerType: GramJs.TypeAttachMenuPeerType): ApiAttachMenuPeerType {
-  if (peerType instanceof GramJs.AttachMenuPeerTypeBotPM) return 'bots';
-  if (peerType instanceof GramJs.AttachMenuPeerTypePM) return 'users';
-  if (peerType instanceof GramJs.AttachMenuPeerTypeChat) return 'chats';
-  if (peerType instanceof GramJs.AttachMenuPeerTypeBroadcast) return 'channels';
+  if (peerType instanceof GramJs.AttachMenuPeerTypeBotPM) return 'bot';
+  if (peerType instanceof GramJs.AttachMenuPeerTypePM) return 'private';
+  if (peerType instanceof GramJs.AttachMenuPeerTypeChat) return 'chat';
+  if (peerType instanceof GramJs.AttachMenuPeerTypeBroadcast) return 'channel';
   if (peerType instanceof GramJs.AttachMenuPeerTypeSameBotPM) return 'self';
   return undefined!; // Never reached
 }
 
-function buildApiAttachMenuIcon(icon: GramJs.AttachMenuBotIcon): ApiAttachBotIcon | undefined {
+function buildApiAttachMenuIcon(icon: GramJs.AttachMenuBotIcon): ApiAttachMenuBotIcon | undefined {
   if (!(icon.icon instanceof GramJs.Document)) return undefined;
 
   const document = buildApiDocument(icon.icon);

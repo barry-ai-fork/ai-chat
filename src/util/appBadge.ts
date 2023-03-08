@@ -1,9 +1,6 @@
 import { DEBUG } from '../config';
-import { getGlobal } from '../global';
-import { selectTabState } from '../global/selectors';
 
 export function updateAppBadge(unreadCount: number) {
-  if (!selectTabState(getGlobal()).isMasterTab) return;
   if (typeof window.navigator.setAppBadge !== 'function') {
     return;
   }

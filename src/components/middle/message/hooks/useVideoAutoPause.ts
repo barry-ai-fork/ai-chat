@@ -1,31 +1,36 @@
-import { useCallback, useEffect, useRef } from '../../../../lib/teact/teact';
+import { useCallback, useRef } from '../../../../lib/teact/teact';
 
 import { fastRaf } from '../../../../util/schedulers';
+import safePlay from '../../../../util/safePlay';
 import useBackgroundMode from '../../../../hooks/useBackgroundMode';
 import useHeavyAnimationCheck from '../../../../hooks/useHeavyAnimationCheck';
-import usePlayPause from '../../../../hooks/usePlayPause';
 
 export default function useVideoAutoPause(playerRef: { current: HTMLVideoElement | null }, canPlay: boolean) {
+  const wasPlaying = useRef(playerRef.current?.paused);
   const canPlayRef = useRef();
   canPlayRef.current = canPlay;
 
-  const { play, pause } = usePlayPause(playerRef);
-
-  const isFrozenRef = useRef();
-
   const freezePlaying = useCallback(() => {
-    isFrozenRef.current = true;
+    if (!playerRef.current) {
+      return;
+    }
 
-    pause();
-  }, [pause]);
+    wasPlaying.current = !playerRef.current.paused;
+
+    if (wasPlaying.current) {
+      playerRef.current.pause();
+    }
+  }, [playerRef]);
 
   const unfreezePlaying = useCallback(() => {
-    isFrozenRef.current = false;
-
-    if (canPlayRef.current) {
-      play();
+    if (
+      playerRef.current && wasPlaying.current && canPlayRef.current
+      // At this point HTMLVideoElement can be unmounted from the DOM
+      && document.body.contains(playerRef.current)
+    ) {
+      safePlay(playerRef.current);
     }
-  }, [play]);
+  }, [playerRef]);
 
   const unfreezePlayingOnRaf = useCallback(() => {
     fastRaf(unfreezePlaying);
@@ -33,22 +38,4 @@ export default function useVideoAutoPause(playerRef: { current: HTMLVideoElement
 
   useBackgroundMode(freezePlaying, unfreezePlayingOnRaf);
   useHeavyAnimationCheck(freezePlaying, unfreezePlaying);
-
-  const handlePlaying = useCallback(() => {
-    if (!canPlayRef.current || isFrozenRef.current) {
-      pause();
-    }
-  }, [pause]);
-
-  useEffect(() => {
-    if (canPlay) {
-      if (!isFrozenRef.current) {
-        play();
-      }
-    } else {
-      pause();
-    }
-  }, [canPlay, play, pause]);
-
-  return { handlePlaying };
 }

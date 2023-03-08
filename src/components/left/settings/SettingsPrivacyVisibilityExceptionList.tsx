@@ -86,7 +86,7 @@ const SettingsPrivacyVisibilityExceptionList: FC<OwnProps & StateProps> = ({
 
   const handleSubmit = useCallback(() => {
     setPrivacySettings({
-      privacyKey: getPrivacyKey(screen)!,
+      privacyKey: getPrivacyKey(screen),
       isAllowList: Boolean(isAllowList),
       contactsIds: newSelectedContactIds,
     });
@@ -143,9 +143,6 @@ function getCurrentPrivacySettings(global: GlobalState, screen: SettingsScreens)
     case SettingsScreens.PrivacyForwardingAllowedContacts:
     case SettingsScreens.PrivacyForwardingDeniedContacts:
       return privacy.forwards;
-    case SettingsScreens.PrivacyVoiceMessagesAllowedContacts:
-    case SettingsScreens.PrivacyVoiceMessagesDeniedContacts:
-      return privacy.voiceMessages;
     case SettingsScreens.PrivacyGroupChatsDeniedContacts:
     case SettingsScreens.PrivacyGroupChatsAllowedContacts:
       return privacy.chatInvite;

@@ -1,22 +1,19 @@
 import type { ChangeEvent } from 'react';
 import type { FC } from '../../../lib/teact/teact';
 import React, {
-  memo, useCallback, useEffect, useMemo, useState,
+  memo, useCallback, useEffect, useState,
 } from '../../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../../global';
 
 import type { ApiChat } from '../../../api/types';
 import { ManagementProgress } from '../../../types';
 
-import { PURCHASE_USERNAME, TME_LINK_PREFIX, USERNAME_PURCHASE_ERROR } from '../../../config';
-import { selectChat, selectTabState, selectManagement } from '../../../global/selectors';
-import { isChatChannel, isChatPublic } from '../../../global/helpers';
-import { selectCurrentLimit } from '../../../global/selectors/limits';
-
+import { selectChat, selectManagement } from '../../../global/selectors';
+import { isChatChannel } from '../../../global/helpers';
 import useFlag from '../../../hooks/useFlag';
 import useLang from '../../../hooks/useLang';
 import useHistoryBack from '../../../hooks/useHistoryBack';
-import usePrevious from '../../../hooks/usePrevious';
+import { selectCurrentLimit } from '../../../global/selectors/limits';
 
 import SafeLink from '../../common/SafeLink';
 import ListItem from '../../ui/ListItem';
@@ -26,7 +23,6 @@ import Spinner from '../../ui/Spinner';
 import FloatingActionButton from '../../ui/FloatingActionButton';
 import UsernameInput from '../../common/UsernameInput';
 import ConfirmDialog from '../../ui/ConfirmDialog';
-import ManageUsernames from '../../common/ManageUsernames';
 
 type PrivacyType = 'private' | 'public';
 
@@ -41,49 +37,37 @@ type StateProps = {
   isChannel: boolean;
   progress?: ManagementProgress;
   isUsernameAvailable?: boolean;
-  checkedUsername?: string;
-  error?: string;
   isProtected?: boolean;
   maxPublicLinks: number;
 };
 
 const ManageChatPrivacyType: FC<OwnProps & StateProps> = ({
   chat,
+  onClose,
   isActive,
   isChannel,
   progress,
   isUsernameAvailable,
-  checkedUsername,
-  error,
   isProtected,
   maxPublicLinks,
-  onClose,
 }) => {
   const {
+    checkPublicLink,
     updatePublicLink,
     updatePrivateLink,
     toggleIsProtected,
     openLimitReachedModal,
   } = getActions();
 
-  const firstEditableUsername = useMemo(() => chat.usernames?.find(({ isEditable }) => isEditable), [chat.usernames]);
-  const currentUsername = firstEditableUsername?.username || '';
-  const isPublic = useMemo(() => isChatPublic(chat), [chat]);
+  const isPublic = Boolean(chat.username);
   const privateLink = chat.fullInfo?.inviteLink;
 
-  const [isProfileFieldsTouched, setIsProfileFieldsTouched] = useState(false);
   const [privacyType, setPrivacyType] = useState<PrivacyType>(isPublic ? 'public' : 'private');
-  const [editableUsername, setEditableUsername] = useState<string>();
+  const [username, setUsername] = useState();
   const [isRevokeConfirmDialogOpen, openRevokeConfirmDialog, closeRevokeConfirmDialog] = useFlag();
-  const [isUsernameLostDialogOpen, openUsernameLostDialog, closeUsernameLostDialog] = useFlag();
 
-  const previousIsUsernameAvailable = usePrevious(isUsernameAvailable);
-  const renderingIsUsernameAvailable = isUsernameAvailable ?? previousIsUsernameAvailable;
-
-  const canUpdate = isProfileFieldsTouched && Boolean(
-    (privacyType === 'public'
-      && (editableUsername || (currentUsername && editableUsername === ''))
-      && renderingIsUsernameAvailable)
+  const canUpdate = Boolean(
+    (privacyType === 'public' && username && isUsernameAvailable)
     || (privacyType === 'private' && isPublic),
   );
 
@@ -93,24 +77,13 @@ const ManageChatPrivacyType: FC<OwnProps & StateProps> = ({
   });
 
   useEffect(() => {
-    setIsProfileFieldsTouched(false);
-  }, [currentUsername]);
-
-  useEffect(() => {
     if (privacyType && !privateLink) {
       updatePrivateLink();
     }
   }, [privacyType, privateLink, updatePrivateLink]);
 
-  const handleUsernameChange = useCallback((value: string) => {
-    setEditableUsername(value);
-    setIsProfileFieldsTouched(true);
-  }, []);
-
   const handleOptionChange = useCallback((value: string, e: ChangeEvent<HTMLInputElement>) => {
-    const myChats = Object.values(getGlobal().chats.byId)
-      .filter(({ isCreator, usernames }) => isCreator && usernames?.some((c) => c.isActive));
-
+    const myChats = Object.values(getGlobal().chats.byId).filter((l) => l.isCreator && l.username);
     if (myChats.length >= maxPublicLinks && value === 'public') {
       openLimitReachedModal({ limit: 'channelsPublic' });
       const radioGroup = e.currentTarget.closest('.radio-group') as HTMLDivElement;
@@ -121,7 +94,6 @@ const ManageChatPrivacyType: FC<OwnProps & StateProps> = ({
       return;
     }
     setPrivacyType(value as PrivacyType);
-    setIsProfileFieldsTouched(true);
   }, [maxPublicLinks, openLimitReachedModal]);
 
   const handleForwardingOptionChange = useCallback((value: string) => {
@@ -132,17 +104,8 @@ const ManageChatPrivacyType: FC<OwnProps & StateProps> = ({
   }, [chat.id, toggleIsProtected]);
 
   const handleSave = useCallback(() => {
-    if (isPublic && privacyType === 'private') {
-      openUsernameLostDialog();
-    } else {
-      updatePublicLink({ username: privacyType === 'public' ? editableUsername : '' });
-    }
-  }, [isPublic, openUsernameLostDialog, privacyType, updatePublicLink, editableUsername]);
-
-  const handleMakeChannelPrivateConfirm = useCallback(() => {
-    updatePublicLink({ username: '' });
-    closeUsernameLostDialog();
-  }, [closeUsernameLostDialog, updatePublicLink]);
+    updatePublicLink({ username: privacyType === 'public' ? username : '' });
+  }, [privacyType, updatePublicLink, username]);
 
   const handleRevokePrivateLink = useCallback(() => {
     closeRevokeConfirmDialog();
@@ -167,22 +130,6 @@ const ManageChatPrivacyType: FC<OwnProps & StateProps> = ({
   }];
 
   const isLoading = progress === ManagementProgress.InProgress;
-  const shouldRenderUsernamesManage = privacyType === 'public' && chat.usernames && chat.usernames.length > 1;
-
-  function renderPurchaseLink() {
-    const purchaseInfoLink = `${TME_LINK_PREFIX}${PURCHASE_USERNAME}`;
-
-    return (
-      <p className="section-info" dir="auto">
-        {(lang('lng_username_purchase_available') as string)
-          .replace('{link}', '%PURCHASE_LINK%')
-          .split('%')
-          .map((s) => {
-            return (s === 'PURCHASE_LINK' ? <SafeLink url={purchaseInfoLink} text={`@${PURCHASE_USERNAME}`} /> : s);
-          })}
-      </p>
-    );
-  }
 
   return (
     <div className="Management">
@@ -225,24 +172,16 @@ const ManageChatPrivacyType: FC<OwnProps & StateProps> = ({
           <div className="section no-border">
             <UsernameInput
               asLink
-              currentUsername={currentUsername}
+              currentUsername={chat.username}
               isLoading={isLoading}
               isUsernameAvailable={isUsernameAvailable}
-              checkedUsername={checkedUsername}
-              onChange={handleUsernameChange}
+              checkUsername={checkPublicLink}
+              onChange={setUsername}
             />
-            {error === USERNAME_PURCHASE_ERROR && renderPurchaseLink()}
             <p className="section-info" dir="auto">
               {lang(`${langPrefix2}.Username.CreatePublicLinkHelp`)}
             </p>
           </div>
-        )}
-        {shouldRenderUsernamesManage && (
-          <ManageUsernames
-            chatId={chat.id}
-            usernames={chat.usernames!}
-            onEditUsername={handleUsernameChange}
-          />
         )}
         <div className="section" dir={lang.isRtl ? 'rtl' : undefined}>
           <h3 className="section-heading">
@@ -273,13 +212,6 @@ const ManageChatPrivacyType: FC<OwnProps & StateProps> = ({
           <i className="icon-check" />
         )}
       </FloatingActionButton>
-      <ConfirmDialog
-        isOpen={isUsernameLostDialogOpen}
-        onClose={closeUsernameLostDialog}
-        text={lang('ChannelVisibility.Confirm.MakePrivate.Channel', currentUsername)}
-        confirmHandler={handleMakeChannelPrivateConfirm}
-        confirmIsDestructive
-      />
     </div>
   );
 };
@@ -287,15 +219,13 @@ const ManageChatPrivacyType: FC<OwnProps & StateProps> = ({
 export default memo(withGlobal<OwnProps>(
   (global, { chatId }): StateProps => {
     const chat = selectChat(global, chatId)!;
-    const { isUsernameAvailable, checkedUsername, error } = selectManagement(global, chatId)!;
+    const { isUsernameAvailable } = selectManagement(global, chatId)!;
 
     return {
       chat,
       isChannel: isChatChannel(chat),
-      progress: selectTabState(global).management.progress,
-      error,
+      progress: global.management.progress,
       isUsernameAvailable,
-      checkedUsername,
       isProtected: chat?.isProtected,
       maxPublicLinks: selectCurrentLimit(global, 'channelsPublic'),
     };

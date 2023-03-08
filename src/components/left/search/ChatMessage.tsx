@@ -5,32 +5,34 @@ import { getActions, withGlobal } from '../../../global';
 import type {
   ApiChat, ApiUser, ApiMessage, ApiMessageOutgoingStatus,
 } from '../../../api/types';
-import type { AnimationLevel } from '../../../types';
-import type { LangFn } from '../../../hooks/useLang';
 
+import { IS_SINGLE_COLUMN_LAYOUT } from '../../../util/environment';
 import {
+  getChatTitle,
   getPrivateChatUserId,
   getMessageMediaHash,
   getMessageMediaThumbDataUri,
   getMessageVideo,
   getMessageRoundVideo,
   getMessageSticker,
-  getMessageIsSpoiler,
 } from '../../../global/helpers';
 import { selectChat, selectUser } from '../../../global/selectors';
 import buildClassName from '../../../util/buildClassName';
+import renderText from '../../common/helpers/renderText';
 import { formatPastTimeShort } from '../../../util/dateFormat';
 import { renderMessageSummary } from '../../common/helpers/renderMessageText';
 
 import useMedia from '../../../hooks/useMedia';
+import type { LangFn } from '../../../hooks/useLang';
 import useLang from '../../../hooks/useLang';
 import useSelectWithEnter from '../../../hooks/useSelectWithEnter';
-import useAppLayout from '../../../hooks/useAppLayout';
 
 import Avatar from '../../common/Avatar';
+import VerifiedIcon from '../../common/VerifiedIcon';
 import ListItem from '../../ui/ListItem';
 import Link from '../../ui/Link';
-import FullNameTitle from '../../common/FullNameTitle';
+import FakeIcon from '../../common/FakeIcon';
+import PremiumIcon from '../../common/PremiumIcon';
 
 import './ChatMessage.scss';
 
@@ -45,7 +47,6 @@ type StateProps = {
   privateChatUser?: ApiUser;
   lastMessageOutgoingStatus?: ApiMessageOutgoingStatus;
   lastSyncTime?: number;
-  animationLevel?: AnimationLevel;
 };
 
 const ChatMessage: FC<OwnProps & StateProps> = ({
@@ -54,12 +55,10 @@ const ChatMessage: FC<OwnProps & StateProps> = ({
   chatId,
   chat,
   privateChatUser,
-  animationLevel,
   lastSyncTime,
 }) => {
   const { focusMessage } = getActions();
 
-  const { isMobile } = useAppLayout();
   const mediaThumbnail = !getMessageSticker(message) ? getMessageMediaThumbDataUri(message) : undefined;
   const mediaBlobUrl = useMedia(getMessageMediaHash(message, 'micro'));
   const isRoundVideo = Boolean(getMessageRoundVideo(message));
@@ -79,7 +78,7 @@ const ChatMessage: FC<OwnProps & StateProps> = ({
   return (
     <ListItem
       className="ChatMessage chat-item-clickable"
-      ripple={!isMobile}
+      ripple={!IS_SINGLE_COLUMN_LAYOUT}
       onClick={handleClick}
       buttonRef={buttonRef}
     >
@@ -88,16 +87,15 @@ const ChatMessage: FC<OwnProps & StateProps> = ({
         user={privateChatUser}
         isSavedMessages={privateChatUser?.isSelf}
         lastSyncTime={lastSyncTime}
-        withVideo
-        animationLevel={animationLevel}
       />
       <div className="info">
         <div className="info-row">
-          <FullNameTitle
-            peer={privateChatUser || chat}
-            withEmojiStatus
-            isSavedMessages={chatId === privateChatUser?.id && privateChatUser?.isSelf}
-          />
+          <div className="title">
+            <h3 dir="auto">{renderText(getChatTitle(lang, chat, privateChatUser))}</h3>
+            {chat.isVerified && <VerifiedIcon />}
+            {privateChatUser?.isPremium && <PremiumIcon />}
+            {chat.fakeType && <FakeIcon fakeType={chat.fakeType} />}
+          </div>
           <div className="message-date">
             <Link className="date">
               {formatPastTimeShort(lang, message.date * 1000)}
@@ -122,17 +120,9 @@ function renderSummary(
     return renderMessageSummary(lang, message, undefined, searchQuery);
   }
 
-  const isSpoiler = getMessageIsSpoiler(message);
-
   return (
     <span className="media-preview">
-      <img
-        src={blobUrl}
-        alt=""
-        className={
-          buildClassName('media-preview--image', isRoundVideo && 'round', isSpoiler && 'media-preview-spoiler')
-        }
-      />
+      <img src={blobUrl} alt="" className={buildClassName('media-preview--image', isRoundVideo && 'round')} />
       {getMessageVideo(message) && <i className="icon-play" />}
       {renderMessageSummary(lang, message, true, searchQuery)}
     </span>
@@ -151,7 +141,6 @@ export default memo(withGlobal<OwnProps>(
     return {
       chat,
       lastSyncTime: global.lastSyncTime,
-      animationLevel: global.settings.byKey.animationLevel,
       ...(privateChatUserId && { privateChatUser: selectUser(global, privateChatUserId) }),
     };
   },

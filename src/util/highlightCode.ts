@@ -32,21 +32,16 @@ const SUPPORTED_LANGUAGES: Record<string, string[]> = {
   r: [],
   ruby: ['rb', 'gemspec', 'podspec', 'thor', 'irb'],
   rust: ['rs'],
-  scheme: [],
   scss: [],
-  smalltalk: ['st'],
   sql: [],
   swift: [],
   twig: ['craftcms'],
-  typelanguage: ['tl'],
   typescript: ['ts', 'tsx'],
   xml: ['html', 'xhtml', 'rss', 'atom', 'xjb', 'xsd', 'xsl', 'plist', 'wsf', 'svg'],
   yaml: [],
 };
 
-const THIRD_PARTY_LANGUAGES = ['typelanguage'];
-
-const languagePromises = new Map<string, Promise<any>>();
+const languagePromises = new Map<string, Promise<void>>();
 
 export default async function highlightCode(text: string, language: string) {
   const lowLang = language.toLowerCase();
@@ -76,35 +71,19 @@ async function ensureLanguage(language: string) {
     return true;
   }
 
-  const languagePromise = THIRD_PARTY_LANGUAGES.includes(langCode)
-    ? loadThirdPartyLanguage(langCode) : loadFirstPartyLanguage(langCode);
-  if (!languagePromise) return false;
-
-  const syntax = await languagePromise;
-  lowlight.registerLanguage(langCode, syntax.default);
-  if (langCode === '1c') {
-    lowlight.registerAlias('1c', '1с'); // Allow cyrillic
-  }
-  return true;
-}
-
-function loadFirstPartyLanguage(langCode: string) {
   // Funky webpack bug https://github.com/webpack/webpack/issues/13865
   const languagePromise = import(
     /* webpackChunkName: "Highlight for [request]" */
     `../../node_modules/highlight.js/lib/languages/${langCode}`
   );
   languagePromises.set(langCode, languagePromise);
-  return languagePromise;
-}
-
-function loadThirdPartyLanguage(langCode: string) {
-  if (langCode === 'typelanguage') {
-    const langPromise = import('../lib/hljs-tl/typelanguage');
-    languagePromises.set(langCode, langPromise);
-    return langPromise;
+  // Allow errors to help debugging wrong language names
+  const syntax = await languagePromise;
+  lowlight.registerLanguage(langCode, syntax.default);
+  if (langCode === '1c') {
+    lowlight.registerAlias('1c', '1с'); // Allow cyrillic
   }
-  return undefined;
+  return true;
 }
 
 function treeToElements(tree: Element | Root): TeactNode {

@@ -38,7 +38,6 @@ export type TransitionProps = {
 const classNames = {
   active: 'Transition__slide--active',
 };
-const FALLBACK_ANIMATION_END = 1000;
 
 const Transition: FC<TransitionProps> = ({
   ref,
@@ -212,7 +211,7 @@ const Transition: FC<TransitionProps> = ({
           : childNodes[activeIndex];
 
       if (watchedNode) {
-        waitForAnimationEnd(watchedNode, onAnimationEnd, undefined, FALLBACK_ANIMATION_END);
+        waitForAnimationEnd(watchedNode, onAnimationEnd);
       } else {
         onAnimationEnd();
       }
@@ -238,14 +237,12 @@ const Transition: FC<TransitionProps> = ({
       const container = containerRef.current!;
       const activeElement = container.querySelector<HTMLDivElement>(`.${classNames.active}`)
         || container.querySelector<HTMLDivElement>('.from');
-      const clientHeight = activeElement?.clientHeight;
-      if (!clientHeight) {
-        return;
-      }
 
-      activeElement.style.height = 'auto';
-      container.style.height = `${clientHeight}px`;
-      container.style.flexBasis = `${clientHeight}px`;
+      if (activeElement) {
+        activeElement.style.height = 'auto';
+        container.style.height = `${activeElement.clientHeight}px`;
+        container.style.flexBasis = `${activeElement.clientHeight}px`;
+      }
     }
   }, [shouldRestoreHeight, children]);
 

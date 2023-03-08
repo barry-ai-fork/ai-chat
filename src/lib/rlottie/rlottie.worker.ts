@@ -1,14 +1,16 @@
 import { inflate } from 'pako/dist/pako_inflate';
-import { createWorkerInterface } from '../../util/createPostMessageInterface';
-import type { CancellableCallback } from '../../util/PostMessageConnector';
-
-import 'script-loader!./rlottie-wasm';
+import createWorkerInterface from '../../util/createWorkerInterface';
+import type { CancellableCallback } from '../../util/WorkerConnector';
 
 declare const Module: any;
 
 declare function allocate(...args: any[]): string;
 
 declare function intArrayFromString(str: String): string;
+
+declare const self: WorkerGlobalScope;
+
+self.importScripts('rlottie-wasm.js');
 
 let rLottieApi: Record<string, Function>;
 const rLottieApiPromise = new Promise<void>((resolve) => {
@@ -28,14 +30,11 @@ const rLottieApiPromise = new Promise<void>((resolve) => {
 
 const HIGH_PRIORITY_MAX_FPS = 60;
 const LOW_PRIORITY_MAX_FPS = 30;
-const DESTROY_REPEAT_DELAY = 1000;
 
 const renderers = new Map<string, {
   imgSize: number;
   reduceFactor: number;
   handle: any;
-  imageData: ImageData;
-  customColor?: [number, number, number];
 }>();
 
 async function init(
@@ -43,7 +42,6 @@ async function init(
   tgsUrl: string,
   imgSize: number,
   isLowPriority: boolean,
-  customColor: [number, number, number] | undefined,
   onInit: CancellableCallback,
 ) {
   if (!rLottieApi) {
@@ -56,14 +54,9 @@ async function init(
   const framesCount = rLottieApi.loadFromData(handle, stringOnWasmHeap);
   rLottieApi.resize(handle, imgSize, imgSize);
 
-  const imageData = new ImageData(imgSize, imgSize);
-
   const { reduceFactor, msPerFrame, reducedFramesCount } = calcParams(json, isLowPriority, framesCount);
 
-  renderers.set(key, {
-    imgSize, reduceFactor, handle, imageData, customColor,
-  });
-
+  renderers.set(key, { imgSize, reduceFactor, handle });
   onInit(reduceFactor, msPerFrame, reducedFramesCount);
 }
 
@@ -83,7 +76,6 @@ async function changeData(
   const framesCount = rLottieApi.loadFromData(handle, stringOnWasmHeap);
 
   const { reduceFactor, msPerFrame, reducedFramesCount } = calcParams(json, isLowPriority, framesCount);
-
   onInit(reduceFactor, msPerFrame, reducedFramesCount);
 }
 
@@ -114,63 +106,36 @@ function calcParams(json: string, isLowPriority: boolean, framesCount: number) {
 }
 
 async function renderFrames(
-  key: string, frameIndex: number, onProgress: CancellableCallback,
+  key: string, fromIndex: number, toIndex: number, onProgress: CancellableCallback,
 ) {
   if (!rLottieApi) {
     await rLottieApiPromise;
   }
 
-  const {
-    imgSize, reduceFactor, handle, imageData, customColor,
-  } = renderers.get(key)!;
+  const { imgSize, reduceFactor, handle } = renderers.get(key)!;
 
-  const realIndex = frameIndex * reduceFactor;
+  for (let i = fromIndex; i <= toIndex; i++) {
+    const realIndex = i * reduceFactor;
 
-  rLottieApi.render(handle, realIndex);
-  const bufferPointer = rLottieApi.buffer(handle);
-  const data = Module.HEAPU8.subarray(bufferPointer, bufferPointer + (imgSize * imgSize * 4));
-
-  if (customColor) {
-    const arr = new Uint8ClampedArray(data);
-    applyColor(arr, customColor);
-    imageData.data.set(arr);
-  } else {
-    imageData.data.set(data);
-  }
-
-  const imageBitmap = await createImageBitmap(imageData);
-
-  onProgress(frameIndex, imageBitmap);
-}
-
-function applyColor(arr: Uint8ClampedArray, color: [number, number, number]) {
-  for (let i = 0; i < arr.length; i += 4) {
-    arr[i] = color[0];
-    arr[i + 1] = color[1];
-    arr[i + 2] = color[2];
+    rLottieApi.render(handle, realIndex);
+    const bufferPointer = rLottieApi.buffer(handle);
+    const data = Module.HEAPU8.subarray(bufferPointer, bufferPointer + (imgSize * imgSize * 4));
+    const arrayBuffer = new Uint8ClampedArray(data).buffer;
+    onProgress(i, arrayBuffer);
   }
 }
 
-function destroy(key: string, isRepeated = false) {
-  try {
-    const renderer = renderers.get(key)!;
-    rLottieApi.destroy(renderer.handle);
-    renderers.delete(key);
-  } catch (err) {
-    // `destroy` sometimes can be called before the initialization is finished
-    if (!isRepeated) {
-      setTimeout(() => destroy(key, true), DESTROY_REPEAT_DELAY);
-    }
-  }
+function destroy(key: string) {
+  const renderer = renderers.get(key)!;
+
+  rLottieApi.destroy(renderer.handle);
+
+  renderers.delete(key);
 }
 
-const api = {
+createWorkerInterface({
   init,
   changeData,
   renderFrames,
   destroy,
-};
-
-createWorkerInterface(api);
-
-export type RLottieApi = typeof api;
+});

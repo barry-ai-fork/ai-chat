@@ -1,17 +1,11 @@
 import { useCallback, useEffect } from '../../../../lib/teact/teact';
-
-import type { InlineBotSettings } from '../../../../types';
-import type { Signal } from '../../../../util/signals';
-
 import { getActions } from '../../../../global';
-import memoized from '../../../../util/memoized';
-
+import type { InlineBotSettings } from '../../../../types';
 import useFlag from '../../../../hooks/useFlag';
-import useDerivedState from '../../../../hooks/useDerivedState';
-import useSyncEffect from '../../../../hooks/useSyncEffect';
-import { useThrottledResolver } from '../../../../hooks/useAsyncResolvers';
+import usePrevious from '../../../../hooks/usePrevious';
+import useDebouncedMemo from '../../../../hooks/useDebouncedMemo';
 
-const THROTTLE = 300;
+const DEBOUNCE_MS = 300;
 const INLINE_BOT_QUERY_REGEXP = /^@([a-z0-9_]{1,32})[\u00A0\u0020]+(.*)/i;
 const HAS_NEW_LINE = /^@([a-z0-9_]{1,32})[\u00A0\u0020]+\n{2,}/i;
 const MEMO_NO_RESULT = {
@@ -24,40 +18,20 @@ const MEMO_NO_RESULT = {
 const tempEl = document.createElement('div');
 
 export default function useInlineBotTooltip(
-  isEnabled: boolean,
+  isAllowed: boolean,
   chatId: string,
-  getHtml: Signal<string>,
+  html: string,
   inlineBots?: Record<string, false | InlineBotSettings>,
 ) {
-  const { queryInlineBot, resetInlineBot, resetAllInlineBots } = getActions();
+  const { queryInlineBot, resetInlineBot } = getActions();
 
-  const [isManuallyClosed, markManuallyClosed, unmarkManuallyClosed] = useFlag(false);
-
-  const extractBotQueryThrottled = useThrottledResolver(() => {
-    const html = getHtml();
-    return isEnabled && html.startsWith('@') ? parseBotQuery(html) : MEMO_NO_RESULT;
-  }, [getHtml, isEnabled], THROTTLE);
+  const [isOpen, markIsOpen, unmarkIsOpen] = useFlag();
   const {
     username, query, canShowHelp, usernameLowered,
-  } = useDerivedState(extractBotQueryThrottled, [extractBotQueryThrottled, getHtml], true);
-
-  useSyncEffect(([prevUsername]) => {
-    if (prevUsername) {
-      resetInlineBot({ username: prevUsername });
-    }
-    // eslint-disable-next-line react-hooks-static-deps/exhaustive-deps
-  }, [username, resetInlineBot] as const);
-
-  useEffect(() => {
-    if (!usernameLowered) return;
-
-    queryInlineBot({
-      chatId, username: usernameLowered, query,
-    });
-  }, [chatId, query, queryInlineBot, usernameLowered]);
-
-  useEffect(unmarkManuallyClosed, [unmarkManuallyClosed, getHtml]);
-
+  } = useDebouncedMemo(() => parseBotQuery(html), DEBOUNCE_MS, [html]) || {};
+  const prevQuery = usePrevious(query);
+  const prevUsername = usePrevious(username);
+  const inlineBotData = usernameLowered ? inlineBots?.[usernameLowered] : undefined;
   const {
     id: botId,
     switchPm,
@@ -65,65 +39,67 @@ export default function useInlineBotTooltip(
     results,
     isGallery,
     help,
-  } = (usernameLowered && inlineBots?.[usernameLowered]) || {};
-
-  const isOpen = Boolean((results?.length || switchPm) && !isManuallyClosed);
+  } = inlineBotData || {};
 
   useEffect(() => {
-    if (!isOpen && !username) {
-      resetAllInlineBots();
+    if (prevQuery !== query) {
+      unmarkIsOpen();
     }
-  }, [isOpen, resetAllInlineBots, username]);
+  }, [prevQuery, query, unmarkIsOpen]);
+
+  useEffect(() => {
+    if (isAllowed && usernameLowered && chatId) {
+      queryInlineBot({ chatId, username: usernameLowered, query });
+    }
+  }, [query, isAllowed, queryInlineBot, chatId, usernameLowered]);
 
   const loadMore = useCallback(() => {
-    if (!usernameLowered) return;
-
     queryInlineBot({
       chatId, username: usernameLowered, query, offset,
     });
-  }, [chatId, offset, query, queryInlineBot, usernameLowered]);
+  }, [offset, chatId, query, queryInlineBot, usernameLowered]);
+
+  useEffect(() => {
+    if (isAllowed && botId && (switchPm || (results?.length))) {
+      markIsOpen();
+    } else {
+      unmarkIsOpen();
+    }
+  }, [botId, isAllowed, markIsOpen, results, switchPm, unmarkIsOpen]);
+
+  if (prevUsername !== username) {
+    resetInlineBot({ username: prevUsername });
+  }
 
   return {
     isOpen,
-    botId,
+    id: botId,
     isGallery,
     switchPm,
     results,
-    closeTooltip: markManuallyClosed,
+    closeTooltip: unmarkIsOpen,
     help: canShowHelp && help ? `@${username} ${help}` : undefined,
     loadMore,
   };
 }
 
-const buildQueryStateMemo = memoized((username: string, query: string, canShowHelp: boolean) => ({
-  username,
-  query,
-  canShowHelp,
-  usernameLowered: username.toLowerCase(),
-}));
-
 function parseBotQuery(html: string) {
-  if (!html.startsWith('@')) {
-    return MEMO_NO_RESULT;
-  }
-
   const text = getPlainText(html);
   const result = text.match(INLINE_BOT_QUERY_REGEXP);
   if (!result) {
     return MEMO_NO_RESULT;
   }
 
-  return buildQueryStateMemo(result[1], result[2], result[2] === '' && !text.match(HAS_NEW_LINE));
+  return {
+    username: result[1],
+    query: result[2],
+    canShowHelp: result[2] === '' && !text.match(HAS_NEW_LINE),
+    usernameLowered: result[1].toLowerCase(),
+  };
 }
 
 function getPlainText(html: string) {
   tempEl.innerHTML = html.replace(/<br>/g, '\n');
-
-  tempEl.querySelectorAll<HTMLElement>('[alt]').forEach((el) => {
-    if (!el.innerText) {
-      el.innerText = el.getAttribute('alt')!;
-    }
-  });
 
   return tempEl.innerText;
 }

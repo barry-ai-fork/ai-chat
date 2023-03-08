@@ -4,8 +4,12 @@
 
 .button {
   font-weight: 600;
-  font-size: 1rem;
-  height: 3rem;
+  font-size: 16px;
+  height: 48px;
+}
+
+.button-premium {
+  background: var(--premium-gradient);
 }
 
 .button-content {
@@ -35,14 +39,8 @@
 }
 
 .frame {
-  aspect-ratio: 1;
-
-  @supports not (aspect-ratio: 1) {
-    height: 0;
-    padding-bottom: 100%;
-  }
+  aspect-ratio: 1/1;
 }
-
 .slide {
   width: 100%;
   flex: none;
@@ -59,17 +57,17 @@
 .limits-content {
   overflow: auto;
   padding: 1rem;
-  margin-top: 3.6875rem;
+  margin-top: 59px;
   height: calc(var(--vh) * 55 + 41px);
 }
 
 .header {
   padding-left: 4rem;
-  font-size: 1.25rem;
+  font-size: 20px;
   font-weight: 500;
   padding-top: 0.875rem;
   padding-bottom: 0.875rem;
-  border-bottom: 0.0625rem solid var(--color-borders);
+  border-bottom: 1px solid var(--color-borders);
   position: absolute;
   background: var(--color-background);
   width: 100%;
@@ -85,19 +83,14 @@
   margin: 0 -1rem;
   margin-top: -1rem;
   background: var(--premium-feature-background);
-  aspect-ratio: 1;
+  aspect-ratio: 1/1;
   width: 100%;
   border-top-right-radius: var(--border-radius-default);
   border-top-left-radius: var(--border-radius-default);
-
-  @supports not (aspect-ratio: 1) {
-    height: 0;
-    padding-bottom: 100%;
-  }
 }
 
 .title {
-  font-size: 1.25rem;
+  font-size: 20px;
   font-weight: 500;
   text-align: center;
   color: var(--color-text);
@@ -105,16 +98,16 @@
 }
 
 .description {
-  font-size: 1rem;
+  font-size: 16px;
   font-weight: 400;
-  line-height: 1.375rem;
+  line-height: 22px;
   text-align: center;
   color: var(--color-text-secondary);
   padding: 0 5%;
 }
 
 .footer {
-  border-top: 0.0625rem solid var(--color-borders);
+  border-top: 1px solid var(--color-borders);
   position: absolute;
   bottom: 0;
   left: 0;

@@ -2,9 +2,7 @@ import { useMemo } from '../lib/teact/teact';
 import { getActions } from '../global';
 
 import type { ApiChat, ApiUser } from '../api/types';
-import type { MenuItemContextAction } from '../components/ui/ListItem';
 
-import { IS_MULTITAB_SUPPORTED } from '../util/environment';
 import { SERVICE_NOTIFICATIONS_USER_ID } from '../config';
 import {
   isChatArchived, getCanDeleteChat, isUserId, isChatChannel, isChatGroup,
@@ -48,18 +46,7 @@ const useChatContextActions = ({
       updateChatMutedState,
       toggleChatArchived,
       toggleChatUnread,
-      openChatInNewTab,
     } = getActions();
-
-    const actionOpenInNewTab = IS_MULTITAB_SUPPORTED && {
-      title: 'Open in new tab',
-      icon: 'open-in-new-tab',
-      handler: () => {
-        openChatInNewTab({ chatId: chat.id });
-      },
-    };
-
-    const newTabActionSeparator = actionOpenInNewTab && { isSeparator: true, key: 'newTabSeparator' };
 
     const actionAddToFolder = canChangeFolder ? {
       title: lang('ChatList.Filter.AddToFolder'),
@@ -71,20 +58,17 @@ const useChatContextActions = ({
       ? {
         title: lang('UnpinFromTop'),
         icon: 'unpin',
-        handler: () => toggleChatPinned({ id: chat.id, folderId: folderId! }),
+        handler: () => toggleChatPinned({ id: chat.id, folderId }),
       }
-      : { title: lang('PinToTop'), icon: 'pin', handler: () => toggleChatPinned({ id: chat.id, folderId: folderId! }) };
+      : { title: lang('PinToTop'), icon: 'pin', handler: () => toggleChatPinned({ id: chat.id, folderId }) };
 
     if (isInSearch) {
-      return compact([actionOpenInNewTab, actionPin, actionAddToFolder]);
+      return compact([actionPin, actionAddToFolder]);
     }
 
-    const actionMaskAsRead = (chat.unreadCount || chat.hasUnreadMark)
+    const actionUnreadMark = chat.unreadCount || chat.hasUnreadMark
       ? { title: lang('MarkAsRead'), icon: 'readchats', handler: () => toggleChatUnread({ id: chat.id }) }
-      : undefined;
-    const actionMarkAsUnread = !(chat.unreadCount || chat.hasUnreadMark) && !chat.isForum
-      ? { title: lang('MarkAsUnread'), icon: 'unread', handler: () => toggleChatUnread({ id: chat.id }) }
-      : undefined;
+      : { title: lang('MarkAsUnread'), icon: 'unread', handler: () => toggleChatUnread({ id: chat.id }) };
 
     const actionMute = isMuted
       ? {
@@ -121,17 +105,14 @@ const useChatContextActions = ({
     const isInFolder = folderId !== undefined;
 
     return compact([
-      actionOpenInNewTab,
-      newTabActionSeparator,
       actionAddToFolder,
-      actionMaskAsRead,
-      actionMarkAsUnread,
+      actionUnreadMark,
       actionPin,
       !isSelf && actionMute,
       !isSelf && !isServiceNotifications && !isInFolder && actionArchive,
       actionReport,
       actionDelete,
-    ]) as MenuItemContextAction[];
+    ]);
   }, [
     chat, user, canChangeFolder, lang, handleChatFolderChange, isPinned, isInSearch, isMuted,
     handleDelete, handleReport, folderId, isSelf, isServiceNotifications,

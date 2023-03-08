@@ -9,11 +9,9 @@ import type {
   ApiChat, ApiPhoto, ApiUser, ApiUserStatus,
 } from '../../api/types';
 import type { ObserveFn } from '../../hooks/useIntersectionObserver';
-import type { AnimationLevel } from '../../types';
 import { ApiMediaFormat } from '../../api/types';
 
-import { ANIMATION_LEVEL_MAX, IS_TEST } from '../../config';
-import { VIDEO_AVATARS_DISABLED } from '../../util/environment';
+import { IS_TEST } from '../../config';
 import {
   getChatAvatarHash,
   getChatTitle,
@@ -33,11 +31,8 @@ import useShowTransition from '../../hooks/useShowTransition';
 import useLang from '../../hooks/useLang';
 import { useIsIntersecting } from '../../hooks/useIntersectionObserver';
 
-import OptimizedVideo from '../ui/OptimizedVideo';
-
 import './Avatar.scss';
-
-const LOOP_COUNT = 3;
+import useVideoAutoPause from '../middle/message/hooks/useVideoAutoPause';
 
 const cn = createClassNameBuilder('Avatar');
 cn.media = cn('media');
@@ -45,20 +40,16 @@ cn.icon = cn('icon');
 
 type OwnProps = {
   className?: string;
-  size?: 'micro' | 'tiny' | 'mini' | 'small' | 'small-mobile' | 'medium' | 'large' | 'jumbo';
+  size?: 'micro' | 'tiny' | 'small' | 'medium' | 'large' | 'jumbo';
   chat?: ApiChat;
   user?: ApiUser;
   photo?: ApiPhoto;
   userStatus?: ApiUserStatus;
   text?: string;
   isSavedMessages?: boolean;
-  withVideo?: boolean;
+  noVideo?: boolean;
   noLoop?: boolean;
-  loopIndefinitely?: boolean;
-  animationLevel?: AnimationLevel;
-  noPersonalPhoto?: boolean;
   lastSyncTime?: number;
-  showVideoOverwrite?: boolean;
   observeIntersection?: ObserveFn;
   onClick?: (e: ReactMouseEvent<HTMLDivElement, MouseEvent>, hasMedia: boolean) => void;
 };
@@ -72,81 +63,66 @@ const Avatar: FC<OwnProps> = ({
   userStatus,
   text,
   isSavedMessages,
-  withVideo,
+  noVideo,
   noLoop,
-  loopIndefinitely,
   lastSyncTime,
-  showVideoOverwrite,
-  animationLevel,
-  noPersonalPhoto,
   observeIntersection,
   onClick,
 }) => {
   const { loadFullUser } = getActions();
   // eslint-disable-next-line no-null/no-null
   const ref = useRef<HTMLDivElement>(null);
-  const videoLoopCountRef = useRef(0);
+  // eslint-disable-next-line no-null/no-null
+  const videoRef = useRef<HTMLVideoElement>(null);
   const isIntersecting = useIsIntersecting(ref, observeIntersection);
   const isDeleted = user && isDeletedUser(user);
   const isReplies = user && isChatWithRepliesBot(user.id);
-  const isForum = chat?.isForum;
   let imageHash: string | undefined;
   let videoHash: string | undefined;
 
-  const shouldShowUserVideo = !VIDEO_AVATARS_DISABLED && animationLevel === ANIMATION_LEVEL_MAX
-    && user?.isPremium && user?.hasVideoAvatar;
-  const shouldShowPhotoVideo = showVideoOverwrite && photo?.isVideo;
-  const shouldShowVideo = (
-    isIntersecting && withVideo && (shouldShowPhotoVideo || shouldShowUserVideo)
-  );
-  const profilePhoto = user?.fullInfo?.personalPhoto || user?.fullInfo?.profilePhoto || user?.fullInfo?.fallbackPhoto;
-  const hasProfileVideo = profilePhoto?.isVideo;
-  const shouldLoadVideo = shouldShowVideo && (hasProfileVideo || shouldShowPhotoVideo);
+  const hasVideoAvatar = (user || chat)?.hasVideoAvatar;
+  const profilePhoto = (user?.fullInfo?.profilePhoto || chat?.fullInfo?.profilePhoto);
+  const shouldShowVideo = !noVideo && Boolean(user?.isPremium && profilePhoto?.isVideo);
+  const shouldPlayVideo = isIntersecting && shouldShowVideo;
 
   const shouldFetchBig = size === 'jumbo';
   if (!isSavedMessages && !isDeleted) {
-    if (user && !noPersonalPhoto) {
+    if (shouldShowVideo) {
+      videoHash = getChatAvatarHash(user!, undefined, 'video');
+    }
+    if (user) {
       imageHash = getChatAvatarHash(user, shouldFetchBig ? 'big' : undefined);
     } else if (chat) {
       imageHash = getChatAvatarHash(chat, shouldFetchBig ? 'big' : undefined);
     } else if (photo) {
       imageHash = `photo${photo.id}?size=m`;
-      if (photo.isVideo && withVideo) {
-        videoHash = `videoAvatar${photo.id}?size=u`;
-      }
-    }
-
-    if (hasProfileVideo) {
-      videoHash = getChatAvatarHash(user!, undefined, 'video');
     }
   }
 
-  const imgBlobUrl = useMedia(imageHash, false, ApiMediaFormat.BlobUrl, lastSyncTime);
-  const videoBlobUrl = useMedia(videoHash, !shouldLoadVideo, ApiMediaFormat.BlobUrl, lastSyncTime);
-  const hasBlobUrl = Boolean(imgBlobUrl || videoBlobUrl);
-  // `videoBlobUrl` can be taken from memory cache, so we need to check `shouldLoadVideo` again
-  const shouldPlayVideo = Boolean(isIntersecting && videoBlobUrl && shouldLoadVideo);
+  useVideoAutoPause(videoRef, shouldPlayVideo);
 
-  const { transitionClassNames } = useShowTransition(hasBlobUrl, undefined, hasBlobUrl, 'slow');
-
-  const handleVideoEnded = useCallback((e) => {
-    const video = e.currentTarget;
-    if (!videoBlobUrl) return;
-
-    if (loopIndefinitely) return;
-
-    videoLoopCountRef.current += 1;
-    if (videoLoopCountRef.current >= LOOP_COUNT || noLoop) {
-      video.style.display = 'none';
-    }
-  }, [loopIndefinitely, noLoop, videoBlobUrl]);
-
-  const userId = user?.id;
   useEffect(() => {
-    if (userId && shouldShowVideo && !profilePhoto) {
-      loadFullUser({ userId });
+    const video = videoRef.current;
+    if (!video || !noLoop) return undefined;
+
+    const returnToStart = () => {
+      video.currentTime = 0;
+    };
+
+    video.addEventListener('ended', returnToStart);
+    return () => video.removeEventListener('ended', returnToStart);
+  }, [noLoop]);
+
+  useEffect(() => {
+    if (isIntersecting && !noVideo && user && hasVideoAvatar && !profilePhoto) {
+      loadFullUser({ userId: user.id });
     }
-  }, [loadFullUser, profilePhoto, userId, shouldShowVideo]);
+  }, [hasVideoAvatar, profilePhoto, loadFullUser, user, noVideo, isIntersecting]);
+
+  const imgBlobUrl = useMedia(imageHash, false, ApiMediaFormat.BlobUrl, lastSyncTime);
+  const videoBlobUrl = useMedia(videoHash, false, ApiMediaFormat.BlobUrl, lastSyncTime);
+  const hasBlobUrl = Boolean(imgBlobUrl || videoBlobUrl);
+  const { transitionClassNames } = useShowTransition(hasBlobUrl, undefined, hasBlobUrl, 'slow');
 
   const lang = useLang();
 
@@ -154,11 +130,11 @@ const Avatar: FC<OwnProps> = ({
   const author = user ? getUserFullName(user) : (chat ? getChatTitle(lang, chat) : text);
 
   if (isSavedMessages) {
-    content = <i className={buildClassName(cn.icon, 'icon-avatar-saved-messages')} role="img" aria-label={author} />;
+    content = <i className={buildClassName(cn.icon, 'icon-avatar-saved-messages')} aria-label={author} />;
   } else if (isDeleted) {
-    content = <i className={buildClassName(cn.icon, 'icon-avatar-deleted-account')} role="img" aria-label={author} />;
+    content = <i className={buildClassName(cn.icon, 'icon-avatar-deleted-account')} aria-label={author} />;
   } else if (isReplies) {
-    content = <i className={buildClassName(cn.icon, 'icon-reply-filled')} role="img" aria-label={author} />;
+    content = <i className={buildClassName(cn.icon, 'icon-reply-filled')} aria-label={author} />;
   } else if (hasBlobUrl) {
     content = (
       <>
@@ -168,17 +144,15 @@ const Avatar: FC<OwnProps> = ({
           alt={author}
           decoding="async"
         />
-        {shouldPlayVideo && (
-          <OptimizedVideo
-            canPlay
+        {videoBlobUrl && (
+          <video
+            ref={videoRef}
             src={videoBlobUrl}
-            className={buildClassName(cn.media, 'avatar-media', 'poster')}
+            className={buildClassName(cn.media, 'avatar-media', transitionClassNames)}
             muted
-            loop={loopIndefinitely}
             autoPlay
-            disablePictureInPicture
+            loop={!noLoop}
             playsInline
-            onEnded={handleVideoEnded}
           />
         )}
       </>
@@ -193,7 +167,7 @@ const Avatar: FC<OwnProps> = ({
     content = getFirstLetters(text, 2);
   }
 
-  const isOnline = !isSavedMessages && user && userStatus && isUserOnline(user, userStatus);
+  let isOnline = !isSavedMessages && user && userStatus && isUserOnline(user, userStatus);
   const fullClassName = buildClassName(
     `Avatar size-${size}`,
     className,
@@ -201,7 +175,6 @@ const Avatar: FC<OwnProps> = ({
     isSavedMessages && 'saved-messages',
     isDeleted && 'deleted-account',
     isReplies && 'replies-bot-account',
-    isForum && 'forum',
     isOnline && 'online',
     onClick && 'interactive',
     (!isSavedMessages && !imgBlobUrl) && 'no-photo',

@@ -1,17 +1,15 @@
+import { updateChatMessage } from './messages';
 import type { GlobalState } from '../types';
-import type { ApiChat, ApiMessage, ApiReaction } from '../../api/types';
-
+import { selectChatMessage } from '../selectors';
 import { MIN_SCREEN_WIDTH_FOR_STATIC_LEFT_COLUMN, MIN_SCREEN_WIDTH_FOR_STATIC_RIGHT_COLUMN } from '../../config';
 import {
   MIN_LEFT_COLUMN_WIDTH,
   SIDE_COLUMN_MAX_WIDTH,
 } from '../../components/middle/helpers/calculateMiddleFooterTransforms';
+import { IS_SINGLE_COLUMN_LAYOUT } from '../../util/environment';
 import windowSize from '../../util/windowSize';
 import { updateChat } from './chats';
-import { isSameReaction, isReactionChosen } from '../helpers';
-import { updateChatMessage } from './messages';
-import { selectTabState } from '../selectors';
-import { getIsMobile } from '../../hooks/useAppLayout';
+import type { ApiChat } from '../../api/types';
 
 function getLeftColumnWidth(windowWidth: number) {
   if (windowWidth > MIN_SCREEN_WIDTH_FOR_STATIC_RIGHT_COLUMN) {
@@ -32,68 +30,61 @@ function getLeftColumnWidth(windowWidth: number) {
 }
 
 export function subtractXForEmojiInteraction(global: GlobalState, x: number) {
-  const tabState = selectTabState(global);
-  return x - ((tabState.isLeftColumnShown && !getIsMobile())
+  return x - ((global.isLeftColumnShown && !IS_SINGLE_COLUMN_LAYOUT)
     ? global.leftColumnWidth || getLeftColumnWidth(windowSize.get().width)
     : 0);
 }
 
-export function addMessageReaction<T extends GlobalState>(
-  global: T, message: ApiMessage, userReactions: ApiReaction[],
-): T {
-  const currentReactions = message.reactions || { results: [] };
+export function addMessageReaction(global: GlobalState, chatId: string, messageId: number, reaction: string) {
+  const { reactions } = selectChatMessage(global, chatId, messageId) || {};
 
-  // Update UI without waiting for server response
-  const results = currentReactions.results.map((current) => (
-    isReactionChosen(current) ? {
-      ...current,
-      chosenOrder: undefined,
-      count: current.count - 1,
-    } : current
-  )).filter(({ count }) => count > 0);
-
-  userReactions.forEach((reaction, i) => {
-    const existingIndex = results.findIndex((r) => isSameReaction(r.reaction, reaction));
-    if (existingIndex > -1) {
-      results[existingIndex] = {
-        ...results[existingIndex],
-        chosenOrder: i,
-        count: results[existingIndex].count + 1,
-      };
-    } else {
-      results.push({
-        reaction,
-        chosenOrder: i,
-        count: 1,
-      });
-    }
-  });
-
-  let { recentReactions = [] } = currentReactions;
-
-  if (recentReactions.length) {
-    recentReactions = recentReactions.filter(({ userId }) => userId !== global.currentUserId);
+  if (!reactions) {
+    return global;
   }
 
-  userReactions.forEach((reaction) => {
-    const { currentUserId } = global;
-    recentReactions.unshift({
-      userId: currentUserId!,
-      reaction,
-    });
-  });
+  // Update UI without waiting for server response
+  let results = reactions.results.map((l) => (l.reaction === reaction
+    ? {
+      ...l,
+      count: l.isChosen ? l.count : l.count + 1,
+      isChosen: true,
+    } : (l.isChosen ? {
+      ...l,
+      isChosen: false,
+      count: l.count - 1,
+    } : l)))
+    .filter((l) => l.count > 0);
 
-  return updateChatMessage(global, message.chatId, message.id, {
+  let { recentReactions } = reactions;
+
+  if (reaction && !results.some((l) => l.reaction === reaction)) {
+    const { currentUserId } = global;
+
+    results = [...results, {
+      reaction,
+      isChosen: true,
+      count: 1,
+    }];
+
+    if (reactions.canSeeList) {
+      recentReactions = [...(recentReactions || []), {
+        userId: currentUserId!,
+        reaction,
+      }];
+    }
+  }
+
+  return updateChatMessage(global, chatId, messageId, {
     reactions: {
-      ...currentReactions,
+      ...reactions,
       results,
       recentReactions,
     },
   });
 }
 
-export function updateUnreadReactions<T extends GlobalState>(
-  global: T, chatId: string, update: Pick<ApiChat, 'unreadReactionsCount' | 'unreadReactions'>,
-): T {
+export function updateUnreadReactions(
+  global: GlobalState, chatId: string, update: Pick<ApiChat, 'unreadReactionsCount' | 'unreadReactions'>,
+) {
   return updateChat(global, chatId, update, undefined, true);
 }

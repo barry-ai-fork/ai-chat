@@ -1,27 +1,23 @@
-import React, {
-  useEffect, useCallback, memo, useMemo,
-} from '../../lib/teact/teact';
+import type { MouseEvent as ReactMouseEvent } from 'react';
+import type { FC } from '../../lib/teact/teact';
+import React, { useEffect, useCallback, memo } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
-import type { FC } from '../../lib/teact/teact';
-import type {
-  ApiUser, ApiTypingStatus, ApiUserStatus, ApiChatMember,
-} from '../../api/types';
+import type { ApiUser, ApiTypingStatus, ApiUserStatus } from '../../api/types';
 import type { GlobalState } from '../../global/types';
-import type { AnimationLevel } from '../../types';
 import { MediaViewerOrigin } from '../../types';
 
 import { selectChatMessages, selectUser, selectUserStatus } from '../../global/selectors';
-import { getMainUsername, getUserStatus, isUserOnline } from '../../global/helpers';
-import buildClassName from '../../util/buildClassName';
+import { getUserFullName, getUserStatus, isUserOnline } from '../../global/helpers';
 import renderText from './helpers/renderText';
-
 import useLang from '../../hooks/useLang';
 
 import Avatar from './Avatar';
+import VerifiedIcon from './VerifiedIcon';
 import TypingStatus from './TypingStatus';
 import DotAnimation from './DotAnimation';
-import FullNameTitle from './FullNameTitle';
+import FakeIcon from './FakeIcon';
+import PremiumIcon from './PremiumIcon';
 
 type OwnProps = {
   userId: string;
@@ -35,10 +31,8 @@ type OwnProps = {
   withFullInfo?: boolean;
   withUpdatingStatus?: boolean;
   withVideoAvatar?: boolean;
-  emojiStatusSize?: number;
   noStatusOrTyping?: boolean;
   noRtl?: boolean;
-  adminMember?: ApiChatMember;
 };
 
 type StateProps =
@@ -46,8 +40,8 @@ type StateProps =
     user?: ApiUser;
     userStatus?: ApiUserStatus;
     isSavedMessages?: boolean;
-    animationLevel: AnimationLevel;
     areMessagesLoaded: boolean;
+    serverTimeOffset: number;
   }
   & Pick<GlobalState, 'lastSyncTime'>;
 
@@ -61,45 +55,40 @@ const PrivateChatInfo: FC<OwnProps & StateProps> = ({
   withFullInfo,
   withUpdatingStatus,
   withVideoAvatar,
-  emojiStatusSize,
   noStatusOrTyping,
   noRtl,
   user,
   userStatus,
   isSavedMessages,
   areMessagesLoaded,
-  animationLevel,
   lastSyncTime,
-  adminMember,
+  serverTimeOffset,
 }) => {
   const {
     loadFullUser,
     openMediaViewer,
-    loadProfilePhotos,
   } = getActions();
 
   const { id: userId } = user || {};
+  const fullName = getUserFullName(user);
 
   useEffect(() => {
-    if (userId && lastSyncTime) {
-      if (withFullInfo) loadFullUser({ userId });
-      if (withMediaViewer) loadProfilePhotos({ profileId: userId });
+    if (withFullInfo && lastSyncTime && userId) {
+      loadFullUser({ userId });
     }
-  }, [userId, loadFullUser, loadProfilePhotos, lastSyncTime, withFullInfo, withMediaViewer]);
+  }, [userId, loadFullUser, lastSyncTime, withFullInfo]);
 
-  const handleAvatarViewerOpen = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>, hasMedia: boolean) => {
+  const handleAvatarViewerOpen = useCallback((e: ReactMouseEvent<HTMLDivElement, MouseEvent>, hasMedia: boolean) => {
     if (user && hasMedia) {
       e.stopPropagation();
       openMediaViewer({
         avatarOwnerId: user.id,
-        mediaId: 0,
         origin: avatarSize === 'jumbo' ? MediaViewerOrigin.ProfileAvatar : MediaViewerOrigin.MiddleHeaderAvatar,
       });
     }
   }, [user, avatarSize, openMediaViewer]);
 
   const lang = useLang();
-  const mainUsername = useMemo(() => user && withUsername && getMainUsername(user), [user, withUsername]);
 
   if (!user) {
     return undefined;
@@ -110,7 +99,7 @@ const PrivateChatInfo: FC<OwnProps & StateProps> = ({
       return withDots ? (
         <DotAnimation className="status" content={status} />
       ) : (
-        <span className="status" dir="auto">{renderText(status)}</span>
+        <span className="status" dir="auto">{status}</span>
       );
     }
 
@@ -129,39 +118,10 @@ const PrivateChatInfo: FC<OwnProps & StateProps> = ({
     }
 
     return (
-      <span className={buildClassName('status', isUserOnline(user, userStatus) && 'online')}>
-        {mainUsername && <span className="handle">{mainUsername}</span>}
-        <span className="user-status" dir="auto">{getUserStatus(lang, user, userStatus)}</span>
+      <span className={`status ${isUserOnline(user, userStatus) ? 'online' : ''}`}>
+        {withUsername && user.username && <span className="handle">{user.username}</span>}
+        <span className="user-status" dir="auto">{getUserStatus(lang, user, userStatus, serverTimeOffset)}</span>
       </span>
-    );
-  }
-
-  const customTitle = adminMember
-    ? adminMember.customTitle || lang(adminMember.isOwner ? 'GroupInfo.LabelOwner' : 'GroupInfo.LabelAdmin')
-    : undefined;
-
-  function renderNameTitle() {
-    if (customTitle) {
-      return (
-        <div className="info-name-title">
-          <FullNameTitle
-            peer={user!}
-            withEmojiStatus
-            emojiStatusSize={emojiStatusSize}
-            isSavedMessages={isSavedMessages}
-          />
-          {customTitle && <span className="custom-title">{customTitle}</span>}
-        </div>
-      );
-    }
-
-    return (
-      <FullNameTitle
-        peer={user!}
-        withEmojiStatus
-        emojiStatusSize={emojiStatusSize}
-        isSavedMessages={isSavedMessages}
-      />
     );
   }
 
@@ -173,11 +133,21 @@ const PrivateChatInfo: FC<OwnProps & StateProps> = ({
         user={user}
         isSavedMessages={isSavedMessages}
         onClick={withMediaViewer ? handleAvatarViewerOpen : undefined}
-        withVideo={withVideoAvatar}
-        animationLevel={animationLevel}
+        noVideo={!withVideoAvatar}
       />
       <div className="info">
-        {renderNameTitle()}
+        {isSavedMessages ? (
+          <div className="title">
+            <h3>{lang('SavedMessages')}</h3>
+          </div>
+        ) : (
+          <div className="title">
+            <h3 dir="auto">{fullName && renderText(fullName)}</h3>
+            {user?.isVerified && <VerifiedIcon />}
+            {user.isPremium && <PremiumIcon />}
+            {user.fakeType && <FakeIcon fakeType={user.fakeType} />}
+          </div>
+        )}
         {(status || (!isSavedMessages && !noStatusOrTyping)) && renderStatusOrTyping()}
       </div>
     </div>
@@ -186,19 +156,14 @@ const PrivateChatInfo: FC<OwnProps & StateProps> = ({
 
 export default memo(withGlobal<OwnProps>(
   (global, { userId, forceShowSelf }): StateProps => {
-    const { lastSyncTime } = global;
+    const { lastSyncTime, serverTimeOffset } = global;
     const user = selectUser(global, userId);
     const userStatus = selectUserStatus(global, userId);
     const isSavedMessages = !forceShowSelf && user && user.isSelf;
     const areMessagesLoaded = Boolean(selectChatMessages(global, userId));
 
     return {
-      lastSyncTime,
-      user,
-      userStatus,
-      isSavedMessages,
-      areMessagesLoaded,
-      animationLevel: global.settings.byKey.animationLevel,
+      lastSyncTime, user, userStatus, isSavedMessages, areMessagesLoaded, serverTimeOffset,
     };
   },
 )(PrivateChatInfo));

@@ -66,12 +66,6 @@ export const forceWebsync = (authed: boolean) => {
   }
 };
 
-export function stopWebsync() {
-  if (DEBUG) return;
-
-  if (lastTimeout) clearTimeout(lastTimeout);
-}
-
 export function startWebsync() {
   if (DEBUG) {
     return;

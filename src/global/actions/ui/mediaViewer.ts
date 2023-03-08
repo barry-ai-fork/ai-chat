@@ -1,108 +1,79 @@
 import { addActionHandler } from '../../index';
-import type { ActionReturnType } from '../../types';
-import { updateTabState } from '../../reducers/tabs';
-import { selectTabState } from '../../selectors';
-import { getCurrentTabId } from '../../../util/establishMultitabRole';
 
-addActionHandler('openMediaViewer', (global, actions, payload): ActionReturnType => {
+addActionHandler('openMediaViewer', (global, actions, payload) => {
   const {
-    chatId, threadId, mediaId, avatarOwnerId, profilePhotoIndex, origin, volume, playbackRate, isMuted,
-    tabId = getCurrentTabId(),
+    chatId, threadId, messageId, avatarOwnerId, profilePhotoIndex, origin, volume, playbackRate, isMuted,
   } = payload;
 
-  const tabState = selectTabState(global, tabId);
-  return updateTabState(global, {
-    mediaViewer: {
-      ...tabState.mediaViewer,
-      chatId,
-      threadId,
-      mediaId,
-      avatarOwnerId,
-      profilePhotoIndex,
-      origin,
-      isHidden: false,
-      volume: volume ?? tabState.mediaViewer.volume,
-      playbackRate: playbackRate || tabState.mediaViewer.playbackRate || global.mediaViewer.lastPlaybackRate,
-      isMuted: isMuted || tabState.mediaViewer.isMuted,
-    },
-    forwardMessages: {},
-  }, tabId);
-});
-
-addActionHandler('closeMediaViewer', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  const {
-    volume, isMuted, playbackRate, isHidden,
-  } = selectTabState(global, tabId).mediaViewer;
-
-  return updateTabState(global, {
-    mediaViewer: {
-      volume,
-      isMuted,
-      isHidden,
-      playbackRate,
-    },
-  }, tabId);
-});
-
-addActionHandler('setMediaViewerVolume', (global, actions, payload): ActionReturnType => {
-  const {
-    volume,
-    tabId = getCurrentTabId(),
-  } = payload;
-
-  return updateTabState(global, {
-    mediaViewer: {
-      ...selectTabState(global, tabId).mediaViewer,
-      volume,
-      isMuted: false,
-    },
-  }, tabId);
-});
-
-addActionHandler('setMediaViewerPlaybackRate', (global, actions, payload): ActionReturnType => {
-  const {
-    playbackRate,
-    tabId = getCurrentTabId(),
-  } = payload;
-
-  global = {
+  return {
     ...global,
     mediaViewer: {
       ...global.mediaViewer,
-      lastPlaybackRate: playbackRate,
+      chatId,
+      threadId,
+      messageId,
+      avatarOwnerId,
+      profilePhotoIndex,
+      origin,
+      volume: volume ?? global.mediaViewer.volume,
+      playbackRate: playbackRate || global.mediaViewer.playbackRate,
+      isMuted: isMuted || global.mediaViewer.isMuted,
     },
+    forwardMessages: {},
   };
+});
 
-  return updateTabState(global, {
+addActionHandler('closeMediaViewer', (global) => {
+  const { volume, isMuted, playbackRate } = global.mediaViewer;
+  return {
+    ...global,
     mediaViewer: {
-      ...selectTabState(global, tabId).mediaViewer,
+      volume,
+      isMuted,
       playbackRate,
     },
-  }, tabId);
+  };
 });
 
-addActionHandler('setMediaViewerMuted', (global, actions, payload): ActionReturnType => {
+addActionHandler('setMediaViewerVolume', (global, actions, payload) => {
   const {
-    isMuted,
-    tabId = getCurrentTabId(),
+    volume,
   } = payload;
 
-  return updateTabState(global, {
+  return {
+    ...global,
     mediaViewer: {
-      ...selectTabState(global, tabId).mediaViewer,
-      isMuted,
+      ...global.mediaViewer,
+      volume,
+      isMuted: false,
     },
-  }, tabId);
+  };
 });
 
-addActionHandler('setMediaViewerHidden', (global, actions, payload): ActionReturnType => {
-  const { isHidden, tabId = getCurrentTabId() } = payload;
+addActionHandler('setMediaViewerPlaybackRate', (global, actions, payload) => {
+  const {
+    playbackRate,
+  } = payload;
 
-  return updateTabState(global, {
+  return {
+    ...global,
     mediaViewer: {
-      ...selectTabState(global, tabId).mediaViewer,
-      isHidden,
+      ...global.mediaViewer,
+      playbackRate,
     },
-  }, tabId);
+  };
+});
+
+addActionHandler('setMediaViewerMuted', (global, actions, payload) => {
+  const {
+    isMuted,
+  } = payload;
+
+  return {
+    ...global,
+    mediaViewer: {
+      ...global.mediaViewer,
+      isMuted,
+    },
+  };
 });

@@ -1,11 +1,12 @@
 import type { FC } from '../../../lib/teact/teact';
 import React, {
-  useCallback, memo,
+  useCallback, memo, useRef, useState,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
-import type { AnimationLevel, ISettings, TimeFormat } from '../../../types';
+import type { ISettings, TimeFormat } from '../../../types';
 import { SettingsScreens } from '../../../types';
+import type { ApiSticker, ApiStickerSet } from '../../../api/types';
 
 import {
   getSystemTheme, IS_IOS, IS_MAC_OS, IS_TOUCH_ENV,
@@ -13,12 +14,18 @@ import {
 import { pick } from '../../../util/iteratees';
 import { setTimeFormat } from '../../../util/langProvider';
 import useLang from '../../../hooks/useLang';
+import useFlag from '../../../hooks/useFlag';
+import { useIntersectionObserver } from '../../../hooks/useIntersectionObserver';
 import useHistoryBack from '../../../hooks/useHistoryBack';
 
 import ListItem from '../../ui/ListItem';
 import RangeSlider from '../../ui/RangeSlider';
+import Checkbox from '../../ui/Checkbox';
 import type { IRadioOption } from '../../ui/RadioGroup';
 import RadioGroup from '../../ui/RadioGroup';
+import SettingsStickerSet from './SettingsStickerSet';
+import StickerSetModal from '../../common/StickerSetModal.async';
+import ReactionStaticEmoji from '../../common/ReactionStaticEmoji';
 import switchTheme from '../../../util/switchTheme';
 import { ANIMATION_LEVEL_MAX } from '../../../config';
 
@@ -33,8 +40,13 @@ type StateProps =
     'messageTextSize' |
     'animationLevel' |
     'messageSendKeyCombo' |
+    'shouldSuggestStickers' |
+    'shouldLoopStickers' |
     'timeFormat'
   )> & {
+    stickerSetIds?: string[];
+    stickerSetsById?: Record<string, ApiStickerSet>;
+    defaultReaction?: string;
     theme: ISettings['theme'];
     shouldUseSystemTheme: boolean;
   };
@@ -57,9 +69,14 @@ const SettingsGeneral: FC<OwnProps & StateProps> = ({
   isActive,
   onScreenSelect,
   onReset,
+  stickerSetIds,
+  stickerSetsById,
+  defaultReaction,
   messageTextSize,
   animationLevel,
   messageSendKeyCombo,
+  shouldSuggestStickers,
+  shouldLoopStickers,
   timeFormat,
   theme,
   shouldUseSystemTheme,
@@ -67,6 +84,12 @@ const SettingsGeneral: FC<OwnProps & StateProps> = ({
   const {
     setSettingOption,
   } = getActions();
+
+  // eslint-disable-next-line no-null/no-null
+  const stickerSettingsRef = useRef<HTMLDivElement>(null);
+  const { observe: observeIntersectionForCovers } = useIntersectionObserver({ rootRef: stickerSettingsRef });
+  const [isModalOpen, openModal, closeModal] = useFlag();
+  const [sticker, setSticker] = useState<ApiSticker>();
 
   const lang = useLang();
 
@@ -95,7 +118,7 @@ const SettingsGeneral: FC<OwnProps & StateProps> = ({
       document.body.classList.toggle(`animation-level-${i}`, newLevel === i);
     });
 
-    setSettingOption({ animationLevel: newLevel as AnimationLevel });
+    setSettingOption({ animationLevel: newLevel });
   }, [setSettingOption]);
 
   const handleMessageTextSizeChange = useCallback((newSize: number) => {
@@ -120,15 +143,32 @@ const SettingsGeneral: FC<OwnProps & StateProps> = ({
   }, [animationLevel, setSettingOption, theme]);
 
   const handleTimeFormatChange = useCallback((newTimeFormat: string) => {
-    setSettingOption({ timeFormat: newTimeFormat as TimeFormat });
+    setSettingOption({ timeFormat: newTimeFormat });
     setSettingOption({ wasTimeFormatSetManually: true });
 
     setTimeFormat(newTimeFormat as TimeFormat);
   }, [setSettingOption]);
 
+  const handleStickerSetClick = useCallback((value: ApiSticker) => {
+    setSticker(value);
+    openModal();
+  }, [openModal]);
+
   const handleMessageSendComboChange = useCallback((newCombo: string) => {
-    setSettingOption({ messageSendKeyCombo: newCombo as ISettings['messageSendKeyCombo'] });
+    setSettingOption({ messageSendKeyCombo: newCombo });
   }, [setSettingOption]);
+
+  const handleSuggestStickersChange = useCallback((newValue: boolean) => {
+    setSettingOption({ shouldSuggestStickers: newValue });
+  }, [setSettingOption]);
+
+  const handleShouldLoopStickersChange = useCallback((newValue: boolean) => {
+    setSettingOption({ shouldLoopStickers: newValue });
+  }, [setSettingOption]);
+
+  const stickerSets = stickerSetIds && stickerSetIds.map((id: string) => {
+    return stickerSetsById?.[id]?.installedDate ? stickerSetsById[id] : false;
+  }).filter<ApiStickerSet>(Boolean as any);
 
   useHistoryBack({
     isActive,
@@ -208,6 +248,50 @@ const SettingsGeneral: FC<OwnProps & StateProps> = ({
           />
         </div>
       )}
+
+      <div className="settings-item">
+        <h4 className="settings-item-header" dir={lang.isRtl ? 'rtl' : undefined}>{lang('AccDescrStickers')}</h4>
+
+        {defaultReaction && (
+          <ListItem
+            className="SettingsDefaultReaction"
+            // eslint-disable-next-line react/jsx-no-bind
+            onClick={() => onScreenSelect(SettingsScreens.QuickReaction)}
+          >
+            <ReactionStaticEmoji reaction={defaultReaction} />
+            <div className="title">{lang('DoubleTapSetting')}</div>
+          </ListItem>
+        )}
+
+        <Checkbox
+          label={lang('SuggestStickers')}
+          checked={shouldSuggestStickers}
+          onCheck={handleSuggestStickersChange}
+        />
+        <Checkbox
+          label={lang('LoopAnimatedStickers')}
+          checked={shouldLoopStickers}
+          onCheck={handleShouldLoopStickersChange}
+        />
+
+        <div className="mt-4" ref={stickerSettingsRef}>
+          {stickerSets && stickerSets.map((stickerSet: ApiStickerSet) => (
+            <SettingsStickerSet
+              key={stickerSet.id}
+              stickerSet={stickerSet}
+              observeIntersection={observeIntersectionForCovers}
+              onClick={handleStickerSetClick}
+            />
+          ))}
+        </div>
+        {sticker && (
+          <StickerSetModal
+            isOpen={isModalOpen}
+            fromSticker={sticker}
+            onClose={closeModal}
+          />
+        )}
+      </div>
     </div>
   );
 };
@@ -221,10 +305,15 @@ export default memo(withGlobal<OwnProps>(
         'messageTextSize',
         'animationLevel',
         'messageSendKeyCombo',
+        'shouldSuggestStickers',
+        'shouldLoopStickers',
         'isSensitiveEnabled',
         'canChangeSensitive',
         'timeFormat',
       ]),
+      stickerSetIds: global.stickers.added.setIds,
+      stickerSetsById: global.stickers.setsById,
+      defaultReaction: global.appConfig?.defaultReaction,
       theme,
       shouldUseSystemTheme,
     };

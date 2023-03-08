@@ -5,9 +5,7 @@ import { getActions, withGlobal } from '../../global';
 import type {
   ApiContact, ApiError, ApiInviteInfo, ApiPhoto,
 } from '../../api/types';
-import type { AnimationLevel } from '../../types';
 
-import { selectTabState } from '../../global/selectors';
 import getReadableErrorText from '../../util/getReadableErrorText';
 import { pick } from '../../util/iteratees';
 import renderText from '../common/helpers/renderText';
@@ -21,11 +19,10 @@ import Avatar from '../common/Avatar';
 import './Dialogs.scss';
 
 type StateProps = {
-  dialogs: (ApiError | ApiInviteInfo | ApiContact)[];
-  animationLevel: AnimationLevel;
+  dialogs: (ApiError | ApiInviteInfo)[];
 };
 
-const Dialogs: FC<StateProps> = ({ dialogs, animationLevel }) => {
+const Dialogs: FC<StateProps> = ({ dialogs }) => {
   const {
     dismissDialog,
     acceptInviteConfirmation,
@@ -49,7 +46,7 @@ const Dialogs: FC<StateProps> = ({ dialogs, animationLevel }) => {
   function renderInviteHeader(title: string, photo?: ApiPhoto) {
     return (
       <div className="modal-header">
-        {photo && <Avatar size="small" photo={photo} animationLevel={animationLevel} withVideo />}
+        {photo && <Avatar size="small" photo={photo} />}
         <div className="modal-title">
           {renderText(title)}
         </div>
@@ -102,17 +99,15 @@ const Dialogs: FC<StateProps> = ({ dialogs, animationLevel }) => {
               : lang('MemberRequests.RequestToJoinDescriptionGroup')}
           </p>
         )}
-        <div className="dialog-buttons mt-2">
-          <Button
-            isText
-            className="confirm-dialog-button"
-            // eslint-disable-next-line react/jsx-no-bind
-            onClick={handleJoinClick}
-          >
-            {isRequestNeeded ? requestToJoinText : joinText}
-          </Button>
-          <Button isText className="confirm-dialog-button" onClick={closeModal}>{lang('Cancel')}</Button>
-        </div>
+        <Button
+          isText
+          className="confirm-dialog-button"
+          // eslint-disable-next-line react/jsx-no-bind
+          onClick={handleJoinClick}
+        >
+          {isRequestNeeded ? requestToJoinText : joinText}
+        </Button>
+        <Button isText className="confirm-dialog-button" onClick={closeModal}>{lang('Cancel')}</Button>
       </Modal>
     );
   };
@@ -134,7 +129,7 @@ const Dialogs: FC<StateProps> = ({ dialogs, animationLevel }) => {
         onCloseAnimationEnd={dismissDialog}
       >
         {lang('AreYouSureShareMyContactInfoBot')}
-        <div className="dialog-buttons mt-2">
+        <div>
           <Button
             className="confirm-dialog-button"
             isText
@@ -158,9 +153,8 @@ const Dialogs: FC<StateProps> = ({ dialogs, animationLevel }) => {
         className="error"
         title={getErrorHeader(error)}
       >
-        {error.hasErrorKey ? getReadableErrorText(error)
-          : renderText(error.message!, ['simple_markdown', 'emoji', 'br'])}
-        <div className="dialog-buttons mt-2">
+        {error.hasErrorKey ? getReadableErrorText(error) : renderText(error.message!, ['emoji', 'br'])}
+        <div>
           <Button isText onClick={closeModal}>{lang('OK')}</Button>
         </div>
       </Modal>
@@ -199,10 +193,5 @@ function getErrorHeader(error: ApiError) {
 }
 
 export default memo(withGlobal(
-  (global): StateProps => {
-    return {
-      dialogs: selectTabState(global).dialogs,
-      animationLevel: global.settings.byKey.animationLevel,
-    };
-  },
+  (global): StateProps => pick(global, ['dialogs']),
 )(Dialogs));

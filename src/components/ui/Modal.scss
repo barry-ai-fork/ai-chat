@@ -28,13 +28,9 @@
     }
   }
 
-  &.slim {
+  &.report {
     .modal-dialog {
-      max-width: 25rem;
-    }
-
-    .modal-content {
-      max-height: min(92vh, 32rem);
+      max-width: 15rem;
     }
   }
 
@@ -148,7 +144,7 @@
     flex-grow: 1;
     padding: 1rem;
     overflow-y: auto;
-    max-height: 92vh;
+    max-height: 90vh;
 
     b,
     strong {
@@ -179,34 +175,19 @@
 
   .dialog-buttons {
     display: flex;
-    flex-direction: row-reverse;
-    justify-content: flex-start;
-    flex-wrap: wrap;
+    align-items: flex-end;
 
     .confirm-dialog-button + .confirm-dialog-button {
-      margin-right: 1rem;
+      margin-left: 1rem;
     }
-  }
-
-  .dialog-buttons-column {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-  }
-
-  .dialog-checkbox {
-    margin: 1rem 0;
   }
 
   .confirm-dialog-button {
     width: auto;
     height: auto;
+    margin-left: auto;
     text-align: right;
     font-weight: 500;
     white-space: pre-wrap;
-  }
-
-  .dialog-button-spacer {
-    flex-grow: 1;
   }
 }

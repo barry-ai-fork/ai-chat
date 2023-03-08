@@ -23,13 +23,12 @@ import { addNotifyExceptions, replaceSettings } from '../global/reducers';
 import {
   selectChatMessage,
   selectCurrentMessageList,
-  selectTopicFromMessage,
   selectNotifyExceptions,
   selectNotifySettings,
   selectUser,
 } from '../global/selectors';
 import { IS_SERVICE_WORKER_SUPPORTED, IS_TOUCH_ENV } from './environment';
-import { translate } from './langProvider';
+import { getTranslation } from './langProvider';
 import * as mediaLoader from './mediaLoader';
 import { debounce } from './schedulers';
 
@@ -97,17 +96,18 @@ const expirationTime = 12 * 60 * 60 * 1000; // 12 hours
 // Notification id is removed from soundPlayed cache after 3 seconds
 const soundPlayedDelay = 3 * 1000;
 const soundPlayedIds = new Set<string>();
-const notificationSound = new Audio('./notification.mp3');
-notificationSound.setAttribute('mozaudiochannel', 'notification');
 
 export async function playNotifySound(id?: string, volume?: number) {
   if (id !== undefined && soundPlayedIds.has(id)) return;
   const { notificationSoundVolume } = selectNotifySettings(getGlobal());
   const currentVolume = volume ? volume / 10 : notificationSoundVolume / 10;
   if (currentVolume === 0) return;
-  notificationSound.volume = currentVolume;
+
+  const audio = new Audio('./notification.mp3');
+  audio.volume = currentVolume;
+  audio.setAttribute('mozaudiochannel', 'notification');
   if (id !== undefined) {
-    notificationSound.addEventListener('ended', () => {
+    audio.addEventListener('ended', () => {
       soundPlayedIds.add(id);
     }, { once: true });
 
@@ -117,7 +117,7 @@ export async function playNotifySound(id?: string, volume?: number) {
   }
 
   try {
-    await notificationSound.play();
+    await audio.play();
   } catch (error) {
     if (DEBUG) {
       // eslint-disable-next-line no-console
@@ -179,8 +179,12 @@ let areSettingsLoaded = false;
 async function loadNotificationSettings() {
   if (areSettingsLoaded) return selectNotifySettings(getGlobal());
   const [resultSettings, resultExceptions] = await Promise.all([
-    callApi('fetchNotificationSettings'),
-    callApi('fetchNotificationExceptions'),
+    callApi('fetchNotificationSettings', {
+      serverTimeOffset: getGlobal().serverTimeOffset,
+    }),
+    callApi('fetchNotificationExceptions', {
+      serverTimeOffset: getGlobal().serverTimeOffset,
+    }),
   ]);
   if (!resultSettings) return selectNotifySettings(getGlobal());
 
@@ -284,12 +288,10 @@ function getNotificationContent(chat: ApiChat, message: ApiMessage, reaction?: A
 
   const actionTargetUsers = actionTargetUserIds
     ? actionTargetUserIds.map((userId) => selectUser(global, userId))
-      .filter(Boolean)
+      .filter<ApiUser>(Boolean as any)
     : undefined;
   const privateChatUserId = getPrivateChatUserId(chat);
   const privateChatUser = privateChatUserId ? selectUser(global, privateChatUserId) : undefined;
-
-  const topic = selectTopicFromMessage(global, message);
 
   let body: string;
   if (
@@ -300,20 +302,18 @@ function getNotificationContent(chat: ApiChat, message: ApiMessage, reaction?: A
       const isChat = chat && (isChatChannel(chat) || message.senderId === message.chatId);
 
       body = renderActionMessageText(
-        translate,
+        getTranslation,
         message,
         !isChat ? messageSender : undefined,
         isChat ? chat : undefined,
         actionTargetUsers,
         actionTargetMessage,
         actionTargetChatId,
-        topic,
         { asPlainText: true },
       ) as string;
     } else {
-      // TODO[forums] Support ApiChat
-      const senderName = getMessageSenderName(translate, chat.id, messageSender);
-      const summary = getMessageSummaryText(translate, message, false, 60, false);
+      const senderName = getMessageSenderName(getTranslation, chat.id, messageSender);
+      const summary = getMessageSummaryText(getTranslation, message, false, 60, false);
 
       body = senderName ? `${senderName}: ${summary}` : summary;
     }
@@ -321,13 +321,10 @@ function getNotificationContent(chat: ApiChat, message: ApiMessage, reaction?: A
     body = 'New message';
   }
 
-  let title = isScreenLocked ? APP_NAME : getChatTitle(translate, chat, privateChatUser);
-
-  if (message.isSilent) {
-    title += ' 🔕';
-  }
-
-  return { title, body };
+  return {
+    title: isScreenLocked ? APP_NAME : getChatTitle(getTranslation, chat, privateChatUser),
+    body,
+  };
 }
 
 async function getAvatar(chat: ApiChat | ApiUser) {
@@ -364,7 +361,7 @@ export async function notifyAboutCall({
     options.vibrate = [200, 100, 200];
   }
 
-  const notification = new Notification(translate('VoipIncoming'), options);
+  const notification = new Notification(getTranslation('VoipIncoming'), options);
 
   notification.onclick = () => {
     notification.close();
@@ -383,11 +380,10 @@ export async function notifyAboutMessage({
   if (!checkIfShouldNotify(chat)) return;
   const areNotificationsSupported = checkIfNotificationsSupported();
   if (!hasWebNotifications || !areNotificationsSupported) {
-    if (!message.isSilent && !isReaction) {
-      // Only play sound if web notifications are disabled
-      playNotifySoundDebounced(String(message.id) || chat.id);
-    }
-
+    // Do not play notification sound for reactions if web notifications are disabled
+    if (isReaction) return;
+    // Only play sound if web notifications are disabled
+    playNotifySoundDebounced(String(message.id) || chat.id);
     return;
   }
   if (!areNotificationsSupported) return;
@@ -417,7 +413,6 @@ export async function notifyAboutMessage({
           chatId: chat.id,
           messageId: message.id,
           shouldReplaceHistory: true,
-          isSilent: message.isSilent,
           reaction: activeReaction?.reaction,
         },
       });
@@ -441,7 +436,7 @@ export async function notifyAboutMessage({
       notification.close();
       dispatch.focusMessage({
         chatId: chat.id,
-        messageId: message.id!,
+        messageId: message.id,
         shouldReplaceHistory: true,
       });
       if (window.focus) {
@@ -451,8 +446,8 @@ export async function notifyAboutMessage({
 
     // Play sound when notification is displayed
     notification.onshow = () => {
-      // TODO Update when reaction badges are implemented
-      if (isReaction || message.isSilent) return;
+      // TODO Remove when reaction badges are implemented
+      if (isReaction) return;
       playNotifySoundDebounced(String(message.id) || chat.id);
     };
   }

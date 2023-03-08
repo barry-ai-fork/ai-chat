@@ -1,31 +1,15 @@
-import type { GlobalState, TabArgs } from '../types';
+import type { GlobalState } from '../types';
 import type { ApiSticker, ApiStickerSet, ApiVideo } from '../../api/types';
 import { buildCollectionByKey, unique } from '../../util/iteratees';
-import { selectTabState, selectCustomEmojiForEmoji, selectStickersForEmoji } from '../selectors';
-import { updateTabState } from './tabs';
-import { getCurrentTabId } from '../../util/establishMultitabRole';
+import { selectStickersForEmoji } from '../selectors';
 
-export function updateStickerSearch<T extends GlobalState>(
-  global: T,
-  hash: string,
-  resultIds?: string[],
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  return updateTabState(global, {
-    stickerSearch: {
-      ...selectTabState(global, tabId).stickerSearch,
-      hash,
-      resultIds,
-    },
-  }, tabId);
-}
-
-export function updateStickerSets<T extends GlobalState>(
-  global: T,
+export function updateStickerSets(
+  global: GlobalState,
   category: 'added' | 'featured' | 'search',
   hash: string,
   sets: ApiStickerSet[],
-): T {
+  resultIds?: string[],
+): GlobalState {
   const updatedSets = sets.map((stickerSet) => {
     const existing = global.stickers.setsById[stickerSet.id];
     if (!existing) {
@@ -37,21 +21,6 @@ export function updateStickerSets<T extends GlobalState>(
       ...stickerSet,
     };
   });
-
-  const regularSetIds = sets.map((set) => set.id);
-
-  if (category === 'search') {
-    return {
-      ...global,
-      stickers: {
-        ...global.stickers,
-        setsById: {
-          ...global.stickers.setsById,
-          ...buildCollectionByKey(updatedSets, 'id'),
-        },
-      },
-    };
-  }
 
   return {
     ...global,
@@ -64,70 +33,23 @@ export function updateStickerSets<T extends GlobalState>(
       [category]: {
         ...global.stickers[category],
         hash,
-        setIds: [
-          ...(global.stickers[category].setIds || []),
-          ...regularSetIds,
-        ],
+        ...(
+          category === 'search'
+            ? { resultIds }
+            : { setIds: sets.map(({ id }) => id) }
+        ),
       },
     },
   };
 }
 
-export function updateCustomEmojiSets<T extends GlobalState>(
-  global: T,
-  hash: string,
-  sets: ApiStickerSet[],
-): T {
-  const updatedSets = sets.map((stickerSet) => {
-    const existing = global.stickers.setsById[stickerSet.id];
-    if (!existing) {
-      return stickerSet;
-    }
-
-    return {
-      ...existing,
-      ...stickerSet,
-    };
-  });
-
-  const customEmojis = sets.map((set) => set.stickers).flat().filter(Boolean);
-  const addedSetIds = sets.map((set) => set.id);
-
-  return {
-    ...global,
-    stickers: {
-      ...global.stickers,
-      setsById: {
-        ...global.stickers.setsById,
-        ...buildCollectionByKey(updatedSets, 'id'),
-      },
-    },
-    customEmojis: {
-      ...global.customEmojis,
-      added: {
-        ...global.customEmojis.added,
-        hash,
-        setIds: [
-          ...(global.customEmojis.added.setIds || []),
-          ...addedSetIds,
-        ],
-      },
-      byId: {
-        ...global.customEmojis.byId,
-        ...buildCollectionByKey(customEmojis, 'id'),
-      },
-    },
-  };
-}
-
-export function updateStickerSet<T extends GlobalState>(
-  global: T, stickerSetId: string, update: Partial<ApiStickerSet>,
-): T {
+export function updateStickerSet(
+  global: GlobalState, stickerSetId: string, update: Partial<ApiStickerSet>,
+): GlobalState {
   const currentStickerSet = global.stickers.setsById[stickerSetId] || {};
-  const isCustomEmoji = update.isEmoji || currentStickerSet.isEmoji;
-  const addedSets = (isCustomEmoji ? global.customEmojis.added.setIds : global.stickers.added.setIds) || [];
+  const addedSets = global.stickers.added.setIds || [];
   let setIds: string[] = addedSets;
-  if (update.installedDate && !update.isArchived && addedSets && !addedSets.includes(stickerSetId)) {
+  if (update.installedDate && addedSets && !addedSets.includes(stickerSetId)) {
     setIds = [stickerSetId, ...setIds];
   }
 
@@ -135,15 +57,13 @@ export function updateStickerSet<T extends GlobalState>(
     setIds = setIds.filter((id) => id !== stickerSetId);
   }
 
-  const customEmojiById = isCustomEmoji && update.stickers && buildCollectionByKey(update.stickers, 'id');
-
   return {
     ...global,
     stickers: {
       ...global.stickers,
       added: {
         ...global.stickers.added,
-        ...(!isCustomEmoji && { setIds }),
+        setIds,
       },
       setsById: {
         ...global.stickers.setsById,
@@ -153,25 +73,13 @@ export function updateStickerSet<T extends GlobalState>(
         },
       },
     },
-    customEmojis: {
-      ...global.customEmojis,
-      byId: {
-        ...global.customEmojis.byId,
-        ...customEmojiById,
-      },
-      added: {
-        ...global.customEmojis.added,
-        ...(isCustomEmoji && { setIds }),
-      },
-    },
   };
 }
 
-export function updateGifSearch<T extends GlobalState>(
-  global: T, isNew: boolean, results: ApiVideo[], nextOffset?: string,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  const { results: currentResults } = selectTabState(global, tabId).gifSearch;
+export function updateGifSearch(
+  global: GlobalState, isNew: boolean, results: ApiVideo[], nextOffset?: string,
+): GlobalState {
+  const { results: currentResults } = global.gifs.search;
 
   let newResults!: ApiVideo[];
   if (isNew || !currentResults) {
@@ -184,25 +92,29 @@ export function updateGifSearch<T extends GlobalState>(
     ];
   }
 
-  return updateTabState(global, {
-    gifSearch: {
-      ...selectTabState(global, tabId).gifSearch,
-      offset: nextOffset,
-      results: newResults,
+  return {
+    ...global,
+    gifs: {
+      ...global.gifs,
+      search: {
+        ...global.gifs.search,
+        offset: nextOffset,
+        results: newResults,
+      },
     },
-  }, tabId);
+  };
 }
 
-export function replaceAnimatedEmojis<T extends GlobalState>(global: T, stickerSet: ApiStickerSet): T {
+export function replaceAnimatedEmojis(global: GlobalState, stickerSet: ApiStickerSet): GlobalState {
   return {
     ...global,
     animatedEmojis: stickerSet,
   };
 }
 
-export function updateStickersForEmoji<T extends GlobalState>(
-  global: T, emoji: string, remoteStickers?: ApiSticker[], hash?: string,
-): T {
+export function updateStickersForEmoji(
+  global: GlobalState, emoji: string, remoteStickers?: ApiSticker[], hash?: string,
+): GlobalState {
   const localStickers = selectStickersForEmoji(global, emoji);
   const allStickers = [...localStickers, ...(remoteStickers || [])];
   const uniqueIds = unique(allStickers.map(({ id }) => id));
@@ -222,60 +134,11 @@ export function updateStickersForEmoji<T extends GlobalState>(
   };
 }
 
-export function updateCustomEmojiForEmoji<T extends GlobalState>(
-  global: T, emoji: string,
-): T {
-  const localStickers = selectCustomEmojiForEmoji(global, emoji);
-  const uniqueIds = unique(localStickers.map(({ id }) => id));
-  const byId = buildCollectionByKey(localStickers, 'id');
-  const stickers = uniqueIds.map((id) => byId[id]);
-
-  return {
-    ...global,
-    customEmojis: {
-      ...global.customEmojis,
-      forEmoji: {
-        emoji,
-        stickers,
-      },
-    },
-  };
-}
-
-export function updateRecentStatusCustomEmojis<T extends GlobalState>(
-  global: T, hash: string, emojis: ApiSticker[],
-): T {
-  return {
-    ...global,
-    customEmojis: {
-      ...global.customEmojis,
-      statusRecent: {
-        ...global.customEmojis.statusRecent,
-        hash,
-        emojis,
-      },
-    },
-  };
-}
-
-export function rebuildStickersForEmoji<T extends GlobalState>(global: T): T {
-  if (global.stickers.forEmoji) {
-    const { emoji, stickers, hash } = global.stickers.forEmoji;
-    if (!emoji) {
-      return global;
-    }
-
-    return updateStickersForEmoji(global, emoji, stickers, hash);
+export function rebuildStickersForEmoji(global: GlobalState): GlobalState {
+  const { emoji, stickers, hash } = global.stickers.forEmoji || {};
+  if (!emoji) {
+    return global;
   }
 
-  if (global.customEmojis.forEmoji) {
-    const { emoji } = global.customEmojis.forEmoji;
-    if (!emoji) {
-      return global;
-    }
-
-    return updateCustomEmojiForEmoji(global, emoji);
-  }
-
-  return global;
+  return updateStickersForEmoji(global, emoji, stickers, hash);
 }

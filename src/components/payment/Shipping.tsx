@@ -29,7 +29,7 @@ const Shipping: FC<OwnProps> = ({
   const lang = useLang();
 
   useEffect(() => {
-    if (!shippingOptions || !shippingOptions.length || state.shipping) {
+    if (!shippingOptions || state.shipping) {
       return;
     }
     dispatch({ type: 'changeShipping', payload: shippingOptions[0].id });

@@ -1,12 +1,15 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useCallback, useMemo } from '../../../lib/teact/teact';
+import React, { memo, useCallback } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiChat, ApiCountryCode, ApiUser } from '../../../api/types';
 
 import { CHAT_HEIGHT_PX } from '../../../config';
 import { formatPhoneNumberWithCode } from '../../../util/phoneNumber';
-import { getMainUsername, isUserId } from '../../../global/helpers';
+import {
+  getChatTitle, getUserFullName, isUserId,
+} from '../../../global/helpers';
+import renderText from '../../common/helpers/renderText';
 import buildClassName from '../../../util/buildClassName';
 import useLang from '../../../hooks/useLang';
 import useHistoryBack from '../../../hooks/useHistoryBack';
@@ -17,7 +20,6 @@ import FloatingActionButton from '../../ui/FloatingActionButton';
 import Avatar from '../../common/Avatar';
 import Loading from '../../ui/Loading';
 import BlockUserModal from './BlockUserModal';
-import FullNameTitle from '../../common/FullNameTitle';
 
 type OwnProps = {
   isActive?: boolean;
@@ -52,32 +54,15 @@ const SettingsPrivacyBlockedUsers: FC<OwnProps & StateProps> = ({
     onBack: onReset,
   });
 
-  const blockedUsernamesById = useMemo(() => {
-    return blockedIds.reduce((acc, contactId) => {
-      const isPrivate = isUserId(contactId);
-      const user = isPrivate ? usersByIds[contactId] : undefined;
-      const mainUsername = user && !user.phoneNumber && getMainUsername(user);
-
-      if (mainUsername) {
-        acc[contactId] = mainUsername;
-      }
-
-      return acc;
-    }, {} as Record<string, string>);
-  }, [blockedIds, usersByIds]);
-
   function renderContact(contactId: string, i: number, viewportOffset: number) {
     const isPrivate = isUserId(contactId);
     const user = isPrivate ? usersByIds[contactId] : undefined;
     const chat = !isPrivate ? chatsByIds[contactId] : undefined;
-    const userOrChat = user || chat;
 
     const className = buildClassName(
       'Chat chat-item-clickable blocked-list-item small-icon',
       isPrivate ? 'private' : 'group',
     );
-
-    const userMainUsername = blockedUsernamesById[contactId];
 
     return (
       <ListItem
@@ -94,13 +79,15 @@ const SettingsPrivacyBlockedUsers: FC<OwnProps & StateProps> = ({
         }]}
         style={`top: ${(viewportOffset + i) * CHAT_HEIGHT_PX}px;`}
       >
-        <Avatar size="medium" user={user} chat={chat} />
+        <Avatar size="medium" user={user} chat={chat} noVideo />
         <div className="contact-info" dir="auto">
-          {userOrChat && <FullNameTitle peer={userOrChat} />}
+          <h3 dir="auto">{renderText((isPrivate ? getUserFullName(user) : getChatTitle(lang, chat!)) || '')}</h3>
           {user?.phoneNumber && (
             <div className="contact-phone" dir="auto">{formatPhoneNumberWithCode(phoneCodeList, user.phoneNumber)}</div>
           )}
-          {userMainUsername && (<div className="contact-username" dir="auto">@{userMainUsername}</div>)}
+          {user && !user.phoneNumber && user.username && (
+            <div className="contact-username" dir="auto">@{user.username}</div>
+          )}
         </div>
       </ListItem>
     );

@@ -82,10 +82,6 @@ const AuthCode: FC<StateProps> = ({
     }
   }, [authError, clearAuthError, code, isTracking, setAuthCode]);
 
-  function handleReturnToAuthPhoneNumber() {
-    returnToAuthPhoneNumber();
-  }
-
   return (
     <div id="auth-code-form" className="custom-scroll">
       <div className="auth-form">
@@ -99,7 +95,7 @@ const AuthCode: FC<StateProps> = ({
           {authPhoneNumber}
           <div
             className="auth-number-edit"
-            onClick={handleReturnToAuthPhoneNumber}
+            onClick={returnToAuthPhoneNumber}
             role="button"
             tabIndex={0}
             title={lang('WrongNumber')}

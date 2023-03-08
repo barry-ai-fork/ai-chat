@@ -15,31 +15,17 @@ const StatoscopeWebpackPlugin = require('@statoscope/webpack-plugin').default;
 const WebpackContextExtension = require('./dev/webpackContextExtension');
 const appVersion = require('./package.json').version;
 
-const {
-  HEAD,
-  APP_ENV = 'production',
-  APP_MOCKED_CLIENT = '',
-} = process.env;
-
 dotenv.config();
 
-const DEFAULT_APP_TITLE = `Telegram${APP_ENV !== 'production' ? ' Beta' : ''}`;
-
-const {
-  BASE_URL = 'https://web.telegram.org/z/',
-  APP_TITLE = DEFAULT_APP_TITLE,
-} = process.env;
-
-module.exports = (_env, { mode = 'production' }) => {
+module.exports = (env = {}, argv = {}) => {
   return {
-    mode,
+    mode: argv.mode,
     entry: './src/index.tsx',
     target: 'web',
-
     devServer: {
-      port: 1234,
+      port: 5005,
       host: '0.0.0.0',
-      allowedHosts: 'all',
+      allowedHosts: "all",
       hot: false,
       static: [
         {
@@ -69,11 +55,9 @@ module.exports = (_env, { mode = 'production' }) => {
     output: {
       filename: '[name].[contenthash].js',
       chunkFilename: '[id].[chunkhash].js',
-      assetModuleFilename: '[name].[contenthash][ext]',
-      path: path.resolve(__dirname, 'dist'),
-      clean: true,
+      assetModuleFilename: '[name].[contenthash].[ext]',
+      path: path.resolve(__dirname, argv['output-path'] || 'dist'),
     },
-
     module: {
       rules: [
         {
@@ -104,9 +88,9 @@ module.exports = (_env, { mode = 'production' }) => {
                 modules: {
                   exportLocalsConvention: 'camelCase',
                   auto: true,
-                  localIdentName: mode === 'production' ? '[hash:base64]' : '[name]__[local]',
-                },
-              },
+                  localIdentName: argv['optimize-minimize'] ? '[hash:base64]' : '[path][name]__[local]'
+                }
+              }
             },
             'postcss-loader',
             'sass-loader',
@@ -126,34 +110,32 @@ module.exports = (_env, { mode = 'production' }) => {
         },
       ],
     },
-
     resolve: {
       extensions: ['.js', '.ts', '.tsx'],
       fallback: {
+        stream: require.resolve("stream-browserify"),
+        assert: require.resolve("assert/"),
+        crypto: require.resolve('crypto-browserify'),
         path: require.resolve('path-browserify'),
         os: require.resolve('os-browserify/browser'),
         buffer: require.resolve('buffer/'),
         fs: false,
-        crypto: false,
       },
     },
-
     plugins: [
       // Clearing of the unused files for code highlight for smaller chunk count
       new ContextReplacementPlugin(
-        /highlight\.js[\\/]lib[\\/]languages/,
-        /^((?!\.js\.js).)*$/,
+        /highlight\.js\/lib\/languages/,
+        /^((?!\.js\.js).)*$/
       ),
-      ...(APP_MOCKED_CLIENT === '1' ? [new NormalModuleReplacementPlugin(
-        /src[\\/]lib[\\/]gramjs[\\/]client[\\/]TelegramClient\.js/,
-        './MockClient.ts',
+      ...(process.env.APP_MOCKED_CLIENT === '1' ? [new NormalModuleReplacementPlugin(
+        /src\/lib\/gramjs\/client\/TelegramClient\.js/,
+        './MockClient.ts'
       )] : []),
       new HtmlWebpackPlugin({
-        appTitle: APP_TITLE,
-        appleIcon: APP_ENV === 'production' ? 'apple-touch-icon' : 'apple-touch-icon-dev',
-        mainIcon: APP_ENV === 'production' ? 'icon-192x192' : 'icon-dev-192x192',
-        manifest: APP_ENV === 'production' ? 'site.webmanifest' : 'site_dev.webmanifest',
-        baseUrl: BASE_URL,
+        appName: process.env.APP_ENV === 'production' ? 'Telegram Web' : 'Telegram Web Beta',
+        appleIcon: process.env.APP_ENV === 'production' ? 'apple-touch-icon' : 'apple-touch-icon-dev',
+        mainIcon: process.env.APP_ENV === 'production' ? 'icon-192x192' : 'icon-dev-192x192',
         template: 'src/index.html',
       }),
       new MiniCssExtractPlugin({
@@ -162,24 +144,21 @@ module.exports = (_env, { mode = 'production' }) => {
         ignoreOrder: true,
       }),
       new EnvironmentPlugin({
-        APP_ENV,
-        APP_MOCKED_CLIENT,
-        // eslint-disable-next-line no-null/no-null
+        NODE_DEBUG: false,
+        APP_ENV: 'production',
+        APP_MOCKED_CLIENT: '',
         APP_NAME: null,
         APP_VERSION: appVersion,
-        APP_TITLE,
-        RELEASE_DATETIME: Date.now(),
         TELEGRAM_T_API_ID: undefined,
         TELEGRAM_T_API_HASH: undefined,
-        // eslint-disable-next-line no-null/no-null
         TEST_SESSION: null,
       }),
       new DefinePlugin({
         APP_REVISION: DefinePlugin.runtimeValue(() => {
           const { branch, commit } = getGitMetadata();
-          const shouldDisplayCommit = APP_ENV === 'staging' || !branch || branch === 'HEAD';
+          const shouldDisplayCommit = process.env.APP_ENV === 'staging' || !branch || branch === 'HEAD';
           return JSON.stringify(shouldDisplayCommit ? commit : branch);
-        }, mode === 'development' ? true : []),
+        }, argv.mode === 'development' ? true : []),
       }),
       new ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],
@@ -196,19 +175,21 @@ module.exports = (_env, { mode = 'production' }) => {
       }),
     ],
 
-    devtool: 'source-map',
+    ...(!env.noSourceMap && {
+      devtool: 'source-map',
+    }),
 
-    ...(APP_ENV !== 'production' && {
+    ...(process.env.APP_ENV !== 'production' && {
       optimization: {
         chunkIds: 'named',
-      },
+      }
     }),
   };
 };
 
 function getGitMetadata() {
   const gitRevisionPlugin = new GitRevisionPlugin();
-  const branch = HEAD || gitRevisionPlugin.branch();
+  const branch = process.env.HEAD || gitRevisionPlugin.branch();
   const commit = gitRevisionPlugin.commithash().substring(0, 7);
   return { branch, commit };
 }

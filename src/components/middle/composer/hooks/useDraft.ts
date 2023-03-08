@@ -1,82 +1,65 @@
-import { useCallback, useEffect } from '../../../../lib/teact/teact';
+import { useCallback, useEffect, useMemo } from '../../../../lib/teact/teact';
 import { getActions } from '../../../../global';
 
-import type { ApiDraft } from '../../../../global/types';
-import type { ApiMessage } from '../../../../api/types';
-import type { Signal } from '../../../../util/signals';
+import type { ApiFormattedText, ApiMessage } from '../../../../api/types';
 
-import { ApiMessageEntityTypes } from '../../../../api/types';
 import { DRAFT_DEBOUNCE, EDITABLE_INPUT_CSS_SELECTOR } from '../../../../config';
-import { IS_TOUCH_ENV } from '../../../../util/environment';
+import usePrevious from '../../../../hooks/usePrevious';
+import { debounce } from '../../../../util/schedulers';
 import focusEditableElement from '../../../../util/focusEditableElement';
 import parseMessageInput from '../../../../util/parseMessageInput';
-import { getTextWithEntitiesAsHtml } from '../../../common/helpers/renderTextWithEntities';
 import useBackgroundMode from '../../../../hooks/useBackgroundMode';
 import useBeforeUnload from '../../../../hooks/useBeforeUnload';
-import { useStateRef } from '../../../../hooks/useStateRef';
-import useEffectWithPrevDeps from '../../../../hooks/useEffectWithPrevDeps';
-import useRunDebounced from '../../../../hooks/useRunDebounced';
+import { IS_TOUCH_ENV } from '../../../../util/environment';
+import { getTextWithEntitiesAsHtml } from '../../../common/helpers/renderTextWithEntities';
 
-let isFrozen = false;
-
-function freeze() {
-  isFrozen = true;
-  requestAnimationFrame(() => {
-    isFrozen = false;
-  });
-}
+// Used to avoid running debounced callbacks when chat changes.
+let currentChatId: string | undefined;
+let currentThreadId: number | undefined;
 
 const useDraft = (
-  draft: ApiDraft | undefined,
+  draft: ApiFormattedText | undefined,
   chatId: string,
   threadId: number,
-  getHtml: Signal<string>,
+  htmlRef: { current: string },
   setHtml: (html: string) => void,
   editedMessage: ApiMessage | undefined,
-  lastSyncTime?: number,
 ) => {
-  const { saveDraft, clearDraft, loadCustomEmojis } = getActions();
+  const { saveDraft, clearDraft } = getActions();
 
-  const isEditing = Boolean(editedMessage);
-
-  const updateDraft = useCallback((prevState: { chatId?: string; threadId?: number } = {}, shouldForce = false) => {
-    if (isEditing || !lastSyncTime) return;
-
-    const html = getHtml();
-
-    if (html) {
-      saveDraft({
-        chatId: prevState.chatId ?? chatId,
-        threadId: prevState.threadId ?? threadId,
-        draft: parseMessageInput(html),
-        shouldForce,
-      });
+  const updateDraft = useCallback((draftChatId: string, draftThreadId: number) => {
+    const currentHtml = htmlRef.current;
+    if (currentHtml === undefined || editedMessage) return;
+    if (currentHtml.length) {
+      saveDraft({ chatId: draftChatId, threadId: draftThreadId, draft: parseMessageInput(currentHtml!) });
     } else {
-      clearDraft({
-        chatId: prevState.chatId ?? chatId,
-        threadId: prevState.threadId ?? threadId,
-        shouldForce,
-      });
+      clearDraft({ chatId: draftChatId, threadId: draftThreadId });
     }
-  }, [chatId, threadId, isEditing, lastSyncTime, getHtml, saveDraft, clearDraft]);
+  }, [clearDraft, editedMessage, htmlRef, saveDraft]);
 
-  const forceUpdateDraft = useCallback(() => {
-    updateDraft(undefined, true);
-  }, [updateDraft]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const runDebouncedForSaveDraft = useMemo(() => debounce((cb) => cb(), DRAFT_DEBOUNCE, false), [chatId]);
 
-  const updateDraftRef = useStateRef(updateDraft);
-  const runDebouncedForSaveDraft = useRunDebounced(DRAFT_DEBOUNCE, true, undefined, [chatId, threadId]);
+  const prevChatId = usePrevious(chatId);
+  const prevThreadId = usePrevious(threadId);
+
+  // Save draft on chat change
+  useEffect(() => {
+    currentChatId = chatId;
+    currentThreadId = threadId;
+
+    return () => {
+      currentChatId = undefined;
+      currentThreadId = undefined;
+
+      updateDraft(chatId, threadId);
+    };
+  }, [chatId, threadId, updateDraft]);
 
   // Restore draft on chat change
-  useEffectWithPrevDeps(([prevChatId, prevThreadId, prevDraft]) => {
+  useEffect(() => {
     if (chatId === prevChatId && threadId === prevThreadId) {
-      if (!draft && prevDraft) {
-        setHtml('');
-      }
-
-      if (!draft?.shouldForce) {
-        return;
-      }
+      return;
     }
 
     if (editedMessage || !draft) {
@@ -84,11 +67,6 @@ const useDraft = (
     }
 
     setHtml(getTextWithEntitiesAsHtml(draft));
-
-    const customEmojiIds = draft.entities
-      ?.map((entity) => entity.type === ApiMessageEntityTypes.CustomEmoji && entity.documentId)
-      .filter(Boolean) || [];
-    if (customEmojiIds.length) loadCustomEmojis({ ids: customEmojiIds });
 
     if (!IS_TOUCH_ENV) {
       requestAnimationFrame(() => {
@@ -98,49 +76,37 @@ const useDraft = (
         }
       });
     }
-    // eslint-disable-next-line react-hooks-static-deps/exhaustive-deps
-  }, [
-    chatId, threadId, draft, setHtml, editedMessage, loadCustomEmojis,
-  ] as const);
+  }, [chatId, threadId, draft, setHtml, updateDraft, prevChatId, prevThreadId, editedMessage]);
 
-  // Save draft on chat change
+  const html = htmlRef.current;
+  // Update draft when input changes
+  const prevHtml = usePrevious(html);
   useEffect(() => {
-    return () => {
-      // eslint-disable-next-line react-hooks-static-deps/exhaustive-deps
-      if (!isEditing) {
-        // eslint-disable-next-line react-hooks-static-deps/exhaustive-deps
-        updateDraftRef.current({ chatId, threadId });
-      }
-
-      freeze();
-    };
-  }, [chatId, threadId, isEditing, updateDraftRef]);
-
-  const chatIdRef = useStateRef(chatId);
-  const threadIdRef = useStateRef(threadId);
-  useEffect(() => {
-    if (isFrozen) {
+    if (!chatId || !threadId || prevChatId !== chatId || prevThreadId !== threadId || prevHtml === html) {
       return;
     }
 
-    if (!getHtml()) {
-      updateDraftRef.current();
+    if (html.length) {
+      runDebouncedForSaveDraft(() => {
+        if (currentChatId !== chatId || currentThreadId !== threadId) {
+          return;
+        }
 
-      return;
+        updateDraft(chatId, threadId);
+      });
+    } else {
+      updateDraft(chatId, threadId);
     }
+  }, [chatId, html, prevChatId, prevHtml, prevThreadId, runDebouncedForSaveDraft, threadId, updateDraft]);
 
-    const scopedShatId = chatIdRef.current;
-    const scopedThreadId = threadIdRef.current;
+  const handleBlur = useCallback(() => {
+    if (chatId && threadId) {
+      updateDraft(chatId, threadId);
+    }
+  }, [chatId, threadId, updateDraft]);
 
-    runDebouncedForSaveDraft(() => {
-      if (chatIdRef.current === scopedShatId && threadIdRef.current === scopedThreadId) {
-        updateDraftRef.current();
-      }
-    });
-  }, [chatIdRef, getHtml, runDebouncedForSaveDraft, threadIdRef, updateDraftRef]);
-
-  useBackgroundMode(forceUpdateDraft);
-  useBeforeUnload(forceUpdateDraft);
+  useBackgroundMode(handleBlur);
+  useBeforeUnload(handleBlur);
 };
 
 export default useDraft;

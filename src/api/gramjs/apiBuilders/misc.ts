@@ -1,12 +1,11 @@
 import { Api as GramJs } from '../../../lib/gramjs';
 
 import type {
-  ApiConfig,
   ApiCountry, ApiSession, ApiUrlAuthResult, ApiWallpaper, ApiWebSession,
 } from '../../types';
 import type { ApiPrivacySettings, ApiPrivacyKey, PrivacyVisibility } from '../../../types';
 
-import { buildApiDocument, buildApiReaction } from './messages';
+import { buildApiDocument } from './messages';
 import { buildApiPeerId, getApiChatIdFromMtpPeer } from './peers';
 import { pick } from '../../../util/iteratees';
 import { getServerTime } from '../../../util/serverTime';
@@ -72,8 +71,6 @@ export function buildPrivacyKey(key: GramJs.TypePrivacyKey): ApiPrivacyKey | und
       return 'phoneP2P';
     case 'PrivacyKeyForwards':
       return 'forwards';
-    case 'PrivacyKeyVoiceMessages':
-      return 'voiceMessages';
     case 'PrivacyKeyChatInvite':
       return 'chatInvite';
   }
@@ -123,7 +120,7 @@ export function buildPrivacyRules(rules: GramJs.TypePrivacyRule[]): ApiPrivacySe
 }
 
 export function buildApiNotifyException(
-  notifySettings: GramJs.TypePeerNotifySettings, peer: GramJs.TypePeer,
+  notifySettings: GramJs.TypePeerNotifySettings, peer: GramJs.TypePeer, serverTimeOffset: number,
 ) {
   const {
     silent, muteUntil, showPreviews, otherSound,
@@ -133,25 +130,7 @@ export function buildApiNotifyException(
 
   return {
     chatId: getApiChatIdFromMtpPeer(peer),
-    isMuted: silent || (typeof muteUntil === 'number' && getServerTime() < muteUntil),
-    ...(!hasSound && { isSilent: true }),
-    ...(showPreviews !== undefined && { shouldShowPreviews: Boolean(showPreviews) }),
-  };
-}
-
-export function buildApiNotifyExceptionTopic(
-  notifySettings: GramJs.TypePeerNotifySettings, peer: GramJs.TypePeer, topicId: number,
-) {
-  const {
-    silent, muteUntil, showPreviews, otherSound,
-  } = notifySettings;
-
-  const hasSound = Boolean(otherSound && !(otherSound instanceof GramJs.NotificationSoundNone));
-
-  return {
-    chatId: getApiChatIdFromMtpPeer(peer),
-    topicId,
-    isMuted: silent || (typeof muteUntil === 'number' && getServerTime() < muteUntil),
+    isMuted: silent || (typeof muteUntil === 'number' && getServerTime(serverTimeOffset) < muteUntil),
     ...(!hasSound && { isSilent: true }),
     ...(showPreviews !== undefined && { shouldShowPreviews: Boolean(showPreviews) }),
   };
@@ -239,14 +218,4 @@ export function buildApiUrlAuthResult(result: GramJs.TypeUrlAuthResult): ApiUrlA
     };
   }
   return undefined;
-}
-
-export function buildApiConfig(config: GramJs.Config): ApiConfig {
-  const defaultReaction = config.reactionsDefault && buildApiReaction(config.reactionsDefault);
-  return {
-    expiresAt: config.expires,
-    gifSearchUsername: config.gifSearchUsername,
-    defaultReaction,
-    maxGroupSize: config.chatSizeMax,
-  };
 }

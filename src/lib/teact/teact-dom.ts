@@ -5,7 +5,6 @@ import type {
   VirtualElementParent,
   VirtualElementChildren,
   VirtualElementReal,
-  VirtualElementFragment,
 } from './teact';
 import {
   hasElementChanged,
@@ -17,21 +16,15 @@ import {
   mountComponent,
   renderComponent,
   unmountComponent,
-  isFragmentElement,
 } from './teact';
+import generateIdFor from '../../util/generateIdFor';
 import { DEBUG } from '../../config';
 import { addEventListener, removeAllDelegatedListeners, removeEventListener } from './dom-events';
 import { unique } from '../../util/iteratees';
 
-interface VirtualDomHead {
+type VirtualDomHead = {
   children: [VirtualElement] | [];
-}
-
-interface SelectionState {
-  selectionStart: number | null;
-  selectionEnd: number | null;
-  isCaretAtEnd: boolean;
-}
+};
 
 const FILTERED_ATTRIBUTES = new Set(['key', 'ref', 'teactFastList', 'teactOrderKey']);
 const HTML_ATTRIBUTES = new Set(['dir', 'role', 'form']);
@@ -42,16 +35,19 @@ const MAPPED_ATTRIBUTES: { [k: string]: string } = {
 };
 const INDEX_KEY_PREFIX = '__indexKey#';
 
-const headsByElement = new WeakMap<HTMLElement, VirtualDomHead>();
+const headsByElement: Record<string, VirtualDomHead> = {};
 // eslint-disable-next-line @typescript-eslint/naming-convention
 let DEBUG_virtualTreeSize = 1;
 
 function render($element: VirtualElement | undefined, parentEl: HTMLElement) {
-  if (!headsByElement.has(parentEl)) {
-    headsByElement.set(parentEl, { children: [] });
+  let headId = parentEl.getAttribute('data-teact-head-id');
+  if (!headId) {
+    headId = generateIdFor(headsByElement);
+    headsByElement[headId] = { children: [] };
+    parentEl.setAttribute('data-teact-head-id', headId);
   }
 
-  const $head = headsByElement.get(parentEl)!;
+  const $head = headsByElement[headId];
   const $newElement = renderWithVirtual(parentEl, $head.children[0], $element, $head, 0);
   $head.children = $newElement ? [$newElement] : [];
 
@@ -84,9 +80,6 @@ function renderWithVirtual<T extends VirtualElement | undefined>(
   const isNewComponent = $new && isComponentElement($new);
   const $newAsReal = $new as VirtualElementReal;
 
-  const isCurrentFragment = $current && !isCurrentComponent && isFragmentElement($current);
-  const isNewFragment = $new && !isNewComponent && isFragmentElement($new);
-
   if (
     !skipComponentUpdate
     && isCurrentComponent && isNewComponent
@@ -105,7 +98,6 @@ function renderWithVirtual<T extends VirtualElement | undefined>(
   }
 
   if (DEBUG && $new) {
-    // @ts-ignore TS 4.9 bug https://github.com/microsoft/TypeScript/issues/51501
     const newTarget = 'target' in $new && $new.target;
     if (newTarget && (!$current || ('target' in $current && newTarget !== $current.target))) {
       throw new Error('[Teact] Cached virtual element was moved within tree');
@@ -113,12 +105,9 @@ function renderWithVirtual<T extends VirtualElement | undefined>(
   }
 
   if (!$current && $new) {
-    if (isNewComponent || isNewFragment) {
-      if (isNewComponent) {
-        $new = initComponent(parentEl, $new as VirtualElementComponent, $parent, index) as unknown as typeof $new;
-      }
-
-      mountChildren(parentEl, $new as VirtualElementComponent | VirtualElementFragment, { nextSibling, fragment });
+    if (isNewComponent) {
+      $new = initComponent(parentEl, $new as VirtualElementComponent, $parent, index) as typeof $new;
+      mountComponentChildren(parentEl, $new as VirtualElementComponent, { nextSibling, fragment });
     } else {
       const node = createNode($newAsReal);
       $newAsReal.target = node;
@@ -132,13 +121,10 @@ function renderWithVirtual<T extends VirtualElement | undefined>(
         nextSibling = getNextSibling($current);
       }
 
-      if (isNewComponent || isNewFragment) {
-        if (isNewComponent) {
-          $new = initComponent(parentEl, $new as VirtualElementComponent, $parent, index) as unknown as typeof $new;
-        }
-
+      if (isNewComponent) {
+        $new = initComponent(parentEl, $new as VirtualElementComponent, $parent, index) as typeof $new;
         remount(parentEl, $current, undefined);
-        mountChildren(parentEl, $new as VirtualElementComponent | VirtualElementFragment, { nextSibling, fragment });
+        mountComponentChildren(parentEl, $new as VirtualElementComponent, { nextSibling, fragment });
       } else {
         const node = createNode($newAsReal);
         $newAsReal.target = node;
@@ -146,12 +132,10 @@ function renderWithVirtual<T extends VirtualElement | undefined>(
       }
     } else {
       const isComponent = isCurrentComponent && isNewComponent;
-      const isFragment = isCurrentFragment && isNewFragment;
-
-      if (isComponent || isFragment) {
-        ($new as VirtualElementComponent | VirtualElementFragment).children = renderChildren(
+      if (isComponent) {
+        ($new as VirtualElementComponent).children = renderChildren(
           $current,
-          $new as VirtualElementComponent | VirtualElementFragment,
+          $new as VirtualElementComponent,
           parentEl,
           nextSibling,
         );
@@ -236,20 +220,16 @@ function setupComponentUpdateListener(
   };
 }
 
-function mountChildren(
-  parentEl: HTMLElement,
-  $element: VirtualElementComponent | VirtualElementFragment,
-  options: {
-    nextSibling?: ChildNode;
-    fragment?: DocumentFragment;
-  },
-) {
+function mountComponentChildren(parentEl: HTMLElement, $element: VirtualElementComponent, options: {
+  nextSibling?: ChildNode;
+  fragment?: DocumentFragment;
+}) {
   $element.children = $element.children.map(($child, i) => {
     return renderWithVirtual(parentEl, undefined, $child, $element, i, options);
   });
 }
 
-function unmountChildren(parentEl: HTMLElement, $element: VirtualElementComponent | VirtualElementFragment) {
+function unmountComponentChildren(parentEl: HTMLElement, $element: VirtualElementComponent) {
   $element.children.forEach(($child) => {
     renderWithVirtual(parentEl, $child, undefined, $element, -1);
   });
@@ -269,8 +249,6 @@ function createNode($element: VirtualElementReal): Node {
 
   if (typeof props.ref === 'object') {
     props.ref.current = element;
-  } else if (typeof props.ref === 'function') {
-    props.ref(element);
   }
 
   processControlled(tag, props);
@@ -296,15 +274,9 @@ function remount(
   node: Node | undefined,
   componentNextSibling?: ChildNode,
 ) {
-  const isComponent = isComponentElement($current);
-  const isFragment = !isComponent && isFragmentElement($current);
-
-  if (isComponent || isFragment) {
-    if (isComponent) {
-      unmountComponent($current.componentInstance);
-    }
-
-    unmountChildren(parentEl, $current);
+  if (isComponentElement($current)) {
+    unmountComponent($current.componentInstance);
+    unmountComponentChildren(parentEl, $current);
 
     if (node) {
       insertBefore(parentEl, node, componentNextSibling);
@@ -327,10 +299,10 @@ export function unmountRealTree($element: VirtualElement) {
     if (isTagElement($element)) {
       if ($element.target) {
         removeAllDelegatedListeners($element.target as HTMLElement);
+      }
 
-        if ($element.props.ref?.current === $element.target) {
-          $element.props.ref.current = undefined;
-        }
+      if ($element.props.ref) {
+        $element.props.ref.current = undefined; // Help GC
       }
     }
 
@@ -355,7 +327,7 @@ function insertBefore(parentEl: HTMLElement | DocumentFragment, node: Node, next
 }
 
 function getNextSibling($current: VirtualElement): ChildNode | undefined {
-  if (isComponentElement($current) || isFragmentElement($current)) {
+  if (isComponentElement($current)) {
     const lastChild = $current.children[$current.children.length - 1];
     return getNextSibling(lastChild);
   }
@@ -372,7 +344,7 @@ function renderChildren(
     DEBUG_checkKeyUniqueness($new.children);
   }
 
-  if (('props' in $new) && $new.props.teactFastList) {
+  if ($new.props.teactFastList) {
     return renderFastListChildren($current, $new, currentEl);
   }
 
@@ -414,18 +386,12 @@ function renderChildren(
 function renderFastListChildren($current: VirtualElementParent, $new: VirtualElementParent, currentEl: HTMLElement) {
   const newKeys = new Set(
     $new.children.map(($newChild) => {
-      const key = 'props' in $newChild ? $newChild.props.key : undefined;
+      const key = 'props' in $newChild && $newChild.props.key;
 
-      if (DEBUG && isParentElement($newChild)) {
-        // eslint-disable-next-line no-null/no-null
-        if (key === undefined || key === null) {
-          // eslint-disable-next-line no-console
-          console.warn('Missing `key` in `teactFastList`');
-        }
-
-        if (isFragmentElement($newChild)) {
-          throw new Error('[Teact] Fragment can not be child of container with `teactFastList`');
-        }
+      // eslint-disable-next-line no-null/no-null
+      if (DEBUG && isParentElement($newChild) && (key === undefined || key === null)) {
+        // eslint-disable-next-line no-console
+        console.warn('Missing `key` in `teactFastList`');
       }
 
       return key;
@@ -565,19 +531,8 @@ function processControlled(tag: string, props: AnyLiteral) {
     onInput?.(e);
     onChange?.(e);
 
-    if (value !== undefined && value !== e.currentTarget.value) {
-      const { selectionStart, selectionEnd } = e.currentTarget;
-      const isCaretAtEnd = selectionStart === selectionEnd && selectionEnd === e.currentTarget.value.length;
-
+    if (value !== undefined) {
       e.currentTarget.value = value;
-
-      if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
-        e.currentTarget.setSelectionRange(selectionStart, selectionEnd);
-
-        const selectionState: SelectionState = { selectionStart, selectionEnd, isCaretAtEnd };
-        // eslint-disable-next-line no-underscore-dangle
-        e.currentTarget.dataset.__teactSelectionState = JSON.stringify(selectionState);
-      }
     }
 
     if (checked !== undefined) {
@@ -600,7 +555,7 @@ function processUncontrolledOnMount(element: HTMLElement, props: AnyLiteral) {
   }
 }
 
-function updateAttributes($current: VirtualElementTag, $new: VirtualElementTag, element: HTMLElement) {
+function updateAttributes($current: VirtualElementParent, $new: VirtualElementParent, element: HTMLElement) {
   processControlled(element.tagName, $new.props);
 
   const currentEntries = Object.entries($current.props);
@@ -635,23 +590,8 @@ function setAttribute(element: HTMLElement, key: string, value: any) {
     element.className = value;
     // An optimization attempt
   } else if (key === 'value') {
-    const inputEl = element as HTMLInputElement;
-
-    if (inputEl.value !== value) {
-      inputEl.value = value;
-
-      // eslint-disable-next-line no-underscore-dangle
-      const selectionStateJson = inputEl.dataset.__teactSelectionState;
-      if (selectionStateJson) {
-        const { selectionStart, selectionEnd, isCaretAtEnd } = JSON.parse(selectionStateJson) as SelectionState;
-
-        if (isCaretAtEnd) {
-          const length = inputEl.value.length;
-          inputEl.setSelectionRange(length, length);
-        } else if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
-          inputEl.setSelectionRange(selectionStart, selectionEnd);
-        }
-      }
+    if ((element as HTMLInputElement).value !== value) {
+      (element as HTMLInputElement).value = value;
     }
   } else if (key === 'style') {
     element.style.cssText = value;
@@ -678,8 +618,10 @@ function removeAttribute(element: HTMLElement, key: string, value: any) {
     element.innerHTML = '';
   } else if (key.startsWith('on')) {
     removeEventListener(element, key, value, key.endsWith('Capture'));
-  } else if (!FILTERED_ATTRIBUTES.has(key)) {
+  } else if (key.startsWith('data-') || key.startsWith('aria-') || HTML_ATTRIBUTES.has(key)) {
     element.removeAttribute(key);
+  } else if (!FILTERED_ATTRIBUTES.has(key)) {
+    delete (element as any)[MAPPED_ATTRIBUTES[key] || key];
   }
 }
 
@@ -707,8 +649,6 @@ function DEBUG_checkKeyUniqueness(children: VirtualElementChildren) {
     }, []);
 
     if (keys.length !== unique(keys).length) {
-      // eslint-disable-next-line no-console
-      console.warn('[Teact] Duplicated keys:', keys.filter((e, i, a) => a.indexOf(e) !== i));
       throw new Error('[Teact] Children keys are not unique');
     }
   }

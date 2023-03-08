@@ -1,28 +1,20 @@
-import type { GlobalState, TabArgs } from '../types';
+import type { GlobalState } from '../types';
 
 import { selectCurrentMessageList } from './messages';
 import { selectChat } from './chats';
 import { isChatGroup, isUserId } from '../helpers';
-import { selectTabState } from './tabs';
-import { getCurrentTabId } from '../../util/establishMultitabRole';
 
-export function selectManagement<T extends GlobalState>(
-  global: T, chatId: string,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-) {
-  return selectTabState(global, tabId).management.byChatId[chatId];
+export function selectManagement(global: GlobalState, chatId: string) {
+  return global.management.byChatId[chatId];
 }
 
-export function selectCurrentManagement<T extends GlobalState>(
-  global: T,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-) {
-  const { chatId, threadId } = selectCurrentMessageList(global, tabId) || {};
+export function selectCurrentManagement(global: GlobalState) {
+  const { chatId, threadId } = selectCurrentMessageList(global) || {};
   if (!chatId || !threadId) {
     return undefined;
   }
 
-  const currentManagement = selectTabState(global, tabId).management.byChatId[chatId];
+  const currentManagement = global.management.byChatId[chatId];
   if (!currentManagement || !currentManagement.isActive) {
     return undefined;
   }
@@ -30,11 +22,8 @@ export function selectCurrentManagement<T extends GlobalState>(
   return currentManagement;
 }
 
-export function selectCurrentManagementType<T extends GlobalState>(
-  global: T,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-) {
-  const { chatId, threadId } = selectCurrentMessageList(global, tabId) || {};
+export function selectCurrentManagementType(global: GlobalState) {
+  const { chatId, threadId } = selectCurrentMessageList(global) || {};
   if (!chatId || !threadId) {
     return undefined;
   }

@@ -6,7 +6,7 @@
 .text {
   display: flex;
   flex-direction: column;
-  margin-inline-start: 1.75rem !important;
+  margin-left: 1.75rem !important;
 }
 
 .header {
@@ -14,17 +14,13 @@
 }
 
 .description {
-  font-size: 0.875rem;
+  font-size: 14px;
   color: var(--color-text-secondary);
   white-space: pre-wrap;
-  line-height: 1.25rem;
-  min-height: 2.5rem;
+  line-height: 20px;
+  min-height: 40px;
 }
 
 .icon {
   min-width: 2rem;
-  height: 2rem;
-  align-self: center;
-  border-radius: 0.625rem;
-  background: var(--item-color, #000);
 }

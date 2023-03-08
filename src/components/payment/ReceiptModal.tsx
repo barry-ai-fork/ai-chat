@@ -1,14 +1,11 @@
-import React, { memo, useMemo, useEffect } from '../../lib/teact/teact';
-import { withGlobal } from '../../global';
-
 import type { FC } from '../../lib/teact/teact';
+import React, { memo, useMemo } from '../../lib/teact/teact';
+import { withGlobal } from '../../global';
 
 import type { Price } from '../../types';
 import type { ApiShippingAddress, ApiWebDocument } from '../../api/types';
 
-import { selectTabState } from '../../global/selectors';
 import useLang from '../../hooks/useLang';
-import useFlag from '../../hooks/useFlag';
 
 import Checkout from './Checkout';
 import Modal from '../ui/Modal';
@@ -24,7 +21,6 @@ export type OwnProps = {
 type StateProps = {
   prices?: Price[];
   shippingPrices: any;
-  tipAmount?: number;
   totalAmount?: number;
   currency?: string;
   info?: {
@@ -44,7 +40,6 @@ const ReceiptModal: FC<OwnProps & StateProps> = ({
   onClose,
   prices,
   shippingPrices,
-  tipAmount,
   totalAmount,
   currency,
   info,
@@ -55,35 +50,15 @@ const ReceiptModal: FC<OwnProps & StateProps> = ({
   shippingMethod,
 }) => {
   const lang = useLang();
-
-  const [isModalOpen, openModal, closeModal] = useFlag();
-
-  useEffect(() => {
-    if (isOpen) {
-      openModal();
-    }
-  }, [isOpen, openModal]);
-
   const checkoutInfo = useMemo(() => {
     return getCheckoutInfo(credentialsTitle, info, shippingMethod);
   }, [info, shippingMethod, credentialsTitle]);
 
-  const invoice = useMemo(() => {
-    return {
-      photo,
-      text: text!,
-      title: title!,
-      amount: totalAmount!,
-      currency: currency!,
-    };
-  }, [currency, photo, text, title, totalAmount]);
-
   return (
     <Modal
       className="PaymentModal PaymentModal-receipt"
-      isOpen={isModalOpen}
-      onClose={closeModal}
-      onCloseAnimationEnd={onClose}
+      isOpen={isOpen}
+      onClose={onClose}
     >
       <div>
         <div className="header" dir={lang.isRtl ? 'rtl' : undefined}>
@@ -92,7 +67,7 @@ const ReceiptModal: FC<OwnProps & StateProps> = ({
             color="translucent"
             round
             size="smaller"
-            onClick={closeModal}
+            onClick={onClose}
             ariaLabel="Close"
           >
             <i className="icon-close" />
@@ -104,8 +79,11 @@ const ReceiptModal: FC<OwnProps & StateProps> = ({
             prices={prices}
             shippingPrices={shippingPrices}
             totalPrice={totalAmount}
-            tipAmount={tipAmount}
-            invoice={invoice}
+            invoiceContent={{
+              photo,
+              text,
+              title,
+            }}
             checkoutInfo={checkoutInfo}
             currency={currency!}
           />
@@ -117,7 +95,7 @@ const ReceiptModal: FC<OwnProps & StateProps> = ({
 
 export default memo(withGlobal<OwnProps>(
   (global): StateProps => {
-    const { receipt } = selectTabState(global).payment;
+    const { receipt } = global.payment;
     const {
       currency,
       prices,
@@ -129,14 +107,12 @@ export default memo(withGlobal<OwnProps>(
       photo,
       text,
       title,
-      tipAmount,
     } = (receipt || {});
 
     return {
       currency,
       prices,
       info,
-      tipAmount,
       totalAmount,
       credentialsTitle,
       shippingPrices,

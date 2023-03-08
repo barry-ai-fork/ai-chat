@@ -4,21 +4,7 @@ import { pause } from '../util/schedulers';
 declare const self: ServiceWorkerGlobalScope;
 
 // An attempt to fix freezing UI on iOS
-const TIMEOUT = 3000;
-
-export async function respondWithCacheNetworkFirst(e: FetchEvent) {
-  const remote = await withTimeout(() => fetch(e.request), TIMEOUT);
-  if (!remote?.ok) {
-    return respondWithCache(e);
-  }
-
-  const toCache = remote.clone();
-  self.caches.open(ASSET_CACHE_NAME).then((cache) => {
-    return cache?.put(e.request, toCache);
-  });
-
-  return remote;
-}
+const CACHE_TIMEOUT = 3000;
 
 export async function respondWithCache(e: FetchEvent) {
   const cacheResult = await withTimeout(async () => {
@@ -26,7 +12,7 @@ export async function respondWithCache(e: FetchEvent) {
     const cached = await cache.match(e.request);
 
     return { cache, cached };
-  }, TIMEOUT);
+  }, CACHE_TIMEOUT);
 
   const { cache, cached } = cacheResult || {};
 

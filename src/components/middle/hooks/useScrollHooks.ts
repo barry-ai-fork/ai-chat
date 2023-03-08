@@ -9,7 +9,7 @@ import { LOCAL_MESSAGE_MIN_ID, MESSAGE_LIST_SLICE } from '../../../config';
 import { IS_SCROLL_PATCH_NEEDED, MESSAGE_LIST_SENSITIVE_AREA } from '../../../util/environment';
 import { debounce } from '../../../util/schedulers';
 import { useIntersectionObserver, useOnIntersect } from '../../../hooks/useIntersectionObserver';
-import useSyncEffect from '../../../hooks/useSyncEffect';
+import useOnChange from '../../../hooks/useOnChange';
 
 const FAB_THRESHOLD = 50;
 const NOTCH_THRESHOLD = 1; // Notch has zero height so we at least need a 1px margin to intersect
@@ -34,7 +34,7 @@ export default function useScrollHooks(
       debounce(() => loadViewportMessages({ direction: LoadMoreDirection.Backwards }), 1000, true, false),
       debounce(() => loadViewportMessages({ direction: LoadMoreDirection.Forwards }), 1000, true, false),
     ] : []),
-    // eslint-disable-next-line react-hooks-static-deps/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [loadViewportMessages, messageIds],
   );
 
@@ -68,8 +68,6 @@ export default function useScrollHooks(
     const scrollBottom = Math.round(scrollHeight - scrollTop - offsetHeight);
     const isNearBottom = scrollBottom <= FAB_THRESHOLD;
     const isAtBottom = scrollBottom <= NOTCH_THRESHOLD;
-
-    if (scrollHeight === 0) return;
 
     onFabToggle(isUnread ? !isAtBottom : !isNearBottom);
     onNotchToggle(!isAtBottom);
@@ -136,16 +134,14 @@ export default function useScrollHooks(
 
   useOnIntersect(fabTriggerRef, observeIntersectionForNotch);
 
-  const toggleScrollToolsRef = useRef<typeof toggleScrollTools>();
-  toggleScrollToolsRef.current = toggleScrollTools;
-  useSyncEffect(() => {
+  useOnChange(() => {
     if (isReady) {
-      toggleScrollToolsRef.current!();
+      toggleScrollTools();
     }
   }, [isReady]);
 
   // Workaround for FAB and notch flickering with tall incoming message
-  useSyncEffect(() => {
+  useOnChange(() => {
     freezeForFab();
     freezeForNotch();
 
@@ -153,7 +149,7 @@ export default function useScrollHooks(
       unfreezeForNotch();
       unfreezeForFab();
     }, TOOLS_FREEZE_TIMEOUT);
-  }, [freezeForFab, freezeForNotch, messageIds, unfreezeForFab, unfreezeForNotch]);
+  }, [messageIds]);
 
   return { backwardsTriggerRef, forwardsTriggerRef, fabTriggerRef };
 }

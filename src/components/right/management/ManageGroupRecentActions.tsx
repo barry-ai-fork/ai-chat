@@ -30,11 +30,11 @@ const ManageGroupRecentActions: FC<OwnProps & StateProps> = ({ chat, onClose, is
   });
 
   const adminMembers = useMemo(() => {
-    if (!chat?.fullInfo?.adminMembersById) {
+    if (!chat || !chat.fullInfo || !chat.fullInfo.adminMembers) {
       return [];
     }
 
-    return Object.values(chat.fullInfo.adminMembersById).sort((a, b) => {
+    return chat.fullInfo.adminMembers.sort((a, b) => {
       if (a.isOwner) {
         return -1;
       } else if (b.isOwner) {

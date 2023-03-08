@@ -1,11 +1,11 @@
 import type { FC } from '../../lib/teact/teact';
 import React, {
-  memo, useEffect, useRef,
+  memo, useEffect, useRef, useState,
 } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
 import { throttle } from '../../util/schedulers';
-import { selectCurrentStickerSearch, selectTabState } from '../../global/selectors';
+import { selectCurrentStickerSearch } from '../../global/selectors';
 import { useIntersectionObserver } from '../../hooks/useIntersectionObserver';
 import useLang from '../../hooks/useLang';
 import useHistoryBack from '../../hooks/useHistoryBack';
@@ -24,7 +24,6 @@ type StateProps = {
   query?: string;
   featuredIds?: string[];
   resultIds?: string[];
-  isModalOpen: boolean;
 };
 
 const INTERSECTION_THROTTLE = 200;
@@ -32,12 +31,11 @@ const INTERSECTION_THROTTLE = 200;
 const runThrottled = throttle((cb) => cb(), 60000, true);
 
 const StickerSearch: FC<OwnProps & StateProps> = ({
+  onClose,
   isActive,
   query,
   featuredIds,
   resultIds,
-  isModalOpen,
-  onClose,
 }) => {
   const { loadFeaturedStickers } = getActions();
 
@@ -45,6 +43,8 @@ const StickerSearch: FC<OwnProps & StateProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const lang = useLang();
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const {
     observe: observeIntersection,
@@ -74,7 +74,8 @@ const StickerSearch: FC<OwnProps & StateProps> = ({
           key={id}
           stickerSetId={id}
           observeIntersection={observeIntersection}
-          isModalOpen={isModalOpen}
+          isSomeModalOpen={isModalOpen}
+          onModalToggle={setIsModalOpen}
         />
       ));
     }
@@ -89,7 +90,8 @@ const StickerSearch: FC<OwnProps & StateProps> = ({
           key={id}
           stickerSetId={id}
           observeIntersection={observeIntersection}
-          isModalOpen={isModalOpen}
+          isSomeModalOpen={isModalOpen}
+          onModalToggle={setIsModalOpen}
         />
       ));
     }
@@ -114,7 +116,6 @@ export default memo(withGlobal(
       query,
       featuredIds: featured.setIds,
       resultIds,
-      isModalOpen: Boolean(selectTabState(global).openedStickerSetShortName),
     };
   },
 )(StickerSearch));

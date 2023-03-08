@@ -1,5 +1,5 @@
 import {
-  addActionHandler, getGlobal, setGlobal,
+  addActionHandler, getActions, getGlobal, setGlobal,
 } from '../../index';
 
 import type { ApiChat } from '../../../api/types';
@@ -23,14 +23,11 @@ import {
   updateLocalTextSearchResults,
 } from '../../reducers';
 import type { SharedMediaType } from '../../../types';
-import type { ActionReturnType, GlobalState, TabArgs } from '../../types';
-import { getCurrentTabId } from '../../../util/establishMultitabRole';
 
-addActionHandler('searchTextMessagesLocal', async (global, actions, payload): Promise<void> => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  const { chatId, threadId } = selectCurrentMessageList(global, tabId) || {};
+addActionHandler('searchTextMessagesLocal', (global) => {
+  const { chatId, threadId } = selectCurrentMessageList(global) || {};
   const chat = chatId ? selectChat(global, chatId) : undefined;
-  let currentSearch = selectCurrentTextSearch(global, tabId);
+  const currentSearch = selectCurrentTextSearch(global);
   if (!chat || !currentSearch || !threadId) {
     return;
   }
@@ -44,6 +41,56 @@ addActionHandler('searchTextMessagesLocal', async (global, actions, payload): Pr
     topMessageId = threadInfo?.topMessageId;
   }
 
+  void searchTextMessages(chat, threadId, topMessageId, query, offsetId);
+});
+
+addActionHandler('searchMediaMessagesLocal', (global) => {
+  const { chatId } = selectCurrentMessageList(global) || {};
+  if (!chatId) {
+    return;
+  }
+
+  const chat = selectChat(global, chatId);
+  const currentSearch = selectCurrentMediaSearch(global);
+
+  if (!chat || !currentSearch) {
+    return;
+  }
+
+  const { currentType: type, resultsByType } = currentSearch;
+  const currentResults = type && resultsByType && resultsByType[type];
+  const offsetId = currentResults?.nextOffsetId;
+
+  if (!type) {
+    return;
+  }
+
+  void searchSharedMedia(chat, type, offsetId);
+});
+
+addActionHandler('searchMessagesByDate', (global, actions, payload) => {
+  const { timestamp } = payload!;
+
+  const { chatId } = selectCurrentMessageList(global) || {};
+  if (!chatId) {
+    return;
+  }
+
+  const chat = selectChat(global, chatId);
+  if (!chat) {
+    return;
+  }
+
+  void searchMessagesByDate(chat, timestamp);
+});
+
+async function searchTextMessages(
+  chat: ApiChat,
+  threadId: number,
+  topMessageId?: number,
+  query?: string,
+  offsetId?: number,
+) {
   if (!query) {
     return;
   }
@@ -68,9 +115,9 @@ addActionHandler('searchTextMessagesLocal', async (global, actions, payload): Pr
   const byId = buildCollectionByKey(messages, 'id');
   const newFoundIds = Object.keys(byId).map(Number);
 
-  global = getGlobal();
+  let global = getGlobal();
 
-  currentSearch = selectCurrentTextSearch(global, tabId);
+  const currentSearch = selectCurrentTextSearch(global);
   if (!currentSearch || query !== currentSearch.query) {
     return;
   }
@@ -78,78 +125,20 @@ addActionHandler('searchTextMessagesLocal', async (global, actions, payload): Pr
   global = addChats(global, buildCollectionByKey(chats, 'id'));
   global = addUsers(global, buildCollectionByKey(users, 'id'));
   global = addChatMessagesById(global, chat.id, byId);
-  global = updateLocalTextSearchResults(global, chat.id, threadId, newFoundIds, totalCount, nextOffsetId, tabId);
+  global = updateLocalTextSearchResults(global, chat.id, threadId, newFoundIds, totalCount, nextOffsetId);
   setGlobal(global);
-});
+}
 
-addActionHandler('searchMediaMessagesLocal', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  const { chatId, threadId } = selectCurrentMessageList(global, tabId) || {};
-  if (!chatId || !threadId) {
-    return;
-  }
-
-  const chat = selectChat(global, chatId);
-  const currentSearch = selectCurrentMediaSearch(global, tabId);
-
-  if (!chat || !currentSearch) {
-    return;
-  }
-
-  const { currentType: type, resultsByType } = currentSearch;
-  const currentResults = type && resultsByType && resultsByType[type];
-  const offsetId = currentResults?.nextOffsetId;
-
-  if (!type) {
-    return;
-  }
-
-  void searchSharedMedia(global, chat, threadId, type, offsetId, undefined, tabId);
-});
-
-addActionHandler('searchMessagesByDate', async (global, actions, payload): Promise<void> => {
-  const { timestamp, tabId = getCurrentTabId() } = payload;
-
-  const { chatId } = selectCurrentMessageList(global, tabId) || {};
-  if (!chatId) {
-    return;
-  }
-
-  const chat = selectChat(global, chatId);
-  if (!chat) {
-    return;
-  }
-
-  const messageId = await callApi('findFirstMessageIdAfterDate', {
-    chat,
-    timestamp,
-  });
-
-  if (!messageId) {
-    return;
-  }
-
-  actions.focusMessage({
-    chatId: chat.id,
-    messageId,
-    tabId,
-  });
-});
-
-async function searchSharedMedia<T extends GlobalState>(
-  global: T,
+async function searchSharedMedia(
   chat: ApiChat,
-  threadId: number,
   type: SharedMediaType,
   offsetId?: number,
   isBudgetPreload = false,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
 ) {
   const result = await callApi('searchMessagesLocal', {
     chat,
     type,
     limit: SHARED_MEDIA_SLICE * 2,
-    topMessageId: threadId === MAIN_THREAD_ID ? undefined : threadId,
     offsetId,
   });
 
@@ -164,9 +153,9 @@ async function searchSharedMedia<T extends GlobalState>(
   const byId = buildCollectionByKey(messages, 'id');
   const newFoundIds = Object.keys(byId).map(Number);
 
-  global = getGlobal();
+  let global = getGlobal();
 
-  const currentSearch = selectCurrentMediaSearch(global, tabId);
+  const currentSearch = selectCurrentMediaSearch(global);
   if (!currentSearch) {
     return;
   }
@@ -174,10 +163,26 @@ async function searchSharedMedia<T extends GlobalState>(
   global = addChats(global, buildCollectionByKey(chats, 'id'));
   global = addUsers(global, buildCollectionByKey(users, 'id'));
   global = addChatMessagesById(global, chat.id, byId);
-  global = updateLocalMediaSearchResults(global, chat.id, threadId, type, newFoundIds, totalCount, nextOffsetId, tabId);
+  global = updateLocalMediaSearchResults(global, chat.id, type, newFoundIds, totalCount, nextOffsetId);
   setGlobal(global);
 
   if (!isBudgetPreload) {
-    void searchSharedMedia(global, chat, threadId, type, nextOffsetId, true, tabId);
+    searchSharedMedia(chat, type, nextOffsetId, true);
   }
+}
+
+async function searchMessagesByDate(chat: ApiChat, timestamp: number) {
+  const messageId = await callApi('findFirstMessageIdAfterDate', {
+    chat,
+    timestamp,
+  });
+
+  if (!messageId) {
+    return;
+  }
+
+  getActions().focusMessage({
+    chatId: chat.id,
+    messageId,
+  });
 }

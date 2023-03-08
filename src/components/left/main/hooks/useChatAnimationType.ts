@@ -6,13 +6,13 @@ export enum ChatAnimationTypes {
   None,
 }
 
-export function useChatAnimationType<T extends number | string>(orderDiffById: Record<T, number>) {
+export function useChatAnimationType(orderDiffById: Record<string, number>) {
   return useMemo(() => {
-    const orderDiffs = Object.values(orderDiffById) as T[];
+    const orderDiffs = Object.values(orderDiffById);
     const numberOfUp = orderDiffs.filter((diff) => diff < 0).length;
     const numberOfDown = orderDiffs.filter((diff) => diff > 0).length;
 
-    return (chatId: T): ChatAnimationTypes => {
+    return (chatId: string): ChatAnimationTypes => {
       const orderDiff = orderDiffById[chatId];
       if (orderDiff === 0) {
         return ChatAnimationTypes.None;

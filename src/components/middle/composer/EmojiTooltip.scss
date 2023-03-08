@@ -1,6 +1,6 @@
 .EmojiTooltip {
   display: flex;
-  padding: 0;
+  padding-left: 0.25rem;
 
   overflow-x: auto;
   @supports (overflow-x: overlay) {
@@ -10,6 +10,5 @@
 
   .EmojiButton {
     flex: 0 0 2.5rem;
-    margin-right: 0;
   }
 }

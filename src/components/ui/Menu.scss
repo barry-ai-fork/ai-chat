@@ -67,7 +67,7 @@
     }
   }
 
-  body.has-open-dialog &:not(.with-menu-transitions) .bubble {
+  body.has-open-dialog &:not(.CustomSendMenu):not(.web-app-more-menu) .bubble {
     transition: none !important;
   }
 
@@ -93,10 +93,5 @@
     &.no-blur .bubble {
       background: var(--color-background);
     }
-  }
-
-  .menu-loading-row {
-    margin: 0.125rem 1rem;
-    width: calc(100% - 2rem);
   }
 }

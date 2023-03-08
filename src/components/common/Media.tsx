@@ -1,26 +1,21 @@
+import type { FC } from '../../lib/teact/teact';
 import React, { memo, useCallback, useRef } from '../../lib/teact/teact';
 
-import type { FC } from '../../lib/teact/teact';
 import type { ApiMessage } from '../../api/types';
-import type { ObserveFn } from '../../hooks/useIntersectionObserver';
 
 import { formatMediaDuration } from '../../util/dateFormat';
 import stopEvent from '../../util/stopEvent';
 import {
   getMessageHtmlId,
-  getMessageIsSpoiler,
   getMessageMediaHash,
   getMessageMediaThumbDataUri,
   getMessageVideo,
 } from '../../global/helpers';
 import buildClassName from '../../util/buildClassName';
-
 import useMedia from '../../hooks/useMedia';
 import useMediaTransition from '../../hooks/useMediaTransition';
-import useFlag from '../../hooks/useFlag';
+import type { ObserveFn } from '../../hooks/useIntersectionObserver';
 import { useIsIntersecting } from '../../hooks/useIntersectionObserver';
-
-import MediaSpoiler from './MediaSpoiler';
 
 import './Media.scss';
 
@@ -49,13 +44,9 @@ const Media: FC<OwnProps> = ({
 
   const video = getMessageVideo(message);
 
-  const hasSpoiler = getMessageIsSpoiler(message);
-  const [isSpoilerShown, , hideSpoiler] = useFlag(hasSpoiler);
-
   const handleClick = useCallback(() => {
-    hideSpoiler();
     onClick!(message.id, message.chatId);
-  }, [hideSpoiler, message, onClick]);
+  }, [message.id, message.chatId, onClick]);
 
   return (
     <div
@@ -66,7 +57,6 @@ const Media: FC<OwnProps> = ({
     >
       <img
         src={thumbDataUri}
-        className="media-miniature"
         alt=""
         draggable={!isProtected}
         decoding="async"
@@ -74,19 +64,12 @@ const Media: FC<OwnProps> = ({
       />
       <img
         src={mediaBlobUrl}
-        className={buildClassName('full-media', 'media-miniature', transitionClassNames)}
+        className={buildClassName('full-media', transitionClassNames)}
         alt=""
         draggable={!isProtected}
         decoding="async"
         onContextMenu={isProtected ? stopEvent : undefined}
       />
-      {hasSpoiler && (
-        <MediaSpoiler
-          thumbDataUri={mediaBlobUrl || thumbDataUri}
-          isVisible={isSpoilerShown}
-          className="media-spoiler"
-        />
-      )}
       {video && <span className="video-duration">{video.isGif ? 'GIF' : formatMediaDuration(video.duration)}</span>}
       {isProtected && <span className="protector" />}
     </div>

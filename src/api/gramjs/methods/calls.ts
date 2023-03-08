@@ -42,8 +42,8 @@ export async function getGroupCall({
   addEntitiesWithPhotosToLocalDb(result.users);
   addEntitiesWithPhotosToLocalDb(result.chats);
 
-  const users = result.users.map(buildApiUser).filter(Boolean);
-  const chats = result.chats.map((c) => buildApiChatFromPreview(c)).filter(Boolean);
+  const users = result.users.map(buildApiUser).filter<ApiUser>(Boolean as any);
+  const chats = result.chats.map((c) => buildApiChatFromPreview(c)).filter<ApiChat>(Boolean as any);
 
   return {
     groupCall: buildApiGroupCall(result.call),
@@ -129,8 +129,8 @@ export async function fetchGroupCallParticipants({
   addEntitiesWithPhotosToLocalDb(result.users);
   addEntitiesWithPhotosToLocalDb(result.chats);
 
-  const users = result.users.map(buildApiUser).filter(Boolean);
-  const chats = result.chats.map((c) => buildApiChatFromPreview(c)).filter(Boolean);
+  const users = result.users.map(buildApiUser).filter<ApiUser>(Boolean as any);
+  const chats = result.chats.map((c) => buildApiChatFromPreview(c)).filter<ApiChat>(Boolean as any);
 
   onUpdate({
     '@type': 'updateGroupCallParticipants',
@@ -226,7 +226,7 @@ export function toggleGroupCallStartSubscription({
   return invokeRequest(new GramJs.phone.ToggleGroupCallStartSubscription({
     call: buildInputGroupCall(call),
     subscribed,
-  }), true, undefined, undefined, undefined, true);
+  }), true);
 }
 
 export function leaveGroupCallPresentation({
@@ -276,7 +276,7 @@ export async function requestCall({
   }));
 
   if (!result) {
-    return undefined;
+    return false;
   }
 
   const call = buildPhoneCall(result.phoneCall);
@@ -286,11 +286,7 @@ export async function requestCall({
     call,
   });
 
-  addEntitiesWithPhotosToLocalDb(result.users);
-
-  return {
-    users: result.users.map(buildApiUser).filter(Boolean),
-  };
+  return true;
 }
 
 export function setCallRating({
@@ -327,7 +323,7 @@ export async function acceptCall({
   }));
 
   if (!result) {
-    return undefined;
+    return;
   }
 
   call = buildPhoneCall(result.phoneCall);
@@ -336,12 +332,6 @@ export async function acceptCall({
     '@type': 'updatePhoneCall',
     call,
   });
-
-  addEntitiesWithPhotosToLocalDb(result.users);
-
-  return {
-    users: result.users.map(buildApiUser).filter(Boolean),
-  };
 }
 
 export async function confirmCall({
@@ -357,7 +347,7 @@ export async function confirmCall({
   }));
 
   if (!result) {
-    return undefined;
+    return;
   }
 
   call = buildPhoneCall(result.phoneCall);
@@ -366,12 +356,6 @@ export async function confirmCall({
     '@type': 'updatePhoneCall',
     call,
   });
-
-  addEntitiesWithPhotosToLocalDb(result.users);
-
-  return {
-    users: result.users.map(buildApiUser).filter(Boolean),
-  };
 }
 
 export function sendSignalingData({

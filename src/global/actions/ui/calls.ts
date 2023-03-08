@@ -1,68 +1,28 @@
-import type { RequiredGlobalActions } from '../../index';
-import {
-  addActionHandler, getGlobal,
-  setGlobal,
-} from '../../index';
-import { callApi } from '../../../api/gramjs';
-import {
-  selectChat, selectTabState, selectUser,
-} from '../../selectors';
-import { copyTextToClipboard } from '../../../util/clipboard';
-import { fetchChatByUsername, loadFullChat } from '../api/chats';
-
-import type { ApiGroupCall } from '../../../api/types';
-import type {
-  CallSound, ActionReturnType, GlobalState, TabArgs,
-} from '../../types';
-
-import { addChats, addUsers } from '../../reducers';
-import { updateGroupCall } from '../../reducers/calls';
+import { addActionHandler, getGlobal, setGlobal } from '../../index';
 import { selectActiveGroupCall, selectChatGroupCall, selectGroupCall } from '../../selectors/calls';
-import { getMainUsername } from '../../helpers';
+import { callApi } from '../../../api/gramjs';
+import { selectChat, selectUser } from '../../selectors';
+import { copyTextToClipboard } from '../../../util/clipboard';
+import type { ApiGroupCall } from '../../../api/types';
+import { updateGroupCall } from '../../reducers/calls';
 import { buildCollectionByKey, omit } from '../../../util/iteratees';
+import { addChats, addUsers } from '../../reducers';
+import { fetchChatByUsername, loadFullChat } from '../api/chats';
 import safePlay from '../../../util/safePlay';
 import { ARE_CALLS_SUPPORTED } from '../../../util/environment';
 import * as langProvider from '../../../util/langProvider';
-import { updateTabState } from '../../reducers/tabs';
-import { getCurrentTabId } from '../../../util/establishMultitabRole';
+import type { CallSound } from '../../types';
 
-// This is a tiny MP3 file that is silent - retrieved from https://bigsoundbank.com and then modified
-// eslint-disable-next-line max-len
-const silentSound = 'data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIMKpIE5DSCBTb2Z0d2FyZQBUSVQyAAAABgAAAzIyMzUAVFNTRQAAAA8AAANMYXZmNTcuODMuMTAwAAAAAAAAAAAAAAD/80DEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsRbAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQMSkAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
-
+// Workaround for Safari not playing audio without user interaction
 let audioElement: HTMLAudioElement | undefined;
 let audioContext: AudioContext | undefined;
+
 let sounds: Record<CallSound, HTMLAudioElement>;
+let initializationPromise: Promise<void> | undefined = Promise.resolve();
 
-// Workaround: this function is called once on the first user interaction.
-// After that, it will be possible to play the notification on iOS without problems.
-// https://rosswintle.uk/2019/01/skirting-the-ios-safari-audio-auto-play-policy-for-ui-sound-effects/
-export function initializeSoundsForSafari() {
-  initializeSounds();
+export const initializeSoundsForSafari = () => {
+  if (!initializationPromise) return Promise.resolve();
 
-  return Promise.all(Object.values(sounds).map((sound) => {
-    const prevSrc = sound.src;
-    sound.src = silentSound;
-    sound.muted = true;
-    sound.volume = 0.0001;
-    return sound.play()
-      .then(() => {
-        sound.pause();
-        sound.volume = 1;
-        sound.currentTime = 0;
-        sound.muted = false;
-
-        requestAnimationFrame(() => {
-          sound.src = prevSrc;
-        });
-      });
-  }));
-}
-
-export function initializeSounds() {
-  if (sounds) {
-    return;
-  }
   const joinAudio = new Audio('./voicechat_join.mp3');
   const connectingAudio = new Audio('./voicechat_connecting.mp3');
   connectingAudio.loop = true;
@@ -87,16 +47,31 @@ export function initializeSounds() {
     busy: busyAudio,
     ringing: ringingAudio,
   };
-}
 
-async function fetchGroupCall<T extends GlobalState>(global: T, groupCall: Partial<ApiGroupCall>) {
+  initializationPromise = Promise.all(Object.values(sounds).map((l) => {
+    l.muted = true;
+    l.volume = 0.0001;
+    return l.play().then(() => {
+      l.pause();
+      l.volume = 1;
+      l.currentTime = 0;
+      l.muted = false;
+    });
+  })).then(() => {
+    initializationPromise = undefined;
+  });
+
+  return initializationPromise;
+};
+
+async function fetchGroupCall(groupCall: Partial<ApiGroupCall>) {
   const result = await callApi('getGroupCall', {
     call: groupCall,
   });
 
   if (!result) return undefined;
 
-  global = getGlobal();
+  let global = getGlobal();
 
   const existingGroupCall = selectGroupCall(global, groupCall.id!);
 
@@ -115,10 +90,7 @@ async function fetchGroupCall<T extends GlobalState>(global: T, groupCall: Parti
   return result.groupCall;
 }
 
-async function fetchGroupCallParticipants<T extends GlobalState>(
-  global: T,
-  groupCall: Partial<ApiGroupCall>, nextOffset?: string,
-) {
+async function fetchGroupCallParticipants(groupCall: Partial<ApiGroupCall>, nextOffset?: string) {
   const result = await callApi('fetchGroupCallParticipants', {
     call: groupCall as ApiGroupCall,
     offset: nextOffset,
@@ -126,7 +98,7 @@ async function fetchGroupCallParticipants<T extends GlobalState>(
 
   if (!result) return;
 
-  global = getGlobal();
+  let global = getGlobal();
 
   global = addUsers(global, buildCollectionByKey(result.users, 'id'));
   global = addChats(global, buildCollectionByKey(result.chats, 'id'));
@@ -134,23 +106,22 @@ async function fetchGroupCallParticipants<T extends GlobalState>(
   setGlobal(global);
 }
 
-addActionHandler('toggleGroupCallPanel', (global, actions, payload): ActionReturnType => {
-  const { force, tabId = getCurrentTabId() } = payload || {};
-  return updateTabState(global, {
-    isCallPanelVisible: 'force' in (payload || {}) ? force : !selectTabState(global, tabId).isCallPanelVisible,
-  }, tabId);
+addActionHandler('toggleGroupCallPanel', (global) => {
+  return {
+    ...global,
+    isCallPanelVisible: !global.isCallPanelVisible,
+  };
 });
 
-addActionHandler('subscribeToGroupCallUpdates', async (global, actions, payload): Promise<void> => {
+addActionHandler('subscribeToGroupCallUpdates', async (global, actions, payload) => {
   const { subscribed, id } = payload!;
   const groupCall = selectGroupCall(global, id);
 
   if (!groupCall) return;
 
   if (subscribed) {
-    await fetchGroupCall(global, groupCall);
-    global = getGlobal();
-    await fetchGroupCallParticipants(global, groupCall);
+    await fetchGroupCall(groupCall);
+    await fetchGroupCallParticipants(groupCall);
   }
 
   await callApi('toggleGroupCallStartSubscription', {
@@ -159,8 +130,8 @@ addActionHandler('subscribeToGroupCallUpdates', async (global, actions, payload)
   });
 });
 
-addActionHandler('createGroupCall', async (global, actions, payload): Promise<void> => {
-  const { chatId, tabId = getCurrentTabId() } = payload;
+addActionHandler('createGroupCall', async (global, actions, payload) => {
+  const { chatId } = payload;
 
   const chat = selectChat(global, chatId);
   if (!chat) {
@@ -174,17 +145,15 @@ addActionHandler('createGroupCall', async (global, actions, payload): Promise<vo
   if (!result) return;
 
   global = getGlobal();
-  global = updateGroupCall(global, result.id, {
+  setGlobal(updateGroupCall(global, result.id, {
     ...result,
     chatId,
-  });
-  setGlobal(global);
+  }));
 
-  actions.requestMasterAndJoinGroupCall({ id: result.id, accessHash: result.accessHash, tabId });
+  actions.joinGroupCall({ id: result.id, accessHash: result.accessHash });
 });
 
-addActionHandler('createGroupCallInviteLink', async (global, actions, payload): Promise<void> => {
-  const { tabId = getCurrentTabId() } = payload || {};
+addActionHandler('createGroupCallInviteLink', async (global, actions) => {
   const groupCall = selectActiveGroupCall(global);
 
   if (!groupCall || !groupCall.chatId) {
@@ -196,10 +165,10 @@ addActionHandler('createGroupCallInviteLink', async (global, actions, payload): 
     return;
   }
 
-  const hasPublicUsername = Boolean(getMainUsername(chat));
+  const canInvite = Boolean(chat.username);
 
   let { inviteLink } = chat.fullInfo!;
-  if (hasPublicUsername) {
+  if (canInvite) {
     inviteLink = await callApi('exportGroupCallInvite', {
       call: groupCall,
       canSelfUnmute: false,
@@ -213,92 +182,63 @@ addActionHandler('createGroupCallInviteLink', async (global, actions, payload): 
   copyTextToClipboard(inviteLink);
   actions.showNotification({
     message: 'Link copied to clipboard',
-    tabId,
   });
 });
 
-addActionHandler('joinVoiceChatByLink', async (global, actions, payload): Promise<void> => {
-  const { username, inviteHash, tabId = getCurrentTabId() } = payload!;
+addActionHandler('joinVoiceChatByLink', async (global, actions, payload) => {
+  const { username, inviteHash } = payload!;
 
-  const chat = await fetchChatByUsername(global, username);
+  const chat = await fetchChatByUsername(username);
 
   if (!chat) {
-    actions.showNotification({ message: langProvider.translate('NoUsernameFound'), tabId });
+    actions.showNotification({ message: langProvider.getTranslation('NoUsernameFound') });
     return;
   }
 
-  global = getGlobal();
-  const full = await loadFullChat(global, actions, chat, tabId);
+  const full = await loadFullChat(chat);
 
   if (full?.groupCall) {
-    actions.requestMasterAndJoinGroupCall({
-      id: full.groupCall.id,
-      accessHash: full.groupCall.accessHash,
-      inviteHash,
-      tabId,
-    });
+    actions.joinGroupCall({ id: full.groupCall.id, accessHash: full.groupCall.accessHash, inviteHash });
   }
 });
 
-addActionHandler('requestMasterAndJoinGroupCall', (global, actions, payload): ActionReturnType => {
-  actions.requestMasterAndCallAction({
-    action: 'joinGroupCall',
-    payload,
-    tabId: payload.tabId || getCurrentTabId(),
-  });
-});
-
-addActionHandler('requestMasterAndAcceptCall', (global, actions, payload): ActionReturnType => {
-  actions.requestMasterAndCallAction({
-    action: 'acceptCall',
-    payload: undefined,
-    tabId: payload?.tabId || getCurrentTabId(),
-  });
-});
-
-addActionHandler('joinGroupCall', async (global, actions, payload): Promise<void> => {
-  const {
-    chatId, id, accessHash, inviteHash, tabId = getCurrentTabId(),
-  } = payload;
-
+addActionHandler('joinGroupCall', async (global, actions, payload) => {
   if (!ARE_CALLS_SUPPORTED) return;
 
   if (global.phoneCall) {
-    actions.toggleGroupCallPanel({ tabId });
+    actions.toggleGroupCallPanel();
     return;
   }
 
+  const {
+    chatId, id, accessHash, inviteHash,
+  } = payload;
+
   createAudioElement();
 
-  initializeSounds();
-  global = getGlobal();
-  void checkNavigatorUserMediaPermissions(global, actions, true, tabId);
-
+  await initializeSoundsForSafari();
   const { groupCalls: { activeGroupCallId } } = global;
-  let groupCall = id ? selectGroupCall(global, id) : selectChatGroupCall(global, chatId!);
+  let groupCall = id ? selectGroupCall(global, id) : selectChatGroupCall(global, chatId);
 
   if (groupCall?.id === activeGroupCallId) {
-    actions.toggleGroupCallPanel({ tabId });
+    actions.toggleGroupCallPanel();
     return;
   }
 
   if (activeGroupCallId) {
-    if ('leaveGroupCall' in actions) {
-      actions.leaveGroupCall({
-        rejoin: payload,
-        tabId,
-      });
-    }
+    actions.leaveGroupCall({
+      rejoin: payload,
+    });
     return;
   }
 
   if (groupCall && activeGroupCallId === groupCall.id) {
-    actions.toggleGroupCallPanel({ tabId });
+    actions.toggleGroupCallPanel();
     return;
   }
 
   if (!groupCall && (!id || !accessHash)) {
-    groupCall = await fetchGroupCall(global, {
+    groupCall = await fetchGroupCall({
       id,
       accessHash,
     });
@@ -323,14 +263,12 @@ addActionHandler('joinGroupCall', async (global, actions, payload): Promise<void
       ...global.groupCalls,
       activeGroupCallId: groupCall.id,
     },
+    isCallPanelVisible: false,
   };
-
   setGlobal(global);
-
-  actions.toggleGroupCallPanel({ force: false, tabId });
 });
 
-addActionHandler('playGroupCallSound', (global, actions, payload): ActionReturnType => {
+addActionHandler('playGroupCallSound', (global, actions, payload) => {
   const { sound } = payload!;
 
   if (!sounds[sound]) {
@@ -350,31 +288,27 @@ addActionHandler('playGroupCallSound', (global, actions, payload): ActionReturnT
     safePlay(sounds[sound]);
   };
 
-  doPlay();
+  if (initializationPromise) {
+    initializationPromise.then(doPlay);
+  } else {
+    doPlay();
+  }
 });
 
-addActionHandler('loadMoreGroupCallParticipants', (global): ActionReturnType => {
+addActionHandler('loadMoreGroupCallParticipants', (global) => {
   const groupCall = selectActiveGroupCall(global);
   if (!groupCall) {
     return;
   }
 
-  void fetchGroupCallParticipants(global, groupCall, groupCall.nextOffset);
+  void fetchGroupCallParticipants(groupCall, groupCall.nextOffset);
 });
 
-addActionHandler('requestMasterAndRequestCall', (global, actions, payload): ActionReturnType => {
-  actions.requestMasterAndCallAction({
-    action: 'requestCall',
-    payload,
-    tabId: payload.tabId || getCurrentTabId(),
-  });
-});
-
-addActionHandler('requestCall', async (global, actions, payload): Promise<void> => {
-  const { userId, isVideo, tabId = getCurrentTabId() } = payload;
+addActionHandler('requestCall', async (global, actions, payload) => {
+  const { userId, isVideo } = payload;
 
   if (global.phoneCall) {
-    actions.toggleGroupCallPanel({ tabId });
+    actions.toggleGroupCallPanel();
     return;
   }
 
@@ -384,13 +318,10 @@ addActionHandler('requestCall', async (global, actions, payload): Promise<void> 
     return;
   }
 
-  initializeSounds();
-  global = getGlobal();
-  void checkNavigatorUserMediaPermissions(global, actions, isVideo, tabId);
+  await initializeSoundsForSafari();
 
-  global = getGlobal();
-  global = {
-    ...global,
+  setGlobal({
+    ...getGlobal(),
     phoneCall: {
       id: '',
       state: 'requesting',
@@ -398,10 +329,8 @@ addActionHandler('requestCall', async (global, actions, payload): Promise<void> 
       isVideo,
       adminId: global.currentUserId,
     },
-  };
-  setGlobal(global);
-
-  actions.toggleGroupCallPanel({ force: false, tabId });
+    isCallPanelVisible: false,
+  });
 });
 
 function createAudioContext() {
@@ -435,55 +364,4 @@ export function removeGroupCallAudioElement() {
   audioElement?.pause();
   audioContext = undefined;
   audioElement = undefined;
-}
-
-// This method is used instead of a navigator.permissions.query to determine permission to use a microphone,
-// because Firefox does not have support for 'microphone' and 'camera' permissions
-// https://github.com/mozilla/standards-positions/issues/19#issuecomment-370158947
-export function checkNavigatorUserMediaPermissions<T extends GlobalState>(
-  global: T,
-  actions: RequiredGlobalActions, isVideo?: boolean,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-) {
-  if (isVideo) {
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then((stream) => {
-        if (stream.getVideoTracks().length === 0) {
-          actions.showNotification({
-            message: langProvider.translate('Call.Camera.Error'),
-            tabId,
-          });
-        } else {
-          checkMicrophonePermission(global, actions, tabId);
-        }
-      })
-      .catch(() => {
-        actions.showNotification({
-          message: langProvider.translate('Call.Camera.Error'),
-          tabId,
-        });
-      });
-  } else {
-    checkMicrophonePermission(global, actions, tabId);
-  }
-}
-
-function checkMicrophonePermission<T extends GlobalState>(
-  global: T, actions: RequiredGlobalActions, ...[tabId = getCurrentTabId()]: TabArgs<T>
-) {
-  navigator.mediaDevices.getUserMedia({ audio: true })
-    .then((stream) => {
-      if (stream.getAudioTracks().length === 0) {
-        actions.showNotification({
-          message: langProvider.translate('RequestAcces.Error.HaveNotAccess.Call'),
-          tabId,
-        });
-      }
-    })
-    .catch(() => {
-      actions.showNotification({
-        message: langProvider.translate('RequestAcces.Error.HaveNotAccess.Call'),
-        tabId,
-      });
-    });
 }

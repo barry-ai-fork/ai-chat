@@ -1,5 +1,5 @@
 import React, {
-  memo, useCallback, useEffect, useMemo, useRef, useState,
+  memo, useCallback, useEffect, useRef, useState,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
@@ -12,17 +12,16 @@ import PremiumFeatureModal, {
   PREMIUM_FEATURE_SECTIONS,
   PREMIUM_FEATURE_TITLES,
 } from './PremiumFeatureModal';
-import { TME_LINK_PREFIX } from '../../../config';
 import { formatCurrency } from '../../../util/formatCurrency';
 import buildClassName from '../../../util/buildClassName';
-import { selectTabState, selectIsCurrentUserPremium, selectUser } from '../../../global/selectors';
+import { selectIsCurrentUserPremium, selectUser } from '../../../global/selectors';
 import { renderTextWithEntities } from '../../common/helpers/renderTextWithEntities';
 import { selectPremiumLimit } from '../../../global/selectors/limits';
 import renderText from '../../common/helpers/renderText';
 import { getUserFullName } from '../../../global/helpers';
 
 import useLang from '../../../hooks/useLang';
-import useSyncEffect from '../../../hooks/useSyncEffect';
+import useOnChange from '../../../hooks/useOnChange';
 
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
@@ -40,18 +39,15 @@ import PremiumStickers from '../../../assets/premium/PremiumStickers.svg';
 import PremiumChats from '../../../assets/premium/PremiumChats.svg';
 import PremiumBadge from '../../../assets/premium/PremiumBadge.svg';
 import PremiumVideo from '../../../assets/premium/PremiumVideo.svg';
-import PremiumEmoji from '../../../assets/premium/PremiumEmoji.svg';
-import PremiumStatus from '../../../assets/premium/PremiumStatus.svg';
 
 import styles from './PremiumMainModal.module.scss';
 
 const LIMIT_ACCOUNTS = 4;
 
 const PREMIUM_FEATURE_COLOR_ICONS: Record<string, string> = {
-  double_limits: PremiumLimits,
-  infinite_reactions: PremiumReactions,
-  premium_stickers: PremiumStickers,
-  animated_emoji: PremiumEmoji,
+  limits: PremiumLimits,
+  reactions: PremiumReactions,
+  stickers: PremiumStickers,
   no_ads: PremiumAds,
   voice_to_text: PremiumVoice,
   profile_badge: PremiumBadge,
@@ -59,7 +55,6 @@ const PREMIUM_FEATURE_COLOR_ICONS: Record<string, string> = {
   more_upload: PremiumFile,
   advanced_chat_management: PremiumChats,
   animated_userpics: PremiumVideo,
-  emoji_status: PremiumStatus,
 };
 
 export type OwnProps = {
@@ -67,16 +62,12 @@ export type OwnProps = {
 };
 
 type StateProps = {
-  currentUserId?: string;
   promo?: ApiPremiumPromo;
   isClosing?: boolean;
   fromUser?: ApiUser;
-  toUser?: ApiUser;
   initialSection?: string;
   isPremium?: boolean;
   isSuccess?: boolean;
-  isGift?: boolean;
-  monthsAmount?: number;
   limitChannels: number;
   limitPins: number;
   limitLinks: number;
@@ -84,12 +75,12 @@ type StateProps = {
   limits?: NonNullable<GlobalState['appConfig']>['limits'];
   premiumSlug?: string;
   premiumBotUsername?: string;
-  premiumPromoOrder?: string[];
 };
+
+const LINK_PREFIX = 'https://t.me/';
 
 const PremiumMainModal: FC<OwnProps & StateProps> = ({
   isOpen,
-  currentUserId,
   fromUser,
   promo,
   initialSection,
@@ -103,10 +94,6 @@ const PremiumMainModal: FC<OwnProps & StateProps> = ({
   premiumBotUsername,
   isClosing,
   isSuccess,
-  isGift,
-  toUser,
-  monthsAmount,
-  premiumPromoOrder,
 }) => {
   // eslint-disable-next-line no-null/no-null
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -140,7 +127,7 @@ const PremiumMainModal: FC<OwnProps & StateProps> = ({
       });
     } else if (premiumBotUsername) {
       openTelegramLink({
-        url: `${TME_LINK_PREFIX}${premiumBotUsername}?start=${startParam || 'promo'}`,
+        url: `${LINK_PREFIX}${premiumBotUsername}?start=${startParam || 'promo'}`,
       });
       closePremiumModal();
     }
@@ -172,57 +159,13 @@ const PremiumMainModal: FC<OwnProps & StateProps> = ({
     }
   }, [isSuccess, showConfetti]);
 
-  useSyncEffect(([prevIsPremium]) => {
+  useOnChange(([prevIsPremium]) => {
     if (prevIsPremium === isPremium) return;
 
     showConfetti();
-  }, [isPremium, showConfetti]);
-
-  const filteredSections = useMemo(() => {
-    if (!premiumPromoOrder) return PREMIUM_FEATURE_SECTIONS;
-    return premiumPromoOrder.filter((section) => PREMIUM_FEATURE_SECTIONS.includes(section));
-  }, [premiumPromoOrder]);
+  }, [isPremium]);
 
   if (!promo) return undefined;
-
-  // TODO Support all subscription options
-  const month = promo.options.find((option) => option.months === 1)!;
-
-  function getHeaderText() {
-    if (isGift) {
-      return fromUser?.id === currentUserId
-        ? lang('TelegramPremiumUserGiftedPremiumOutboundDialogTitle', [getUserFullName(toUser), monthsAmount])
-        : lang('TelegramPremiumUserGiftedPremiumDialogTitle', [getUserFullName(fromUser), monthsAmount]);
-    }
-
-    return fromUser
-      ? lang('TelegramPremiumUserDialogTitle', getUserFullName(fromUser))
-      : lang(isPremium ? 'TelegramPremiumSubscribedTitle' : 'TelegramPremium');
-  }
-
-  function getHeaderDescription() {
-    if (isGift) {
-      return fromUser?.id === currentUserId
-        ? lang('TelegramPremiumUserGiftedPremiumOutboundDialogSubtitle', getUserFullName(toUser))
-        : lang('TelegramPremiumUserGiftedPremiumDialogSubtitle');
-    }
-
-    return fromUser
-      ? lang('TelegramPremiumUserDialogSubtitle')
-      : lang(isPremium ? 'TelegramPremiumSubscribedSubtitle' : 'TelegramPremiumSubtitle');
-  }
-
-  function renderFooterText() {
-    if (!promo || (isGift && fromUser?.id === currentUserId)) {
-      return undefined;
-    }
-
-    return (
-      <div className={styles.footerText} dir={lang.isRtl ? 'rtl' : undefined}>
-        {renderTextWithEntities(promo.statusText, promo.statusEntities)}
-      </div>
-    );
-  }
 
   return (
     <Modal
@@ -249,10 +192,19 @@ const PremiumMainModal: FC<OwnProps & StateProps> = ({
             </Button>
             <img className={styles.logo} src={PremiumLogo} alt="" />
             <h2 className={styles.headerText}>
-              {renderText(getHeaderText(), ['simple_markdown', 'emoji'])}
+              {renderText(
+                fromUser
+                  ? lang('TelegramPremiumUserDialogTitle', getUserFullName(fromUser))
+                  : lang(isPremium ? 'TelegramPremiumSubscribedTitle' : 'TelegramPremium'),
+                ['simple_markdown', 'emoji'],
+              )}
             </h2>
             <div className={styles.description}>
-              {renderText(getHeaderDescription(), ['simple_markdown', 'emoji'])}
+              {renderText(
+                lang(fromUser ? 'TelegramPremiumUserDialogSubtitle'
+                  : (isPremium ? 'TelegramPremiumSubscribedSubtitle' : 'TelegramPremiumSubtitle')),
+                ['simple_markdown'],
+              )}
             </div>
             <div className={buildClassName(styles.header, isHeaderHidden && styles.hiddenHeader)}>
               <h2 className={styles.premiumHeaderText}>
@@ -261,25 +213,19 @@ const PremiumMainModal: FC<OwnProps & StateProps> = ({
             </div>
 
             <div className={buildClassName(styles.list, isPremium && styles.noButton)}>
-              {filteredSections.map((section, index) => {
-                return (
-                  <PremiumFeatureItem
-                    key={section}
-                    title={lang(PREMIUM_FEATURE_TITLES[section])}
-                    text={section === 'double_limits'
-                      ? lang(PREMIUM_FEATURE_DESCRIPTIONS[section],
-                        [limitChannels, limitFolders, limitPins, limitLinks, LIMIT_ACCOUNTS])
-                      : lang(PREMIUM_FEATURE_DESCRIPTIONS[section])}
-                    icon={PREMIUM_FEATURE_COLOR_ICONS[section]}
-                    index={index}
-                    onClick={handleOpen(section)}
-                  />
-                );
-              })}
-              <div
-                className={buildClassName(styles.footerText, styles.primaryFooterText)}
-                dir={lang.isRtl ? 'rtl' : undefined}
-              >
+              {PREMIUM_FEATURE_SECTIONS.map((section) => (
+                <PremiumFeatureItem
+                  key={section}
+                  title={lang(PREMIUM_FEATURE_TITLES[section])}
+                  text={section === 'limits'
+                    ? lang(PREMIUM_FEATURE_DESCRIPTIONS[section],
+                      [limitChannels, limitFolders, limitPins, limitLinks, LIMIT_ACCOUNTS])
+                    : lang(PREMIUM_FEATURE_DESCRIPTIONS[section])}
+                  icon={PREMIUM_FEATURE_COLOR_ICONS[section]}
+                  onClick={handleOpen(section)}
+                />
+              ))}
+              <div className={buildClassName(styles.footerText, styles.primaryFooterText)}>
                 <p>
                   {renderText(lang('AboutPremiumDescription'), ['simple_markdown'])}
                 </p>
@@ -287,13 +233,24 @@ const PremiumMainModal: FC<OwnProps & StateProps> = ({
                   {renderText(lang('AboutPremiumDescription2'), ['simple_markdown'])}
                 </p>
               </div>
-              {renderFooterText()}
+              <div className={styles.footerText}>
+                {renderTextWithEntities(
+                  promo.statusText,
+                  promo.statusEntities,
+                  undefined,
+                  undefined,
+                  undefined,
+                  undefined,
+                  undefined,
+                  undefined,
+                )}
+              </div>
             </div>
             {!isPremium && (
               <div className={styles.footer}>
                 {/* eslint-disable-next-line react/jsx-no-bind */}
-                <Button className={styles.button} isShiny withPremiumGradient onClick={handleClick}>
-                  {lang('SubscribeToPremium', formatCurrency(Number(month.amount), month.currency, lang.code))}
+                <Button className={styles.button} isShiny onClick={handleClick}>
+                  {lang('SubscribeToPremium', formatCurrency(Number(promo.monthlyAmount), promo.currency, lang.code))}
                 </Button>
               </div>
             )}
@@ -315,19 +272,12 @@ const PremiumMainModal: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>((global): StateProps => {
-  const {
-    premiumModal,
-  } = selectTabState(global);
   return {
-    currentUserId: global.currentUserId,
-    promo: premiumModal?.promo,
-    isClosing: premiumModal?.isClosing,
-    isSuccess: premiumModal?.isSuccess,
-    isGift: premiumModal?.isGift,
-    monthsAmount: premiumModal?.monthsAmount,
-    fromUser: premiumModal?.fromUserId ? selectUser(global, premiumModal.fromUserId) : undefined,
-    toUser: premiumModal?.toUserId ? selectUser(global, premiumModal.toUserId) : undefined,
-    initialSection: premiumModal?.initialSection,
+    promo: global.premiumModal?.promo,
+    isClosing: global.premiumModal?.isClosing,
+    isSuccess: global.premiumModal?.isSuccess,
+    fromUser: global.premiumModal?.fromUserId ? selectUser(global, global.premiumModal.fromUserId) : undefined,
+    initialSection: global.premiumModal?.initialSection,
     isPremium: selectIsCurrentUserPremium(global),
     limitChannels: selectPremiumLimit(global, 'channels'),
     limitFolders: selectPremiumLimit(global, 'dialogFilters'),
@@ -336,6 +286,5 @@ export default memo(withGlobal<OwnProps>((global): StateProps => {
     limits: global.appConfig?.limits,
     premiumSlug: global.appConfig?.premiumInvoiceSlug,
     premiumBotUsername: global.appConfig?.premiumBotUsername,
-    premiumPromoOrder: global.appConfig?.premiumPromoOrder,
   };
 })(PremiumMainModal));

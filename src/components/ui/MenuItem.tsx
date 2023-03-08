@@ -8,23 +8,23 @@ import { IS_COMPACT_MENU } from '../../util/environment';
 
 import './MenuItem.scss';
 
-export type MenuItemProps = {
+type OnClickHandler = (e: React.SyntheticEvent<HTMLDivElement | HTMLAnchorElement>) => void;
+
+type OwnProps = {
   icon?: string;
   customIcon?: React.ReactNode;
   className?: string;
   children: React.ReactNode;
-  onClick?: (e: React.SyntheticEvent<HTMLDivElement | HTMLAnchorElement>, arg?: number) => void;
-  clickArg?: number;
+  onClick?: OnClickHandler;
   onContextMenu?: (e: React.UIEvent) => void;
   href?: string;
   download?: string;
   disabled?: boolean;
   destructive?: boolean;
   ariaLabel?: string;
-  withWrap?: boolean;
 };
 
-const MenuItem: FC<MenuItemProps> = (props) => {
+const MenuItem: FC<OwnProps> = (props) => {
   const {
     icon,
     customIcon,
@@ -36,9 +36,7 @@ const MenuItem: FC<MenuItemProps> = (props) => {
     disabled,
     destructive,
     ariaLabel,
-    withWrap,
     onContextMenu,
-    clickArg,
   } = props;
 
   const lang = useLang();
@@ -50,8 +48,8 @@ const MenuItem: FC<MenuItemProps> = (props) => {
       return;
     }
 
-    onClick(e, clickArg);
-  }, [clickArg, disabled, onClick]);
+    onClick(e);
+  }, [disabled, onClick]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.keyCode !== 13 && e.keyCode !== 32) {
@@ -65,8 +63,8 @@ const MenuItem: FC<MenuItemProps> = (props) => {
       return;
     }
 
-    onClick(e, clickArg);
-  }, [clickArg, disabled, onClick]);
+    onClick(e);
+  }, [disabled, onClick]);
 
   const fullClassName = buildClassName(
     'MenuItem',
@@ -74,7 +72,6 @@ const MenuItem: FC<MenuItemProps> = (props) => {
     disabled && 'disabled',
     destructive && 'destructive',
     IS_COMPACT_MENU && 'compact',
-    withWrap && 'wrap',
   );
 
   const content = (
@@ -108,7 +105,7 @@ const MenuItem: FC<MenuItemProps> = (props) => {
 
   return (
     <div
-      role="menuitem"
+      role="button"
       tabIndex={0}
       className={fullClassName}
       onClick={handleClick}

@@ -1,6 +1,5 @@
-import React, { memo, useCallback } from '../../../lib/teact/teact';
-
 import type { FC } from '../../../lib/teact/teact';
+import React, { memo, useCallback } from '../../../lib/teact/teact';
 
 import { IS_EMOJI_SUPPORTED } from '../../../util/environment';
 import { handleEmojiLoad, LOADED_EMOJIS } from '../../../util/emoji';
@@ -14,9 +13,7 @@ type OwnProps = {
   onClick: (emoji: string, name: string) => void;
 };
 
-const EmojiButton: FC<OwnProps> = ({
-  emoji, focus, onClick,
-}) => {
+const EmojiButton: FC<OwnProps> = ({ emoji, focus, onClick }) => {
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     // Preventing safari from losing focus on Composer MessageInput
     e.preventDefault();

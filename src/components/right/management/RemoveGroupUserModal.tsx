@@ -1,6 +1,6 @@
 import type { FC } from '../../../lib/teact/teact';
 import React, {
-  useMemo, useState, memo, useCallback,
+  useMemo, useState, memo, useRef, useCallback,
 } from '../../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../../global';
 
@@ -33,7 +33,9 @@ const RemoveGroupUserModal: FC<OwnProps & StateProps> = ({
   } = getActions();
 
   const lang = useLang();
-  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('');
+  // eslint-disable-next-line no-null/no-null
+  const filterRef = useRef<HTMLInputElement>(null);
 
   const usersId = useMemo(() => {
     const availableMemberIds = (chat.fullInfo?.members || [])
@@ -47,8 +49,8 @@ const RemoveGroupUserModal: FC<OwnProps & StateProps> = ({
     // No need for expensive global updates on users, so we avoid them
     const usersById = getGlobal().users.byId;
 
-    return filterUsersByName(availableMemberIds, usersById, search);
-  }, [chat.fullInfo?.members, currentUserId, search]);
+    return filterUsersByName(availableMemberIds, usersById, filter);
+  }, [chat.fullInfo?.members, currentUserId, filter]);
 
   const handleRemoveUser = useCallback((userId: string) => {
     deleteChatMember({ chatId: chat.id, userId });
@@ -59,9 +61,10 @@ const RemoveGroupUserModal: FC<OwnProps & StateProps> = ({
     <ChatOrUserPicker
       isOpen={isOpen}
       chatOrUserIds={usersId}
-      searchPlaceholder={lang('ChannelBlockUser')}
-      search={search}
-      onSearchChange={setSearch}
+      filterRef={filterRef}
+      filterPlaceholder={lang('ChannelBlockUser')}
+      filter={filter}
+      onFilterChange={setFilter}
       loadMore={loadMoreMembers}
       onSelectChatOrUser={handleRemoveUser}
       onClose={onClose}

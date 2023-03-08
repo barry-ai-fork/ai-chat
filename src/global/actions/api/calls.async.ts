@@ -8,11 +8,9 @@ import {
   setVolume, stopPhoneCall,
 } from '../../../lib/secret-sauce';
 
-import type { ActionReturnType } from '../../types';
-
 import { GROUP_CALL_VOLUME_MULTIPLIER } from '../../../config';
 import { callApi } from '../../../api/gramjs';
-import { selectChat, selectTabState, selectUser } from '../../selectors';
+import { selectChat, selectUser } from '../../selectors';
 import {
   selectActiveGroupCall, selectPhoneCallUser,
 } from '../../selectors/calls';
@@ -22,25 +20,17 @@ import {
 } from '../../reducers/calls';
 import { getGroupCallAudioContext, getGroupCallAudioElement, removeGroupCallAudioElement } from '../ui/calls';
 import { loadFullChat } from './chats';
-import { addUsers } from '../../reducers';
-import { buildCollectionByKey } from '../../../util/iteratees';
-import { updateTabState } from '../../reducers/tabs';
-import { getCurrentTabId } from '../../../util/establishMultitabRole';
 
-const HANG_UP_UI_DELAY = 500;
-
-addActionHandler('leaveGroupCall', async (global, actions, payload): Promise<void> => {
+addActionHandler('leaveGroupCall', async (global, actions, payload) => {
   const {
     isFromLibrary, shouldDiscard, shouldRemove, rejoin,
-    tabId = getCurrentTabId(),
   } = payload || {};
   const groupCall = selectActiveGroupCall(global);
   if (!groupCall) {
     return;
   }
 
-  global = updateActiveGroupCall(global, { connectionState: 'disconnected' }, groupCall.participantsCount - 1);
-  setGlobal(global);
+  setGlobal(updateActiveGroupCall(global, { connectionState: 'disconnected' }, groupCall.participantsCount - 1));
 
   await callApi('leaveGroupCall', {
     call: groupCall,
@@ -59,32 +49,25 @@ addActionHandler('leaveGroupCall', async (global, actions, payload): Promise<voi
 
   removeGroupCallAudioElement();
 
-  global = {
+  setGlobal({
     ...global,
     groupCalls: {
       ...global.groupCalls,
       activeGroupCallId: undefined,
     },
-  };
-  setGlobal(global);
-
-  actions.toggleGroupCallPanel({ force: undefined, tabId });
+    isCallPanelVisible: undefined,
+  });
 
   if (!isFromLibrary) {
     leaveGroupCall();
   }
 
-  actions.afterHangUp();
-
   if (rejoin) {
-    actions.requestMasterAndJoinGroupCall({
-      ...rejoin,
-      tabId,
-    });
+    actions.joinGroupCall(rejoin);
   }
 });
 
-addActionHandler('toggleGroupCallVideo', async (global): Promise<void> => {
+addActionHandler('toggleGroupCallVideo', async (global) => {
   const groupCall = selectActiveGroupCall(global);
   const user = selectUser(global, global.currentUserId!);
   if (!user || !groupCall) {
@@ -100,7 +83,7 @@ addActionHandler('toggleGroupCallVideo', async (global): Promise<void> => {
   });
 });
 
-addActionHandler('requestToSpeak', (global, actions, payload): ActionReturnType => {
+addActionHandler('requestToSpeak', (global, actions, payload) => {
   const { value } = payload || { value: true };
   const groupCall = selectActiveGroupCall(global);
   const user = selectUser(global, global.currentUserId!);
@@ -115,7 +98,7 @@ addActionHandler('requestToSpeak', (global, actions, payload): ActionReturnType 
   });
 });
 
-addActionHandler('setGroupCallParticipantVolume', (global, actions, payload): ActionReturnType => {
+addActionHandler('setGroupCallParticipantVolume', (global, actions, payload) => {
   const { participantId, volume } = payload!;
 
   const groupCall = selectActiveGroupCall(global);
@@ -133,7 +116,7 @@ addActionHandler('setGroupCallParticipantVolume', (global, actions, payload): Ac
   });
 });
 
-addActionHandler('toggleGroupCallMute', async (global, actions, payload): Promise<void> => {
+addActionHandler('toggleGroupCallMute', async (global, actions, payload) => {
   const { participantId, value } = payload || {};
   const groupCall = selectActiveGroupCall(global);
   const user = selectUser(global, participantId || global.currentUserId!);
@@ -156,7 +139,7 @@ addActionHandler('toggleGroupCallMute', async (global, actions, payload): Promis
   });
 });
 
-addActionHandler('toggleGroupCallPresentation', async (global, actions, payload): Promise<void> => {
+addActionHandler('toggleGroupCallPresentation', async (global, actions, payload) => {
   const groupCall = selectActiveGroupCall(global);
   const user = selectUser(global, global.currentUserId!);
   if (!user || !groupCall) {
@@ -188,13 +171,12 @@ addActionHandler('toggleGroupCallPresentation', async (global, actions, payload)
   });
 });
 
-addActionHandler('connectToActiveGroupCall', async (global, actions, payload): Promise<void> => {
-  const { tabId = getCurrentTabId() } = payload || {};
+addActionHandler('connectToActiveGroupCall', async (global, actions) => {
   const groupCall = selectActiveGroupCall(global);
   if (!groupCall) return;
 
   if (groupCall.connectionState === 'discarded') {
-    actions.showNotification({ message: 'This voice chat is not active', tabId });
+    actions.showNotification({ message: 'This voice chat is not active' });
     return;
   }
 
@@ -219,21 +201,18 @@ addActionHandler('connectToActiveGroupCall', async (global, actions, payload): P
     inviteHash: groupCall.inviteHash,
   });
 
-  global = getGlobal();
-
   if (!result) return;
 
   actions.loadMoreGroupCallParticipants();
 
   if (groupCall.chatId) {
-    global = getGlobal();
-    const chat = selectChat(global, groupCall.chatId);
+    const chat = selectChat(getGlobal(), groupCall.chatId);
     if (!chat) return;
-    await loadFullChat(global, actions, chat, tabId);
+    await loadFullChat(chat);
   }
 });
 
-addActionHandler('connectToActivePhoneCall', async (global, actions): Promise<void> => {
+addActionHandler('connectToActivePhoneCall', async (global, actions) => {
   const { phoneCall } = global;
 
   if (!phoneCall) return;
@@ -253,15 +232,11 @@ addActionHandler('connectToActivePhoneCall', async (global, actions): Promise<vo
   const result = await callApi('requestCall', { user, gAHash, isVideo: phoneCall.isVideo });
 
   if (!result) {
-    if ('hangUp' in actions) actions.hangUp({ tabId: getCurrentTabId() });
-    return;
+    actions.hangUp();
   }
-  global = getGlobal();
-  global = addUsers(global, buildCollectionByKey(result.users, 'id'));
-  setGlobal(global);
 });
 
-addActionHandler('acceptCall', async (global): Promise<void> => {
+addActionHandler('acceptCall', async (global) => {
   const { phoneCall } = global;
 
   if (!phoneCall) return;
@@ -272,16 +247,10 @@ addActionHandler('acceptCall', async (global): Promise<void> => {
   await callApi('createPhoneCallState', [false]);
 
   const gB = await callApi('acceptPhoneCall', [dhConfig])!;
-  const result = await callApi('acceptCall', { call: phoneCall, gB });
-  if (!result) {
-    return;
-  }
-  global = getGlobal();
-  global = addUsers(global, buildCollectionByKey(result.users, 'id'));
-  setGlobal(global);
+  callApi('acceptCall', { call: phoneCall, gB });
 });
 
-addActionHandler('sendSignalingData', (global, actions, payload): ActionReturnType => {
+addActionHandler('sendSignalingData', (global, actions, payload) => {
   const { phoneCall } = global;
   if (!phoneCall) {
     return;
@@ -298,30 +267,30 @@ addActionHandler('sendSignalingData', (global, actions, payload): ActionReturnTy
   })();
 });
 
-addActionHandler('closeCallRatingModal', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  return updateTabState(global, {
+addActionHandler('closeCallRatingModal', (global) => {
+  return {
+    ...global,
     ratingPhoneCall: undefined,
-  }, tabId);
+  };
 });
 
-addActionHandler('setCallRating', (global, actions, payload): ActionReturnType => {
-  const { rating, comment, tabId = getCurrentTabId() } = payload;
-
-  const { ratingPhoneCall } = selectTabState(global, tabId);
+addActionHandler('setCallRating', (global, actions, payload) => {
+  const { ratingPhoneCall } = global;
   if (!ratingPhoneCall) {
     return undefined;
   }
 
+  const { rating, comment } = payload;
+
   callApi('setCallRating', { call: ratingPhoneCall, rating, comment });
 
-  return updateTabState(global, {
+  return {
+    ...global,
     ratingPhoneCall: undefined,
-  }, tabId);
+  };
 });
 
-addActionHandler('hangUp', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
+addActionHandler('hangUp', (global) => {
   const { phoneCall } = global;
 
   if (!phoneCall) return undefined;
@@ -329,17 +298,11 @@ addActionHandler('hangUp', (global, actions, payload): ActionReturnType => {
   if (phoneCall.state === 'discarded') {
     callApi('destroyPhoneCallState');
     stopPhoneCall();
-
-    global = {
+    return {
       ...global,
       phoneCall: undefined,
+      isCallPanelVisible: undefined,
     };
-    setGlobal(global);
-    actions.toggleGroupCallPanel({ force: undefined, tabId });
-
-    actions.afterHangUp();
-
-    return undefined;
   }
 
   callApi('destroyPhoneCallState');
@@ -347,29 +310,20 @@ addActionHandler('hangUp', (global, actions, payload): ActionReturnType => {
   callApi('discardCall', { call: phoneCall });
 
   if (phoneCall.state === 'requesting') {
-    global = {
+    return {
       ...global,
       phoneCall: undefined,
+      isCallPanelVisible: undefined,
     };
-    setGlobal(global);
-    actions.toggleGroupCallPanel({ force: undefined, tabId });
-
-    actions.afterHangUp();
-
-    return undefined;
   }
 
   setTimeout(() => {
-    global = getGlobal();
-    global = {
-      ...global,
+    setGlobal({
+      ...getGlobal(),
       phoneCall: undefined,
-    };
-    setGlobal(global);
-
-    actions.toggleGroupCallPanel({ force: undefined, tabId });
-    actions.afterHangUp();
-  }, HANG_UP_UI_DELAY);
+      isCallPanelVisible: undefined,
+    });
+  }, 500);
 
   return undefined;
 });

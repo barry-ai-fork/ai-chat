@@ -1,26 +1,19 @@
-import React, {
-  useState, useRef, useCallback, useMemo,
-} from '../../lib/teact/teact';
-
 import type { FC } from '../../lib/teact/teact';
+import React, { useState, useRef, useCallback } from '../../lib/teact/teact';
 
 import Menu from './Menu';
-import Button from './Button';
 
 import './DropdownMenu.scss';
 
 type OwnProps = {
   className?: string;
-  trigger?: FC<{ onTrigger: () => void; isOpen?: boolean }>;
+  trigger: FC<{ onTrigger: () => void; isOpen?: boolean }>;
   positionX?: 'left' | 'right';
   positionY?: 'top' | 'bottom';
   footer?: string;
   forceOpen?: boolean;
   onOpen?: NoneToVoidFunction;
   onClose?: NoneToVoidFunction;
-  onHide?: NoneToVoidFunction;
-  onTransitionEnd?: NoneToVoidFunction;
-  onMouseEnterBackdrop?: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
   children: React.ReactNode;
 };
 
@@ -34,9 +27,6 @@ const DropdownMenu: FC<OwnProps> = ({
   forceOpen,
   onOpen,
   onClose,
-  onTransitionEnd,
-  onMouseEnterBackdrop,
-  onHide,
 }) => {
   // eslint-disable-next-line no-null/no-null
   const menuRef = useRef<HTMLDivElement>(null);
@@ -47,10 +37,8 @@ const DropdownMenu: FC<OwnProps> = ({
   const toggleIsOpen = () => {
     setIsOpen(!isOpen);
     if (isOpen) {
-      onClose?.();
-    } else {
-      onOpen?.();
-    }
+      if (onClose) onClose();
+    } else if (onOpen) onOpen();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<any>) => {
@@ -70,34 +58,16 @@ const DropdownMenu: FC<OwnProps> = ({
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
-    onClose?.();
+    if (onClose) onClose();
   }, [onClose]);
-
-  const triggerComponent: FC<{ onTrigger: () => void; isOpen?: boolean }> = useMemo(() => {
-    if (trigger) return trigger;
-
-    return ({ onTrigger, isOpen: isMenuOpen }) => (
-      <Button
-        round
-        size="smaller"
-        color="translucent"
-        className={isMenuOpen ? 'active' : ''}
-        onClick={onTrigger}
-        ariaLabel="More actions"
-      >
-        <i className="icon-more" />
-      </Button>
-    );
-  }, [trigger]);
 
   return (
     <div
       ref={dropdownRef}
       className={`DropdownMenu ${className || ''}`}
       onKeyDown={handleKeyDown}
-      onTransitionEnd={onTransitionEnd}
     >
-      {triggerComponent({ onTrigger: toggleIsOpen, isOpen })}
+      {trigger({ onTrigger: toggleIsOpen, isOpen })}
 
       <Menu
         ref={menuRef}
@@ -110,8 +80,6 @@ const DropdownMenu: FC<OwnProps> = ({
         autoClose
         onClose={handleClose}
         shouldSkipTransition={forceOpen}
-        onCloseAnimationEnd={onHide}
-        onMouseEnterBackdrop={onMouseEnterBackdrop}
       >
         {children}
       </Menu>

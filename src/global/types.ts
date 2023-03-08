@@ -35,29 +35,13 @@ import type {
   ApiPhoto,
   ApiKeyboardButton,
   ApiThemeParameters,
-  ApiAttachBot,
+  ApiAttachMenuBot,
   ApiPhoneCall,
   ApiWebSession,
   ApiPremiumPromo,
   ApiTranscription,
   ApiInputInvoice,
   ApiInvoice,
-  ApiStickerSetInfo,
-  ApiChatType,
-  ApiReceipt,
-  ApiPaymentCredentials,
-  ApiConfig,
-  ApiReaction,
-  ApiChatReactions,
-  ApiContact,
-  ApiExportedInvite,
-  ApiSendMessageAction,
-  ApiMessageEntity,
-  ApiAttachment,
-  ApiChatBannedRights,
-  ApiChatAdminRights,
-  ApiSessionData,
-  ApiTypingStatus,
 } from '../api/types';
 import type {
   FocusDirection,
@@ -70,7 +54,8 @@ import type {
   ManagementProgress,
   PaymentStep,
   ShippingOption,
-  ApiInvoiceContainer,
+  Invoice,
+  Receipt,
   ApiPrivacyKey,
   ApiPrivacySettings,
   ThemeKey,
@@ -83,12 +68,9 @@ import type {
   AudioOrigin,
   ManagementState,
   SettingsScreens,
-  ManagementScreens,
-  LoadMoreDirection, PrivacyVisibility,
 } from '../types';
 import { typify } from '../lib/teact/teactn';
 import type { P2pMessage } from '../lib/secret-sauce';
-import type { ApiCredentials } from '../components/payment/PaymentModal';
 
 export type MessageListType =
   'thread'
@@ -101,6 +83,10 @@ export interface MessageList {
   type: MessageListType;
 }
 
+export enum MainViewTypeEnums{
+  noView
+}
+
 export interface ActiveEmojiInteraction {
   id: number;
   x: number;
@@ -111,36 +97,28 @@ export interface ActiveEmojiInteraction {
   isReversed?: boolean;
 }
 
-export type ApiPaymentStatus = 'paid' | 'failed' | 'pending' | 'cancelled';
-
 export interface ActiveReaction {
   messageId?: number;
-  reaction?: ApiReaction;
-}
-
-export interface TabThread {
-  scrollOffset?: number;
-  replyStack?: number[];
-  outlyingIds?: number[];
-  viewportIds?: number[];
+  reaction?: string;
 }
 
 export interface Thread {
-  lastScrollOffset?: number;
-  lastViewportIds?: number[];
   listedIds?: number[];
+  outlyingIds?: number[];
+  viewportIds?: number[];
   pinnedIds?: number[];
   scheduledIds?: number[];
-  editingId?: number;
+  scrollOffset?: number;
   replyingToId?: number;
+  editingId?: number;
   editingScheduledId?: number;
   editingDraft?: ApiFormattedText;
   editingScheduledDraft?: ApiFormattedText;
-  draft?: ApiDraft;
+  draft?: ApiFormattedText;
   noWebPage?: boolean;
   threadInfo?: ApiThreadInfo;
   firstMessageId?: number;
-  typingStatus?: ApiTypingStatus;
+  replyStack?: number[];
 }
 
 export interface ServiceNotification {
@@ -148,7 +126,11 @@ export interface ServiceNotification {
   message: ApiMessage;
   version?: string;
   isUnread?: boolean;
-  isDeleted?: boolean;
+}
+
+export interface NotifyUpdater {
+  updaterDialogs: number;
+  updaterChatListContent:number;
 }
 
 export type ApiLimitType = (
@@ -160,443 +142,22 @@ export type ApiLimitTypeWithModal = Exclude<ApiLimitType, (
   'captionLength' | 'aboutLength' | 'stickersFaved' | 'savedGifs'
 )>;
 
-export type TranslatedMessage = {
-  isPending?: boolean;
-  text?: ApiFormattedText;
-};
-
-export type ChatTranslatedMessages = {
-  byLangCode: Record<string, Record<number, TranslatedMessage>>;
-};
-
-export type ChatRequestedTranslations = {
-  toLanguage?: string;
-  manualMessages?: Record<number, string>;
-};
-
-export type TabState = {
-  id: number;
-  isMasterTab: boolean;
-  isInactive?: boolean;
-  inviteHash?: string;
+export type GlobalState = {
+  notifyUpdater: NotifyUpdater,
+  appConfig?: ApiAppConfig;
   canInstall?: boolean;
   isChatInfoShown: boolean;
   isStatisticsShown?: boolean;
   isLeftColumnShown: boolean;
   newChatMembersProgress?: NewChatMembersProgress;
   uiReadyState: 0 | 1 | 2;
-  shouldInit: boolean;
   shouldSkipHistoryAnimations?: boolean;
-
-  gifSearch: {
-    query?: string;
-    offset?: string;
-    results?: ApiVideo[];
-  };
-
-  stickerSearch: {
-    query?: string;
-    hash?: string;
-    resultIds?: string[];
-  };
-
-  nextSettingsScreen?: SettingsScreens;
-
-  isCallPanelVisible?: boolean;
-  multitabNextAction?: CallbackAction;
-  ratingPhoneCall?: ApiPhoneCall;
-
-  messageLists: MessageList[];
-
-  contentToBeScheduled?: {
-    gif?: ApiVideo;
-    sticker?: ApiSticker;
-    poll?: ApiNewPoll;
-    isSilent?: boolean;
-    sendGrouped?: boolean;
-    sendCompressed?: boolean;
-  };
-
-  activeChatFolder: number;
-  tabThreads: Record<string, Record<number, TabThread>>;
-  forumPanelChatId?: string;
-
-  focusedMessage?: {
-    chatId?: string;
-    threadId?: number;
-    messageId?: number;
-    direction?: FocusDirection;
-    noHighlight?: boolean;
-    isResizingContainer?: boolean;
-    hasReachedMessage?: boolean;
-  };
-
-  selectedMessages?: {
-    chatId: string;
-    messageIds: number[];
-  };
-
-  seenByModal?: {
-    chatId: string;
-    messageId: number;
-  };
-
-  reactorModal?: {
-    chatId: string;
-    messageId: number;
-  };
-
-  inlineBots: {
-    isLoading: boolean;
-    byUsername: Record<string, false | InlineBotSettings>;
-  };
-
-  globalSearch: {
-    query?: string;
-    date?: number;
-    currentContent?: GlobalSearchContent;
-    chatId?: string;
-    foundTopicIds?: number[];
-    fetchingStatus?: {
-      chats?: boolean;
-      messages?: boolean;
-    };
-    isClosing?: boolean;
-    localResults?: {
-      chatIds?: string[];
-      userIds?: string[];
-    };
-    globalResults?: {
-      chatIds?: string[];
-      userIds?: string[];
-    };
-    resultsByType?: Partial<Record<ApiGlobalMessageSearchType, {
-      totalCount?: number;
-      nextOffsetId: number;
-      foundIds: string[];
-    }>>;
-  };
-
-  userSearch: {
-    query?: string;
-    fetchingStatus?: boolean;
-    localUserIds?: string[];
-    globalUserIds?: string[];
-  };
-
-  activeEmojiInteractions?: ActiveEmojiInteraction[];
-  activeReactions: Record<number, ActiveReaction[]>;
-
-  localTextSearch: {
-    byChatThreadKey: Record<string, {
-      isActive: boolean;
-      query?: string;
-      results?: {
-        totalCount?: number;
-        nextOffsetId?: number;
-        foundIds?: number[];
-      };
-    }>;
-  };
-
-  localMediaSearch: {
-    byChatThreadKey: Record<string, {
-      currentType?: SharedMediaType;
-      resultsByType?: Partial<Record<SharedMediaType, {
-        totalCount?: number;
-        nextOffsetId: number;
-        foundIds: number[];
-      }>>;
-    }>;
-  };
-
-  management: {
-    progress?: ManagementProgress;
-    byChatId: Record<string, ManagementState>;
-  };
-
-  mediaViewer: {
-    chatId?: string;
-    threadId?: number;
-    mediaId?: number;
-    avatarOwnerId?: string;
-    profilePhotoIndex?: number;
-    origin?: MediaViewerOrigin;
-    volume: number;
-    playbackRate: number;
-    isMuted: boolean;
-    isHidden?: boolean;
-  };
-
-  audioPlayer: {
-    chatId?: string;
-    messageId?: number;
-    threadId?: number;
-    origin?: AudioOrigin;
-    volume: number;
-    playbackRate: number;
-    isPlaybackRateActive?: boolean;
-    isMuted: boolean;
-  };
-
-  webPagePreview?: ApiWebPage;
-
-  forwardMessages: {
-    isModalShown?: boolean;
-    fromChatId?: string;
-    messageIds?: number[];
-    toChatId?: string;
-    toThreadId?: number;
-    withMyScore?: boolean;
-    noAuthors?: boolean;
-    noCaptions?: boolean;
-  };
-
-  pollResults: {
-    chatId?: string;
-    messageId?: number;
-    voters?: Record<string, string[]>; // TODO Rename to `voterIds`
-    offsets?: Record<string, string>;
-  };
-
-  payment: {
-    inputInvoice?: ApiInputInvoice;
-    step?: PaymentStep;
-    status?: ApiPaymentStatus;
-    shippingOptions?: ShippingOption[];
-    formId?: string;
-    requestId?: string;
-    savedInfo?: ApiPaymentSavedInfo;
-    canSaveCredentials?: boolean;
-    invoice?: ApiInvoice;
-    invoiceContainer?: Omit<ApiInvoiceContainer, 'receiptMsgId'>;
-    nativeProvider?: string;
-    providerId?: string;
-    nativeParams?: ApiPaymentFormNativeParams;
-    stripeCredentials?: {
-      type: string;
-      id: string;
-    };
-    smartGlocalCredentials?: {
-      type: string;
-      token: string;
-    };
-    passwordMissing?: boolean;
-    savedCredentials?: ApiPaymentCredentials[];
-    receipt?: ApiReceipt;
-    error?: {
-      field?: string;
-      message?: string;
-      description?: string;
-    };
-    isPaymentModalOpen?: boolean;
-    isExtendedMedia?: boolean;
-    confirmPaymentUrl?: string;
-    temporaryPassword?: {
-      value: string;
-      validUntil: number;
-    };
-  };
-
-  chatCreation?: {
-    progress: ChatCreationProgress;
-    error?: string;
-  };
-
-  profileEdit?: {
-    progress: ProfileEditProgress;
-    checkedUsername?: string;
-    isUsernameAvailable?: boolean;
-    error?: string;
-  };
-
-  notifications: ApiNotification[];
-  dialogs: (ApiError | ApiInviteInfo | ApiContact)[];
-
-  safeLinkModalUrl?: string;
-  historyCalendarSelectedAt?: number;
-  openedStickerSetShortName?: string;
-  openedCustomEmojiSetIds?: string[];
-
-  activeDownloads: {
-    byChatId: Record<string, number[]>;
-  };
-
-  shouldShowContextMenuHint?: boolean;
-
-  statistics: {
-    byChatId: Record<string, ApiChannelStatistics | ApiGroupStatistics>;
-    currentMessage?: ApiMessageStatistics;
-    currentMessageId?: number;
-  };
-
-  newContact?: {
-    userId?: string;
-    isByPhoneNumber?: boolean;
-  };
-
-  openedGame?: {
-    url: string;
-    chatId: string;
-    messageId: number;
-  };
-
-  requestedDraft?: {
-    chatId?: string;
-    text: string;
-    files?: File[];
-  };
-
-  pollModal: {
-    isOpen: boolean;
-    isQuiz?: boolean;
-  };
-
-  webApp?: {
-    url: string;
-    botId: string;
-    buttonText: string;
-    queryId?: string;
-    slug?: string;
-    replyToMessageId?: number;
-    threadId?: number;
-  };
-
-  botTrustRequest?: {
-    botId: string;
-    type: 'game' | 'webApp';
-    onConfirm?: CallbackAction;
-  };
-  requestedAttachBotInstall?: {
-    bot: ApiAttachBot;
-    onConfirm?: CallbackAction;
-  };
-  requestedAttachBotInChat?: {
-    bot: ApiAttachBot;
-    filter: ApiChatType[];
-    startParam?: string;
-  };
-
-  confetti?: {
-    lastConfettiTime?: number;
-    top?: number;
-    left?: number;
-    width?: number;
-    height?: number;
-  };
-
-  urlAuth?: {
-    button?: {
-      chatId: string;
-      messageId: number;
-      buttonId: number;
-    };
-    request?: {
-      domain: string;
-      botId: string;
-      shouldRequestWriteAccess?: boolean;
-    };
-    url: string;
-  };
-
-  premiumModal?: {
-    isOpen?: boolean;
-    isClosing?: boolean;
-    promo: ApiPremiumPromo;
-    initialSection?: string;
-    fromUserId?: string;
-    toUserId?: string;
-    isGift?: boolean;
-    monthsAmount?: number;
-    isSuccess?: boolean;
-  };
-
-  giftPremiumModal?: {
-    isOpen?: boolean;
-    forUserId?: string;
-    monthlyCurrency?: string;
-    monthlyAmount?: string;
-  };
-
-  limitReachedModal?: {
-    limit: ApiLimitTypeWithModal;
-  };
-
-  deleteFolderDialogModal?: number;
-
-  createTopicPanel?: {
-    chatId: string;
-    isLoading?: boolean;
-  };
-
-  editTopicPanel?: {
-    chatId: string;
-    topicId: number;
-    isLoading?: boolean;
-  };
-
-  requestedTranslations: {
-    byChatId: Record<string, ChatRequestedTranslations>;
-  };
-  messageLanguageModal?: {
-    chatId: string;
-    messageId: number;
-    activeLanguage?: string;
-  };
-};
-
-export type GlobalState = {
-  config?: ApiConfig;
-  appConfig?: ApiAppConfig;
-  hasWebAuthTokenFailed?: boolean;
-  hasWebAuthTokenPasswordRequired?: true;
   connectionState?: ApiUpdateConnectionStateType;
   currentUserId?: string;
   isSyncing?: boolean;
-  isUpdateAvailable?: boolean;
   lastSyncTime?: number;
   serverTimeOffset: number;
-  blurredTabTokens: number[];
   leftColumnWidth?: number;
-  lastIsChatInfoShown?: boolean;
-  initialUnreadNotifications?: number;
-
-  audioPlayer: {
-    lastPlaybackRate: number;
-    isLastPlaybackRateActive?: boolean;
-  };
-
-  mediaViewer: {
-    lastPlaybackRate: number;
-  };
-
-  recentlyFoundChatIds?: string[];
-
-  twoFaSettings: {
-    hint?: string;
-    isLoading?: boolean;
-    error?: string;
-    waitingEmailCodeLength?: number;
-  };
-
-  attachmentSettings: {
-    shouldCompress: boolean;
-    shouldSendGrouped: boolean;
-  };
-
-  attachMenu: {
-    hash?: string;
-    bots: Record<string, ApiAttachBot>;
-  };
-
-  passcode: {
-    isScreenLocked?: boolean;
-    hasPasscode?: boolean;
-    error?: string;
-    invalidAttemptsCount?: number;
-    invalidAttemptError?: string;
-    isLoading?: boolean;
-  };
 
   // TODO Move to `auth`.
   isLoggingOut?: boolean;
@@ -633,6 +194,7 @@ export type GlobalState = {
   };
 
   chats: {
+    orderedIds?:string[],
     // TODO Replace with `Partial<Record>` to properly handle missing keys
     byId: Record<string, ApiChat>;
     listIds: {
@@ -659,6 +221,13 @@ export type GlobalState = {
       byId: Record<number, ApiMessage>;
       threadsById: Record<number, Thread>;
     }>;
+    messageLists: MessageList[];
+    contentToBeScheduled?: {
+      gif?: ApiVideo;
+      sticker?: ApiSticker;
+      poll?: ApiNewPoll;
+      isSilent?: boolean;
+    };
     sponsoredByChatId: Record<string, ApiSponsoredMessage>;
   };
 
@@ -666,6 +235,10 @@ export type GlobalState = {
     byId: Record<string, ApiGroupCall>;
     activeGroupCallId?: string;
   };
+
+  isCallPanelVisible?: boolean;
+  phoneCall?: ApiPhoneCall;
+  ratingPhoneCall?: ApiPhoneCall;
 
   scheduledMessages: {
     byChatId: Record<string, {
@@ -677,9 +250,32 @@ export type GlobalState = {
     orderedIds?: number[];
     byId: Record<number, ApiChatFolder>;
     recommended?: ApiChatFolder[];
+    activeChatFolder: number;
   };
 
-  phoneCall?: ApiPhoneCall;
+  focusedMessage?: {
+    chatId?: string;
+    threadId?: number;
+    messageId?: number;
+    direction?: FocusDirection;
+    noHighlight?: boolean;
+    isResizingContainer?: boolean;
+  };
+
+  selectedMessages?: {
+    chatId: string;
+    messageIds: number[];
+  };
+
+  seenByModal?: {
+    chatId: string;
+    messageId: number;
+  };
+
+  reactorModal?: {
+    chatId: string;
+    messageId: number;
+  };
 
   fileUploads: {
     byMessageLocalId: Record<string, {
@@ -688,7 +284,6 @@ export type GlobalState = {
   };
 
   recentEmojis: string[];
-  recentCustomEmojis: string[];
 
   stickers: {
     setsById: Record<string, ApiStickerSet>;
@@ -712,45 +307,23 @@ export type GlobalState = {
       hash?: string;
       stickers: ApiSticker[];
     };
-    premiumSet: {
-      hash?: string;
-      stickers: ApiSticker[];
-    };
     featured: {
       hash?: string;
       setIds?: string[];
     };
+    search: {
+      query?: string;
+      resultIds?: string[];
+    };
     forEmoji: {
       emoji?: string;
       stickers?: ApiSticker[];
       hash?: string;
-    };
-  };
-
-  customEmojis: {
-    added: {
-      hash?: string;
-      setIds?: string[];
-    };
-    lastRendered: string[];
-    byId: Record<string, ApiSticker>;
-    forEmoji: {
-      emoji?: string;
-      stickers?: ApiSticker[];
-    };
-    featuredIds?: string[];
-    statusRecent: {
-      hash?: string;
-      emojis?: ApiSticker[];
     };
   };
 
   animatedEmojis?: ApiStickerSet;
   animatedEmojiEffects?: ApiStickerSet;
-  genericEmojiEffects?: ApiStickerSet;
-  defaultTopicIconsId?: string;
-  defaultStatusIconsId?: string;
-  premiumGifts?: ApiStickerSet;
   emojiKeywords: Partial<Record<LangCode, EmojiKeywords>>;
 
   gifs: {
@@ -758,9 +331,103 @@ export type GlobalState = {
       hash?: string;
       gifs?: ApiVideo[];
     };
+    search: {
+      query?: string;
+      offset?: string;
+      results?: ApiVideo[];
+    };
+  };
+
+  inlineBots: {
+    isLoading: boolean;
+    byUsername: Record<string, false | InlineBotSettings>;
+  };
+
+  globalSearch: {
+    query?: string;
+    date?: number;
+    recentlyFoundChatIds?: string[];
+    currentContent?: GlobalSearchContent;
+    chatId?: string;
+    fetchingStatus?: {
+      chats?: boolean;
+      messages?: boolean;
+    };
+    localResults?: {
+      chatIds?: string[];
+      userIds?: string[];
+    };
+    globalResults?: {
+      chatIds?: string[];
+      userIds?: string[];
+    };
+    resultsByType?: Partial<Record<ApiGlobalMessageSearchType, {
+      totalCount?: number;
+      nextOffsetId: number;
+      foundIds: string[];
+    }>>;
+  };
+
+  userSearch: {
+    query?: string;
+    fetchingStatus?: boolean;
+    localUserIds?: string[];
+    globalUserIds?: string[];
   };
 
   availableReactions?: ApiAvailableReaction[];
+  activeEmojiInteractions?: ActiveEmojiInteraction[];
+  activeReactions: Record<number, ActiveReaction>;
+
+  localTextSearch: {
+    byChatThreadKey: Record<string, {
+      isActive: boolean;
+      query?: string;
+      results?: {
+        totalCount?: number;
+        nextOffsetId?: number;
+        foundIds?: number[];
+      };
+    }>;
+  };
+
+  localMediaSearch: {
+    byChatId: Record<string, {
+      currentType?: SharedMediaType;
+      resultsByType?: Partial<Record<SharedMediaType, {
+        totalCount?: number;
+        nextOffsetId: number;
+        foundIds: number[];
+      }>>;
+    }>;
+  };
+
+  management: {
+    progress?: ManagementProgress;
+    byChatId: Record<string, ManagementState>;
+  };
+
+  mediaViewer: {
+    chatId?: string;
+    threadId?: number;
+    messageId?: number;
+    avatarOwnerId?: string;
+    profilePhotoIndex?: number;
+    origin?: MediaViewerOrigin;
+    volume: number;
+    playbackRate: number;
+    isMuted: boolean;
+  };
+
+  audioPlayer: {
+    chatId?: string;
+    messageId?: number;
+    threadId?: number;
+    origin?: AudioOrigin;
+    volume: number;
+    playbackRate: number;
+    isMuted: boolean;
+  };
 
   topPeers: {
     userIds?: string[];
@@ -771,6 +438,73 @@ export type GlobalState = {
     userIds?: string[];
     lastRequestedAt?: number;
   };
+
+  webPagePreview?: ApiWebPage;
+
+  forwardMessages: {
+    isModalShown?: boolean;
+    fromChatId?: string;
+    messageIds?: number[];
+    toChatId?: string;
+    withMyScore?: boolean;
+  };
+
+  pollResults: {
+    chatId?: string;
+    messageId?: number;
+    voters?: Record<string, string[]>; // TODO Rename to `voterIds`
+    offsets?: Record<string, string>;
+  };
+
+  payment: {
+    inputInvoice?: ApiInputInvoice;
+    step?: PaymentStep;
+    status?: 'paid' | 'failed' | 'pending' | 'cancelled';
+    shippingOptions?: ShippingOption[];
+    formId?: string;
+    requestId?: string;
+    savedInfo?: ApiPaymentSavedInfo;
+    canSaveCredentials?: boolean;
+    invoice?: Invoice;
+    invoiceContent?: Omit<ApiInvoice, 'receiptMsgId'>;
+    nativeProvider?: string;
+    providerId?: string;
+    nativeParams?: ApiPaymentFormNativeParams;
+    stripeCredentials?: {
+      type: string;
+      id: string;
+    };
+    smartGlocalCredentials?: {
+      type: string;
+      token: string;
+    };
+    passwordMissing?: boolean;
+    savedCredentials?: {
+      id: string;
+      title: string;
+    };
+    receipt?: Receipt;
+    error?: {
+      field?: string;
+      message?: string;
+      description: string;
+    };
+    isPaymentModalOpen?: boolean;
+    confirmPaymentUrl?: string;
+  };
+
+  chatCreation?: {
+    progress: ChatCreationProgress;
+    error?: string;
+  };
+
+  profileEdit?: {
+    progress: ProfileEditProgress;
+    isUsernameAvailable?: boolean;
+  };
+
+  notifications: ApiNotification[];
+  dialogs: (ApiError | ApiInviteInfo)[];
 
   activeSessions: {
     byHash: Record<string, ApiSession>;
@@ -789,6 +523,22 @@ export type GlobalState = {
     themes: Partial<Record<ThemeKey, IThemeSettings>>;
     privacy: Partial<Record<ApiPrivacyKey, ApiPrivacySettings>>;
     notifyExceptions?: Record<number, NotifyException>;
+    nextScreen?: SettingsScreens;
+  };
+
+  twoFaSettings: {
+    hint?: string;
+    isLoading?: boolean;
+    error?: string;
+    waitingEmailCodeLength?: number;
+  };
+
+  passcode: {
+    isScreenLocked?: boolean;
+    hasPasscode?: boolean;
+    error?: string;
+    invalidAttemptsCount?: number;
+    isLoading?: boolean;
   };
 
   push?: {
@@ -796,774 +546,144 @@ export type GlobalState = {
     subscribedAt: number;
   };
 
-  transcriptions: Record<string, ApiTranscription>;
-  trustedBotIds: string[];
+  safeLinkModalUrl?: string;
+  historyCalendarSelectedAt?: number;
+  openedStickerSetShortName?: string;
+
+  activeDownloads: {
+    byChatId: Record<string, number[]>;
+  };
+
+  shouldShowContextMenuHint?: boolean;
 
   serviceNotifications: ServiceNotification[];
 
-  byTabId: Record<number, TabState>;
-
-  archiveSettings: {
-    isMinimized: boolean;
-    isHidden: boolean;
+  statistics: {
+    byChatId: Record<string, ApiChannelStatistics | ApiGroupStatistics>;
+    currentMessage?: ApiMessageStatistics;
+    currentMessageId?: number;
   };
 
-  translations: {
-    byChatId: Record<string, ChatTranslatedMessages>;
+  newContact?: {
+    userId?: string;
+    isByPhoneNumber?: boolean;
   };
+
+  openedGame?: {
+    url: string;
+    chatId: string;
+    messageId: number;
+  };
+
+  switchBotInline?: {
+    query: string;
+    botUsername: string;
+  };
+
+  openChatWithText?: {
+    chatId: string;
+    text: string;
+  };
+
+  pollModal: {
+    isOpen: boolean;
+    isQuiz?: boolean;
+  };
+
+  webApp?: {
+    url: string;
+    botId: string;
+    buttonText: string;
+    queryId?: string;
+    slug?: string;
+  };
+
+  trustedBotIds: string[];
+  botTrustRequest?: {
+    botId: string;
+    type: 'game' | 'webApp';
+    onConfirm?: {
+      action: keyof GlobalActions;
+      payload: any; // TODO add TS support
+    };
+  };
+  botAttachRequest?: {
+    botId: string;
+    chatId: string;
+    startParam?: string;
+  };
+
+  attachMenu: {
+    hash?: string;
+    bots: Record<string, ApiAttachMenuBot>;
+  };
+
+  confetti?: {
+    lastConfettiTime?: number;
+    top?: number;
+    left?: number;
+    width?: number;
+    height?: number;
+  };
+
+  urlAuth?: {
+    button?: {
+      chatId: string;
+      messageId: number;
+      buttonId: number;
+    };
+    request?: {
+      domain: string;
+      botId: string;
+      shouldRequestWriteAccess?: boolean;
+    };
+    url: string;
+  };
+
+  premiumModal?: {
+    isOpen?: boolean;
+    isClosing?: boolean;
+    promo: ApiPremiumPromo;
+    initialSection?: string;
+    fromUserId?: string;
+    isSuccess?: boolean;
+  };
+
+  transcriptions: Record<string, ApiTranscription>;
+
+  limitReachedModal?: {
+    limit: ApiLimitTypeWithModal;
+  };
+
+  deleteFolderDialogModal?: number;
 };
 
 export type CallSound = (
   'join' | 'allowTalk' | 'leave' | 'connecting' | 'incoming' | 'end' | 'connect' | 'busy' | 'ringing'
 );
 
-export interface RequiredActionPayloads {
-  apiUpdate: ApiUpdate;
-}
-
-type Values<T> = T[keyof T];
-export type CallbackAction = Values<{
-  [ActionName in keyof (ActionPayloads)]: {
-    action: ActionName;
-    payload: (ActionPayloads)[ActionName];
-  }
-}>;
-
-export type ApiDraft = ApiFormattedText & { isLocal?: boolean; shouldForce?: boolean };
-
-type WithTabId = { tabId?: number };
-
 export interface ActionPayloads {
-  // system
-  init: ({
-    isMasterTab?: boolean;
-  } & WithTabId) | undefined;
-  reset: undefined;
-  disconnect: undefined;
-  initApi: undefined;
-  sync: undefined;
-  saveSession: {
-    sessionData?: ApiSessionData;
-  };
-
-  // auth
-  setAuthPhoneNumber: { phoneNumber: string };
-  setAuthCode: { code: string };
-  setAuthPassword: { password: string };
-  signUp: {
-    firstName: string;
-    lastName: string;
-  };
-  returnToAuthPhoneNumber: undefined;
-  setAuthRememberMe: boolean;
-  clearAuthError: undefined;
-  uploadProfilePhoto: {
-    file: File;
-    isFallback?: boolean;
-    videoTs?: number;
-    isVideo?: boolean;
-  };
-  goToAuthQrCode: undefined;
-
-  // stickers & GIFs
-  setStickerSearchQuery: { query?: string } & WithTabId;
-  saveGif: {
-    gif: ApiVideo;
-    shouldUnsave?: boolean;
-  } & WithTabId;
-  setGifSearchQuery: { query?: string } & WithTabId;
-  searchMoreGifs: WithTabId | undefined;
-  faveSticker: { sticker: ApiSticker } & WithTabId;
-  unfaveSticker: { sticker: ApiSticker };
-  toggleStickerSet: { stickerSetId: string };
-  loadEmojiKeywords: { language: LangCode };
-
-  // groups
-  togglePreHistoryHidden: {
-    chatId: string;
-    isEnabled: boolean;
-  } & WithTabId;
-  updateChatDefaultBannedRights: {
-    chatId: string;
-    bannedRights: ApiChatBannedRights;
-  };
-  updateChatMemberBannedRights: {
-    chatId: string;
-    userId: string;
-    bannedRights: ApiChatBannedRights;
-  } & WithTabId;
-  updateChatAdmin: {
-    chatId: string;
-    userId: string;
-    adminRights: ApiChatAdminRights;
-    customTitle?: string;
-  } & WithTabId;
-  acceptInviteConfirmation: { hash: string } & WithTabId;
-
-  // settings
-  setSettingOption: Partial<ISettings> | undefined;
-  loadPasswordInfo: undefined;
-  clearTwoFaError: undefined;
-  updatePassword: {
-    currentPassword: string;
-    password: string;
-    hint?: string;
-    email?: string;
-    onSuccess: VoidFunction;
-  };
-  updateRecoveryEmail: {
-    currentPassword: string;
-    email: string;
-    onSuccess: VoidFunction;
-  };
-  clearPassword: {
-    currentPassword: string;
-    onSuccess: VoidFunction;
-  };
-  provideTwoFaEmailCode: {
-    code: string;
-  };
-  checkPassword: {
-    currentPassword: string;
-    onSuccess: VoidFunction;
-  };
-  loadBlockedContacts: undefined;
-  blockContact: {
-    contactId: string;
-    accessHash: string;
-  };
-  unblockContact: {
-    contactId: string;
-  };
-
-  loadNotificationSettings: undefined;
-  updateContactSignUpNotification: {
-    isSilent: boolean;
-  };
-  updateNotificationSettings: {
-    peerType: 'contact' | 'group' | 'broadcast';
-    isSilent?: boolean;
-    shouldShowPreviews?: boolean;
-  };
-
-  updateWebNotificationSettings: {
-    hasWebNotifications?: boolean;
-    hasPushNotifications?: boolean;
-    notificationSoundVolume?: number;
-  };
-  loadLanguages: undefined;
-  loadPrivacySettings: undefined;
-  setPrivacyVisibility: {
-    privacyKey: ApiPrivacyKey;
-    visibility: PrivacyVisibility;
-  };
-
-  setPrivacySettings: {
-    privacyKey: ApiPrivacyKey;
-    isAllowList: boolean;
-    contactsIds: string[];
-  };
-  loadNotificationExceptions: undefined;
-  setThemeSettings: { theme: ThemeKey } & Partial<IThemeSettings>;
-  updateIsOnline: boolean;
-
-  loadContentSettings: undefined;
-  updateContentSettings: boolean;
-
-  loadCountryList: {
-    langCode?: LangCode;
-  };
-  ensureTimeFormat: WithTabId | undefined;
-
-  // misc
-  loadWebPagePreview: {
-    text: string;
-  } & WithTabId;
-  clearWebPagePreview: WithTabId | undefined;
-  loadWallpapers: undefined;
-  uploadWallpaper: File;
-  setDeviceToken: string;
-  deleteDeviceToken: undefined;
-  checkVersionNotification: undefined;
-  createServiceNotification: {
-    message: ApiMessage;
-    version?: string;
-  };
-
-  // message search
-  openLocalTextSearch: WithTabId | undefined;
-  closeLocalTextSearch: WithTabId | undefined;
-  setLocalTextSearchQuery: {
-    query?: string;
-  } & WithTabId;
-  setLocalMediaSearchType: {
-    mediaType: SharedMediaType;
-  } & WithTabId;
-  searchTextMessagesLocal: WithTabId | undefined;
-  searchMediaMessagesLocal: WithTabId | undefined;
-  searchMessagesByDate: {
-    timestamp: number;
-  } & WithTabId;
-
-  toggleChatInfo: ({ force?: boolean } & WithTabId) | undefined;
-  setIsUiReady: {
-    uiReadyState: 0 | 1 | 2;
-  } & WithTabId;
-  toggleLeftColumn: WithTabId | undefined;
-
-  addChatMembers: {
-    chatId: string;
-    memberIds: string[];
-  } & WithTabId;
-  deleteChatMember: {
-    chatId: string;
-    userId: string;
-  } & WithTabId;
-  openPreviousChat: WithTabId | undefined;
-  editChatFolders: {
-    chatId: string;
-    idsToRemove: number[];
-    idsToAdd: number[];
-  } & WithTabId;
-  toggleIsProtected: {
-    chatId: string;
-    isProtected: boolean;
-  };
-  preloadTopChatMessages: undefined;
-  loadAllChats: {
-    listType: 'active' | 'archived';
-    onReplace?: VoidFunction;
-    shouldReplace?: boolean;
-  };
-  openChatWithInfo: ActionPayloads['openChat'] & WithTabId;
-  openLinkedChat: { id: string } & WithTabId;
-  loadMoreMembers: WithTabId | undefined;
-  setActiveChatFolder: {
-    activeChatFolder: number;
-  } & WithTabId;
-  openNextChat: {
-    orderedIds: string[];
-    targetIndexDelta: number;
-  } & WithTabId;
-  joinChannel: {
-    chatId: string;
-  } & WithTabId;
-  leaveChannel: { chatId: string } & WithTabId;
-  deleteChannel: { chatId: string } & WithTabId;
-  toggleChatPinned: {
-    id: string;
-    folderId: number;
-  } & WithTabId;
-  toggleChatArchived: {
-    id: string;
-  };
-  toggleChatUnread: { id: string };
-  loadChatFolders: undefined;
-  loadRecommendedChatFolders: undefined;
-  editChatFolder: {
-    id: number;
-    folderUpdate: Omit<ApiChatFolder, 'id' | 'description' | 'emoticon'>;
-  };
-  addChatFolder: {
-    folder: ApiChatFolder;
-  } & WithTabId;
-  deleteChatFolder: {
-    id: number;
-  };
-  openSupportChat: WithTabId | undefined;
-  focusMessageInComments: {
-    chatId: string;
-    threadId: number;
-    messageId: number;
-  } & WithTabId;
-  openChatByPhoneNumber: {
-    phoneNumber: string;
-    startAttach?: string | boolean;
-    attach?: string;
-  } & WithTabId;
-  openChatByInvite: {
-    hash: string;
-  } & WithTabId;
-
-  // global search
-  setGlobalSearchQuery: {
-    query?: string;
-  } & WithTabId;
-  searchMessagesGlobal: {
-    type: ApiGlobalMessageSearchType;
-  } & WithTabId;
-  addRecentlyFoundChatId: {
-    id: string;
-  };
-  clearRecentlyFoundChats: undefined;
-  setGlobalSearchContent: {
-    content?: GlobalSearchContent;
-  } & WithTabId;
-  setGlobalSearchChatId: {
-    id?: string;
-  } & WithTabId;
-  setGlobalSearchDate: {
-    date?: number;
-  } & WithTabId;
-
-  // scheduled messages
-  loadScheduledHistory: {
-    chatId: string;
-  };
-  sendScheduledMessages: {
-    chatId: string;
-    id: number;
-  };
-  rescheduleMessage: {
-    chatId: string;
-    messageId: number;
-    scheduledAt: number;
-  };
-  deleteScheduledMessages: { messageIds: number[] } & WithTabId;
-  // Message
-  loadViewportMessages: {
-    direction?: LoadMoreDirection;
-    isBudgetPreload?: boolean;
-    chatId?: string;
-    threadId?: number;
-  } & WithTabId;
-  sendMessage: {
-    text?: string;
-    entities?: ApiMessageEntity[];
-    attachments?: ApiAttachment[];
-    sticker?: ApiSticker;
-    isSilent?: boolean;
-    scheduledAt?: number;
-    gif?: ApiVideo;
-    poll?: ApiNewPoll;
-    contact?: Partial<ApiContact>;
-    shouldUpdateStickerSetsOrder?: boolean;
-    shouldGroupMessages?: boolean;
-  } & WithTabId;
-  cancelSendingMessage: {
-    chatId: string;
-    messageId: number;
-  };
-  pinMessage: {
-    messageId: number;
-    isUnpin: boolean;
-    isOneSide?: boolean;
-    isSilent?: boolean;
-  } & WithTabId;
-  deleteMessages: {
-    messageIds: number[];
-    shouldDeleteForAll?: boolean;
-  } & WithTabId;
-  markMessageListRead: {
-    maxId: number;
-  } & WithTabId;
-  markMessagesRead: {
-    messageIds: number[];
-  } & WithTabId;
-  loadMessage: {
-    chatId: string;
-    messageId: number;
-    replyOriginForId?: number;
-    threadUpdate?: {
-      lastMessageId: number;
-      isDeleting?: boolean;
-    };
-  };
-  editMessage: {
-    text: string;
-    entities?: ApiMessageEntity[];
-  } & WithTabId;
-  deleteHistory: {
-    chatId: string;
-    shouldDeleteForAll?: boolean;
-  } & WithTabId;
-  loadSponsoredMessages: {
-    chatId: string;
-  };
-  viewSponsoredMessage: {
-    chatId: string;
-  };
-  loadSendAs: {
-    chatId: string;
-  };
-  saveDefaultSendAs: {
-    chatId: string;
-    sendAsId: string;
-  };
-  stopActiveEmojiInteraction: {
-    id: number;
-  } & WithTabId;
-  interactWithAnimatedEmoji: {
-    emoji: string;
-    x: number;
-    y: number;
-    startSize: number;
-    isReversed?: boolean;
-  } & WithTabId;
-  loadReactors: {
-    chatId: string;
-    messageId: number;
-    reaction?: ApiReaction;
-  };
-  sendEmojiInteraction: {
-    messageId: number;
-    chatId: string;
-    emoji: string;
-    interactions: number[];
-  };
-  sendWatchingEmojiInteraction: {
-    chatId: string;
-    id: number;
-    emoticon: string;
-    x: number;
-    y: number;
-    startSize: number;
-    isReversed?: boolean;
-  } & WithTabId;
-  reportMessages: {
-    messageIds: number[];
-    reason: ApiReportReason;
-    description: string;
-  } & WithTabId;
-  sendMessageAction: {
-    action: ApiSendMessageAction;
-    chatId: string;
-    threadId: number;
-  };
-  loadSeenBy: {
-    chatId: string;
-    messageId: number;
-  };
-  openTelegramLink: {
-    url: string;
-  } & WithTabId;
-  openChatByUsername: {
-    username: string;
-    threadId?: number;
-    messageId?: number;
-    commentId?: number;
-    startParam?: string;
-    startAttach?: string | boolean;
-    attach?: string;
-  } & WithTabId;
-  requestThreadInfoUpdate: {
-    chatId: string;
-    threadId: number;
-  };
-  setScrollOffset: {
-    chatId: string;
-    threadId: number;
-    scrollOffset: number;
-  } & WithTabId;
-  unpinAllMessages: {
-    chatId: string;
-    threadId: number;
-  };
-  setEditingId: {
-    messageId?: number;
-  } & WithTabId;
-  editLastMessage: WithTabId | undefined;
-  saveDraft: {
-    chatId: string;
-    threadId: number;
-    draft: ApiDraft;
-    shouldForce?: boolean;
-  };
-  clearDraft: {
-    chatId: string;
-    threadId?: number;
-    localOnly?: boolean;
-    shouldForce?: boolean;
-  };
-  loadPinnedMessages: {
-    chatId: string;
-    threadId: number;
-  };
-  toggleMessageWebPage: {
-    chatId: string;
-    threadId: number;
-    noWebPage?: boolean;
-  };
-  replyToNextMessage: {
-    targetIndexDelta: number;
-  } & WithTabId;
-  deleteChatUser: { chatId: string; userId: string } & WithTabId;
-  deleteChat: { chatId: string } & WithTabId;
-
-  // chat creation
-  createChannel: {
-    title: string;
-    about?: string;
-    photo?: File;
-    memberIds: string[];
-  } & WithTabId;
-  createGroupChat: {
-    title: string;
-    memberIds: string[];
-    photo?: File;
-  } & WithTabId;
-  resetChatCreation: WithTabId | undefined;
-
-  // payment
-  closePaymentModal: WithTabId | undefined;
-  addPaymentError: {
-    error: TabState['payment']['error'];
-  } & WithTabId;
-  validateRequestedInfo: {
-    requestInfo: any;
-    saveInfo?: boolean;
-  } & WithTabId;
-  setPaymentStep: {
-    step?: PaymentStep;
-  } & WithTabId;
-  sendPaymentForm: {
-    shippingOptionId?: string;
-    saveCredentials?: any;
-    savedCredentialId?: string;
-    tipAmount?: number;
-  } & WithTabId;
-  getReceipt: {
-    receiptMessageId: number;
-    chatId: string;
-    messageId: number;
-  } & WithTabId;
-  sendCredentialsInfo: {
-    credentials: ApiCredentials;
-  } & WithTabId;
-  clearPaymentError: WithTabId | undefined;
-  clearReceipt: WithTabId | undefined;
-
-  // stats
-  toggleStatistics: WithTabId | undefined;
-  toggleMessageStatistics: ({
-    messageId?: number;
-  } & WithTabId) | undefined;
-  loadStatistics: {
-    chatId: string;
-    isGroup: boolean;
-  } & WithTabId;
-  loadMessageStatistics: {
-    chatId: string;
-    messageId: number;
-  } & WithTabId;
-  loadStatisticsAsyncGraph: {
-    chatId: string;
-    token: string;
-    name: string;
-    isPercentage?: boolean;
-  } & WithTabId;
-
-  // ui
-  dismissDialog: WithTabId | undefined;
-  setNewChatMembersDialogState: {
-    newChatMembersProgress?: NewChatMembersProgress;
-  } & WithTabId;
-  disableHistoryAnimations: WithTabId | undefined;
-  setLeftColumnWidth: {
-    leftColumnWidth: number;
-  };
-  resetLeftColumnWidth: undefined;
-
-  copySelectedMessages: WithTabId;
-  copyMessagesByIds: {
-    messageIds?: number[];
-  } & WithTabId;
-  openSeenByModal: {
-    chatId: string;
-    messageId: number;
-  } & WithTabId;
-  closeSeenByModal: WithTabId | undefined;
-  closeReactorListModal: WithTabId | undefined;
-  openReactorListModal: {
-    chatId: string;
-    messageId: number;
-  } & WithTabId;
-  enterMessageSelectMode: ({
-    messageId: number;
-  } & WithTabId) | undefined;
-  toggleMessageSelection: {
-    messageId: number;
-    groupedId?: string;
-    childMessageIds?: number[];
-    withShift?: boolean;
-  } & WithTabId;
-  exitMessageSelectMode: WithTabId | undefined;
-  openHistoryCalendar: {
-    selectedAt?: number;
-  } & WithTabId;
-  closeHistoryCalendar: WithTabId | undefined;
-  disableContextMenuHint: WithTabId | undefined;
-  focusNextReply: WithTabId | undefined;
-
-  openMessageLanguageModal: {
-    chatId: string;
-    id: number;
-  } & WithTabId;
-  closeMessageLanguageModal: WithTabId | undefined;
-
-  // poll result
-  openPollResults: {
-    chatId: string;
-    messageId: number;
-  } & WithTabId;
-  closePollResults: WithTabId | undefined;
-  loadPollOptionResults: {
-    chat: ApiChat;
-    messageId: number;
-    option: string;
-    offset: string;
-    limit: number;
-    shouldResetVoters?: boolean;
-  } & WithTabId;
-
-  // management
-  setEditingExportedInvite: { chatId: string; invite?: ApiExportedInvite } & WithTabId;
-  loadExportedChatInvites: {
-    chatId: string;
-    adminId?: string;
-    isRevoked?: boolean;
-    limit?: number;
-  } & WithTabId;
-  editExportedChatInvite: {
-    chatId: string;
-    link: string;
-    isRevoked?: boolean;
-    expireDate?: number;
-    usageLimit?: number;
-    isRequestNeeded?: boolean;
-    title?: string;
-  } & WithTabId;
-  exportChatInvite: {
-    chatId: string;
-    expireDate?: number;
-    usageLimit?: number;
-    isRequestNeeded?: boolean;
-    title?: string;
-  } & WithTabId;
-  deleteExportedChatInvite: {
-    chatId: string;
-    link: string;
-  } & WithTabId;
-  deleteRevokedExportedChatInvites: {
-    chatId: string;
-    adminId?: string;
-  } & WithTabId;
-  setOpenedInviteInfo: { chatId: string; invite?: ApiExportedInvite } & WithTabId;
-  loadChatInviteImporters: {
-    chatId: string;
-    link?: string;
-    offsetDate?: number;
-    offsetUserId?: string;
-    limit?: number;
-  } & WithTabId;
-  hideChatJoinRequest: {
-    chatId: string;
-    userId: string;
-    isApproved: boolean;
-  };
-  hideAllChatJoinRequests: {
-    chatId: string;
-    isApproved: boolean;
-    link?: string;
-  };
-  loadChatInviteRequesters: {
-    chatId: string;
-    link?: string;
-    offsetDate?: number;
-    offsetUserId?: string;
-    limit?: number;
-  } & WithTabId;
-  hideChatReportPanel: {
-    chatId: string;
-  };
-  toggleManagement: WithTabId | undefined;
-  requestNextManagementScreen: ({
-    screen?: ManagementScreens;
-  } & WithTabId) | undefined;
-  closeManagement: WithTabId | undefined;
-  checkPublicLink: { username: string } & WithTabId;
-  updatePublicLink: { username: string } & WithTabId;
-  updatePrivateLink: WithTabId | undefined;
-
-  requestChatUpdate: { chatId: string };
-  loadChatJoinRequests: {
-    chatId: string;
-    offsetDate?: number;
-    offsetUserId?: string;
-    limit?: number;
-  };
-  loadTopChats: undefined;
-  showDialog: {
-    data: TabState['dialogs'][number];
-  } & WithTabId;
-  setReachedFocusedMessage: {
-    hasReached?: boolean;
-  } & WithTabId;
-  focusMessage: {
-    chatId: string;
-    threadId?: number;
-    messageListType?: MessageListType;
-    messageId: number;
-    noHighlight?: boolean;
-    groupedId?: string;
-    groupedChatId?: string;
-    replyMessageId?: number;
-    isResizingContainer?: boolean;
-    shouldReplaceHistory?: boolean;
-    noForumTopicPanel?: boolean;
-  } & WithTabId;
-
-  focusLastMessage: WithTabId | undefined;
-  setReplyingToId: {
-    messageId?: number;
-  } & WithTabId;
-  closeWebApp: WithTabId | undefined;
-
-  // Multitab
-  destroyConnection: undefined;
-  initShared: { force?: boolean } | undefined;
-  switchMultitabRole: {
-    isMasterTab: boolean;
-  } & WithTabId;
-  openChatInNewTab: {
-    chatId: string;
-    threadId?: number;
-  };
-  onTabFocusChange: {
-    isBlurred: boolean;
-  } & WithTabId;
-  onSomeTabSwitchedMultitabRole: undefined;
-  afterHangUp: undefined;
-  requestMasterAndCallAction: CallbackAction & WithTabId;
-  clearMultitabNextAction: WithTabId | undefined;
-  requestMasterAndJoinGroupCall: ActionPayloads['joinGroupCall'];
-  requestMasterAndRequestCall: ActionPayloads['requestCall'];
-  requestMasterAndAcceptCall: WithTabId | undefined;
-
   // Initial
   signOut: { forceInitApi?: boolean } | undefined;
+  apiUpdate: ApiUpdate;
 
   // Misc
-  setInstallPrompt: { canInstall: boolean } & WithTabId;
-  openLimitReachedModal: { limit: ApiLimitTypeWithModal } & WithTabId;
-  closeLimitReachedModal: WithTabId | undefined;
-  checkAppVersion: undefined;
-  setGlobalSearchClosing: ({
-    isClosing?: boolean;
-  } & WithTabId) | undefined;
+  setInstallPrompt: { canInstall: boolean };
+  openLimitReachedModal: { limit: ApiLimitTypeWithModal };
+  closeLimitReachedModal: never;
 
   // Accounts
   reportPeer: {
     chatId?: string;
     reason: ApiReportReason;
     description: string;
-  } & WithTabId;
+  };
   reportProfilePhoto: {
     chatId?: string;
     reason: ApiReportReason;
     description: string;
     photo?: ApiPhoto;
-  } & WithTabId;
+  };
   changeSessionSettings: {
     hash: string;
     areCallsEnabled?: boolean;
@@ -1574,79 +694,25 @@ export interface ActionPayloads {
   };
 
   // Chats
-  loadChatSettings: {
-    chatId: string;
-  };
-  updateChatMutedState: {
-    chatId: string;
-    isMuted: boolean;
-  };
-
-  updateChat: {
-    chatId: string;
-    title: string;
-    about: string;
-    photo?: File;
-  } & WithTabId;
-  toggleSignatures: {
-    chatId: string;
-    isEnabled: boolean;
-  };
-  loadGroupsForDiscussion: undefined;
-  linkDiscussionGroup: {
-    channelId: string;
-    chatId: string;
-  } & WithTabId;
-  unlinkDiscussionGroup: {
-    channelId: string;
-  } & WithTabId;
-
   openChat: {
     id: string | undefined;
     threadId?: number;
     type?: MessageListType;
     shouldReplaceHistory?: boolean;
-    noForumTopicPanel?: boolean;
-  } & WithTabId;
-  openComments: {
-    id: string;
-    threadId: number;
-    originChannelId?: string;
-  } & WithTabId;
-  loadFullChat: {
+  };
+
+  openChatWithText: {
     chatId: string;
-    force?: boolean;
-  } & WithTabId;
-  updateChatPhoto: {
-    chatId: string;
-    photo: ApiPhoto;
-  } & WithTabId;
-  deleteChatPhoto: {
-    chatId: string;
-    photo: ApiPhoto;
-  } & WithTabId;
-  openChatWithDraft: {
-    chatId?: string;
-    threadId?: number;
     text: string;
-    files?: File[];
-  } & WithTabId;
-  resetOpenChatWithDraft: WithTabId | undefined;
+  };
+  resetOpenChatWithText: never;
+
   toggleJoinToSend: {
     chatId: string;
     isEnabled: boolean;
   };
+
   toggleJoinRequest: {
-    chatId: string;
-    isEnabled: boolean;
-  };
-
-  openForumPanel: {
-    chatId: string;
-  } & WithTabId;
-  closeForumPanel: WithTabId | undefined;
-
-  toggleParticipantsHidden: {
     chatId: string;
     isEnabled: boolean;
   };
@@ -1666,20 +732,16 @@ export interface ActionPayloads {
     chatId: string;
     offsetId?: number;
   };
-  loadMessageViews: {
-    chatId: string;
-    ids: number[];
-  };
   animateUnreadReaction: {
     messageIds: number[];
-  } & WithTabId;
-  focusNextReaction: WithTabId | undefined;
-  focusNextMention: WithTabId | undefined;
-  readAllReactions: WithTabId | undefined;
-  readAllMentions: WithTabId | undefined;
+  };
+  focusNextReaction: never;
+  focusNextMention: never;
+  readAllReactions: never;
+  readAllMentions: never;
   markMentionsRead: {
     messageIds: number[];
-  } & WithTabId;
+  };
 
   sendPollVote: {
     chatId: string;
@@ -1695,85 +757,29 @@ export interface ActionPayloads {
     messageId: number;
   };
 
-  loadExtendedMedia: {
-    chatId: string;
-    ids: number[];
-  };
-
-  requestMessageTranslation: {
-    chatId: string;
-    id: number;
-    toLanguageCode?: string;
-  } & WithTabId;
-
-  showOriginalMessage: {
-    chatId: string;
-    id: number;
-  } & WithTabId;
-
-  translateMessages: {
-    chatId: string;
-    messageIds: number[];
-    toLanguageCode?: string;
-  };
-
-  // Reactions
-  loadAvailableReactions: undefined;
-
-  loadMessageReactions: {
-    chatId: string;
-    ids: number[];
-  };
-
-  toggleReaction: {
-    chatId: string;
-    messageId: number;
-    reaction: ApiReaction;
-  } & WithTabId;
-
-  setDefaultReaction: {
-    reaction: ApiReaction;
-  };
-  sendDefaultReaction: {
-    chatId: string;
-    messageId: number;
-  } & WithTabId;
-
-  setChatEnabledReactions: {
-    chatId: string;
-    enabledReactions?: ApiChatReactions;
-  } & WithTabId;
-
-  stopActiveReaction: {
-    messageId: number;
-    reaction: ApiReaction;
-  } & WithTabId;
-
   // Media Viewer & Audio Player
   openMediaViewer: {
     chatId?: string;
     threadId?: number;
-    mediaId?: number;
+    messageId?: number;
     avatarOwnerId?: string;
     profilePhotoIndex?: number;
-    origin: MediaViewerOrigin;
+    origin?: MediaViewerOrigin;
     volume?: number;
     playbackRate?: number;
     isMuted?: boolean;
-  } & WithTabId;
-  closeMediaViewer: WithTabId | undefined;
+  };
+  closeMediaViewer: never;
   setMediaViewerVolume: {
     volume: number;
-  } & WithTabId;
+  };
   setMediaViewerPlaybackRate: {
     playbackRate: number;
-  } & WithTabId;
+  };
   setMediaViewerMuted: {
     isMuted: boolean;
-  } & WithTabId;
-  setMediaViewerHidden: {
-    isHidden: boolean;
-  } & WithTabId;
+  };
+
   openAudioPlayer: {
     chatId: string;
     threadId?: number;
@@ -1782,120 +788,53 @@ export interface ActionPayloads {
     volume?: number;
     playbackRate?: number;
     isMuted?: boolean;
-  } & WithTabId;
-  closeAudioPlayer: WithTabId | undefined;
+  };
+  closeAudioPlayer: never;
   setAudioPlayerVolume: {
     volume: number;
-  } & WithTabId;
+  };
   setAudioPlayerPlaybackRate: {
     playbackRate: number;
-    isPlaybackRateActive?: boolean;
-  } & WithTabId;
+  };
   setAudioPlayerMuted: {
     isMuted: boolean;
-  } & WithTabId;
+  };
   setAudioPlayerOrigin: {
     origin: AudioOrigin;
-  } & WithTabId;
+  };
 
   // Downloads
-  downloadSelectedMessages: WithTabId | undefined;
+  downloadSelectedMessages: never;
   downloadMessageMedia: {
     message: ApiMessage;
-  } & WithTabId;
+  };
   cancelMessageMediaDownload: {
     message: ApiMessage;
-  } & WithTabId;
+  };
   cancelMessagesMediaDownload: {
     messages: ApiMessage[];
-  } & WithTabId;
+  };
 
   // Users
-  loadNearestCountry: undefined;
-  loadTopUsers: undefined;
-  loadContactList: undefined;
-
-  loadCurrentUser: undefined;
-  updateProfile: {
-    photo?: File;
-    firstName?: string;
-    lastName?: string;
-    bio?: string;
-    username?: string;
-  } & WithTabId;
-  checkUsername: {
-    username: string;
-  } & WithTabId;
-
-  deleteContact: { userId: string };
-  loadUser: { userId: string };
-  setUserSearchQuery: { query?: string } & WithTabId;
-  loadCommonChats: WithTabId | undefined;
-  reportSpam: { chatId: string };
-  loadFullUser: { userId: string };
-  openAddContactDialog: { userId?: string } & WithTabId;
-  openNewContactDialog: WithTabId | undefined;
-  closeNewContactDialog: WithTabId | undefined;
+  openAddContactDialog: {
+    userId?: string;
+  };
+  openNewContactDialog: undefined;
+  closeNewContactDialog: undefined;
   importContact: {
     phoneNumber: string;
     firstName: string;
     lastName?: string;
-  } & WithTabId;
+  };
   updateContact: {
     userId: string;
     firstName: string;
     lastName?: string;
     isMuted?: boolean;
     shouldSharePhoneNumber?: boolean;
-  } & WithTabId;
-  loadProfilePhotos: {
-    profileId: string;
   };
-  deleteProfilePhoto: {
-    photo: ApiPhoto;
-  };
-  updateProfilePhoto: {
-    photo: ApiPhoto;
-    isFallback?: boolean;
-  };
-
-  // Forwards
-  openForwardMenu: {
-    fromChatId: string;
-    messageIds?: number[];
-    groupedId?: string;
-    withMyScore?: boolean;
-  } & WithTabId;
-  openForwardMenuForSelectedMessages: WithTabId | undefined;
-  setForwardChatOrTopic: {
-    chatId: string;
-    topicId?: number;
-  } & WithTabId;
-  forwardMessages: {
-    isSilent?: boolean;
-    scheduledAt?: number;
-  } & WithTabId;
-  setForwardNoAuthors: {
-    noAuthors: boolean;
-  } & WithTabId;
-  setForwardNoCaptions: {
-    noCaptions: boolean;
-  } & WithTabId;
-  exitForwardMode: WithTabId | undefined;
-  changeForwardRecipient: WithTabId | undefined;
-  forwardToSavedMessages: WithTabId | undefined;
-
-  // GIFs
-  loadSavedGifs: undefined;
 
   // Stickers
-  loadStickers: {
-    stickerSetInfo: ApiStickerSetInfo;
-  } & WithTabId;
-  loadAnimatedEmojis: undefined;
-  loadGreetingStickers: undefined;
-  loadGenericEmojiEffects: undefined;
-
   addRecentSticker: {
     sticker: ApiSticker;
   };
@@ -1904,16 +843,15 @@ export interface ActionPayloads {
     sticker: ApiSticker;
   };
 
-  clearRecentStickers: undefined;
+  clearRecentStickers: {};
 
-  loadStickerSets: undefined;
-  loadAddedStickers: WithTabId | undefined;
-  loadRecentStickers: undefined;
-  loadFavoriteStickers: undefined;
-  loadFeaturedStickers: undefined;
+  loadStickerSets: {};
+  loadAddedStickers: {};
+  loadRecentStickers: {};
+  loadFavoriteStickers: {};
+  loadFeaturedStickers: {};
 
   reorderStickerSets: {
-    isCustomEmoji?: boolean;
     order: string[];
   };
 
@@ -1921,90 +859,42 @@ export interface ActionPayloads {
     stickerSet: ApiStickerSet;
   };
 
-  openStickerSet: { stickerSetInfo: ApiStickerSetInfo } & WithTabId;
-  closeStickerSetModal: WithTabId | undefined;
-
-  loadStickersForEmoji: {
-    emoji: string;
-  };
-  clearStickersForEmoji: undefined;
-
-  loadCustomEmojiForEmoji: {
-    emoji: string;
-  };
-  clearCustomEmojiForEmoji: undefined;
-
-  addRecentEmoji: {
-    emoji: string;
+  openStickerSetShortName: {
+    stickerSetShortName?: string;
   };
 
-  loadCustomEmojis: {
-    ids: string[];
-    ignoreCache?: boolean;
+  openStickerSet: {
+    sticker: ApiSticker;
   };
-  updateLastRenderedCustomEmojis: {
-    ids: string[];
-  };
-  openCustomEmojiSets: {
-    setIds: string[];
-  } & WithTabId;
-  closeCustomEmojiSets: WithTabId | undefined;
-  addRecentCustomEmoji: {
-    documentId: string;
-  };
-  clearRecentCustomEmoji: undefined;
-  loadFeaturedEmojiStickers: undefined;
-  loadDefaultStatusIcons: undefined;
-  loadRecentEmojiStatuses: undefined;
 
   // Bots
-  sendBotCommand: {
-    command: string;
-    chatId?: string;
-  } & WithTabId;
-  loadTopInlineBots: undefined;
-  queryInlineBot: {
-    chatId: string;
-    username: string;
-    query: string;
-    offset?: string;
-  } & WithTabId;
-  sendInlineBotResult: {
-    id: string;
-    queryId: string;
-    isSilent?: boolean;
-    scheduledAt?: number;
-  } & WithTabId;
-  resetInlineBot: {
-    username: string;
-    force?: boolean;
-  } & WithTabId;
-  resetAllInlineBots: WithTabId | undefined;
   startBot: {
     botId: string;
     param?: string;
   };
   restartBot: {
     chatId: string;
-  } & WithTabId;
+  };
 
   clickBotInlineButton: {
     messageId: number;
     button: ApiKeyboardButton;
-  } & WithTabId;
+  };
 
   switchBotInline: {
     messageId: number;
     query: string;
     isSamePeer?: boolean;
-  } & WithTabId;
+  };
+
+  resetSwitchBotInline: never;
 
   openGame: {
     url: string;
     chatId: string;
     messageId: number;
-  } & WithTabId;
-  closeGame: WithTabId | undefined;
+  };
+  closeGame: never;
 
   requestWebView: {
     url?: string;
@@ -2015,46 +905,32 @@ export interface ActionPayloads {
     buttonText: string;
     isFromBotMenu?: boolean;
     startParam?: string;
-  } & WithTabId;
+  };
   prolongWebView: {
     botId: string;
     peerId: string;
     queryId: string;
     isSilent?: boolean;
     replyToMessageId?: number;
-    threadId?: number;
-  } & WithTabId;
+  };
   requestSimpleWebView: {
     url: string;
     botId: string;
     buttonText: string;
     theme?: ApiThemeParameters;
-  } & WithTabId;
+  };
+  closeWebApp: never;
   setWebAppPaymentSlug: {
     slug?: string;
-  } & WithTabId;
+  };
 
-  cancelBotTrustRequest: WithTabId | undefined;
+  cancelBotTrustRequest: never;
   markBotTrusted: {
     botId: string;
-  } & WithTabId;
+  };
 
-  cancelAttachBotInstall: WithTabId | undefined;
-  confirmAttachBotInstall: {
-    isWriteAllowed: boolean;
-  } & WithTabId;
-
-  processAttachBotParameters: {
-    username: string;
-    filter: ApiChatType[];
-    startParam?: string;
-  } & WithTabId;
-  requestAttachBotInChat: {
-    bot: ApiAttachBot;
-    filter: ApiChatType[];
-    startParam?: string;
-  } & WithTabId;
-  cancelAttachBotInChat: WithTabId | undefined;
+  closeBotAttachRequestModal: never;
+  confirmBotAttachRequest: never;
 
   sendWebViewData: {
     bot: ApiUser;
@@ -2062,328 +938,232 @@ export interface ActionPayloads {
     buttonText: string;
   };
 
-  loadAttachBots: {
+  loadAttachMenuBots: {
     hash?: string;
   };
 
-  toggleAttachBot: {
+  toggleBotInAttachMenu: {
     botId: string;
-    isWriteAllowed?: boolean;
     isEnabled: boolean;
   };
 
-  callAttachBot: {
+  callAttachMenuBot: {
     chatId: string;
-    threadId?: number;
-    bot?: ApiAttachBot;
+    botId: string;
+    isFromBotMenu?: boolean;
     url?: string;
     startParam?: string;
-  } & WithTabId;
+  };
 
   requestBotUrlAuth: {
     chatId: string;
     messageId: number;
     buttonId: number;
     url: string;
-  } & WithTabId;
+  };
 
   acceptBotUrlAuth: {
     isWriteAllowed?: boolean;
-  } & WithTabId;
+  };
 
   requestLinkUrlAuth: {
     url: string;
-  } & WithTabId;
+  };
 
   acceptLinkUrlAuth: {
     isWriteAllowed?: boolean;
-  } & WithTabId;
+  };
 
   // Settings
-  loadAuthorizations: undefined;
+  loadAuthorizations: never;
   terminateAuthorization: {
     hash: string;
   };
-  terminateAllAuthorizations: undefined;
+  terminateAllAuthorizations: never;
 
-  loadWebAuthorizations: undefined;
+  loadWebAuthorizations: never;
   terminateWebAuthorization: {
     hash: string;
   };
-  terminateAllWebAuthorizations: undefined;
-  toggleUsername: {
-    username: string;
-    isActive: boolean;
-  };
-  sortUsernames: {
-    usernames: string[];
-  };
-  toggleChatUsername: {
-    chatId: string;
-    username: string;
-    isActive: boolean;
-  } & WithTabId;
-  sortChatUsernames: {
-    chatId: string;
-    usernames: string[];
-  };
+  terminateAllWebAuthorizations: never;
 
   // Misc
   openPollModal: {
     isQuiz?: boolean;
-  } & WithTabId;
-  closePollModal: WithTabId | undefined;
-  requestConfetti: ({
+  };
+  closePollModal: never;
+  requestConfetti: {
     top: number;
     left: number;
     width: number;
     height: number;
-  } & WithTabId) | undefined;
-
-  updateAttachmentSettings: {
-    shouldCompress?: boolean;
-    shouldSendGrouped?: boolean;
-  };
-
-  updateArchiveSettings: {
-    isMinimized?: boolean;
-    isHidden?: boolean;
-  };
+  } | undefined;
 
   openUrl: {
     url: string;
     shouldSkipModal?: boolean;
-  } & WithTabId;
+  };
   toggleSafeLinkModal: {
     url?: string;
-  } & WithTabId;
-  closeUrlAuthModal: WithTabId | undefined;
-  showNotification: {
-    localId?: string;
-    title?: string;
-    message: string;
-    className?: string;
-    actionText?: string;
-    action?: CallbackAction;
-  } & WithTabId;
-  showAllowedMessageTypesNotification: {
-    chatId: string;
-  } & WithTabId;
-  dismissNotification: { localId: string } & WithTabId;
-
-  updatePageTitle: WithTabId | undefined;
+  };
+  closeUrlAuthModal: never;
 
   // Calls
-  joinGroupCall: {
-    chatId?: string;
-    id?: string;
-    accessHash?: string;
-    inviteHash?: string;
-  } & WithTabId;
-  toggleGroupCallMute: {
-    participantId: string;
-    value: boolean;
-  };
-  toggleGroupCallPresentation: {
-    value?: boolean;
-  } | undefined;
-  leaveGroupCall: ({
-    isFromLibrary?: boolean;
-    shouldDiscard?: boolean;
-    shouldRemove?: boolean;
-    rejoin?: ActionPayloads['joinGroupCall'];
-  } & WithTabId) | undefined;
-
-  toggleGroupCallVideo: undefined;
-  requestToSpeak: {
-    value: boolean;
-  } | undefined;
-  setGroupCallParticipantVolume: {
-    participantId: string;
-    volume: number;
-  };
-  toggleGroupCallPanel: ({ force?: boolean } & WithTabId) | undefined;
-
-  createGroupCall: {
-    chatId: string;
-  } & WithTabId;
-  joinVoiceChatByLink: {
-    username: string;
-    inviteHash: string;
-  } & WithTabId;
-  subscribeToGroupCallUpdates: {
-    subscribed: boolean;
-    id: string;
-  };
-  createGroupCallInviteLink: WithTabId | undefined;
-
-  loadMoreGroupCallParticipants: undefined;
-  connectToActiveGroupCall: WithTabId | undefined;
-
   requestCall: {
     userId: string;
     isVideo?: boolean;
-  } & WithTabId;
+  };
   sendSignalingData: P2pMessage;
-  hangUp: WithTabId | undefined;
-  acceptCall: undefined;
+  hangUp: never;
+  acceptCall: never;
   setCallRating: {
     rating: number;
     comment: string;
-  } & WithTabId;
-  closeCallRatingModal: WithTabId | undefined;
+  };
+  closeCallRatingModal: never;
   playGroupCallSound: {
     sound: CallSound;
   };
-  connectToActivePhoneCall: undefined;
+  connectToActivePhoneCall: never;
 
   // Passcode
   setPasscode: { passcode: string };
-  clearPasscode: undefined;
-  lockScreen: undefined;
-  decryptSession: { passcode: string };
+  clearPasscode: never;
+  lockScreen: never;
   unlockScreen: { sessionJson: string; globalJson: string };
-  softSignIn: undefined;
-  logInvalidUnlockAttempt: undefined;
-  resetInvalidUnlockAttempts: undefined;
+  softSignIn: never;
+  logInvalidUnlockAttempt: never;
+  resetInvalidUnlockAttempts: never;
   setPasscodeError: { error: string };
-  clearPasscodeError: undefined;
-  skipLockOnUnload: undefined;
+  clearPasscodeError: never;
+  skipLockOnUnload: never;
 
   // Settings
-  loadConfig: undefined;
-  loadAppConfig: undefined;
-  requestNextSettingsScreen: {
-    screen?: SettingsScreens;
-  } & WithTabId;
-  sortChatFolders: { folderIds: number[] };
-  closeDeleteChatFolderModal: WithTabId | undefined;
-  openDeleteChatFolderModal: { folderId: number } & WithTabId;
-  loadGlobalPrivacySettings: undefined;
+  requestNextSettingsScreen: SettingsScreens;
+  closeDeleteChatFolderModal: never;
+  openDeleteChatFolderModal: { folderId: number };
+  loadGlobalPrivacySettings: never;
   updateGlobalPrivacySettings: { shouldArchiveAndMuteNewNonContact: boolean };
 
   // Premium
   openPremiumModal: {
     initialSection?: string;
     fromUserId?: string;
-    toUserId?: string;
     isSuccess?: boolean;
-    isGift?: boolean;
-    monthsAmount?: number;
-  } & WithTabId;
-  closePremiumModal: ({
+  };
+  closePremiumModal: never | {
     isClosed?: boolean;
-  } & WithTabId) | undefined;
+  };
 
   transcribeAudio: {
     chatId: string;
     messageId: number;
   };
 
-  loadPremiumGifts: undefined;
-  loadDefaultTopicIcons: never;
-  loadPremiumStickers: undefined;
-  loadPremiumSetStickers: {
+  loadPremiumStickers: {
     hash?: string;
   };
 
-  openGiftPremiumModal: ({
-    forUserId?: string;
-  } & WithTabId) | undefined;
-
-  closeGiftPremiumModal: WithTabId | undefined;
-  setEmojiStatus: {
-    emojiStatus: ApiSticker;
-    expires?: number;
-  };
-
   // Invoice
-  openInvoice: ApiInputInvoice & WithTabId;
-
-  // Payment
-  validatePaymentPassword: {
-    password: string;
-  } & WithTabId;
-
-  // Forums
-  toggleForum: {
-    chatId: string;
-    isEnabled: boolean;
-  } & WithTabId;
-  createTopic: {
-    chatId: string;
-    title: string;
-    iconColor?: number;
-    iconEmojiId?: string;
-  } & WithTabId;
-  loadTopics: {
-    chatId: string;
-    force?: boolean;
-  };
-  loadTopicById: ({
-    chatId: string;
-    topicId: number;
-  } | {
-    chatId: string;
-    topicId: number;
-    shouldCloseChatOnError?: boolean;
-  } & WithTabId);
-
-  deleteTopic: {
-    chatId: string;
-    topicId: number;
-  };
-
-  editTopic: {
-    chatId: string;
-    topicId: number;
-    title?: string;
-    iconEmojiId?: string;
-    isClosed?: boolean;
-    isHidden?: boolean;
-  } & WithTabId;
-
-  toggleTopicPinned: {
-    chatId: string;
-    topicId: number;
-    isPinned: boolean;
-  } & WithTabId;
-
-  markTopicRead: {
-    chatId: string;
-    topicId: number;
-  };
-
-  updateTopicMutedState: {
-    chatId: string;
-    topicId: number;
-    isMuted: boolean;
-  };
-
-  openCreateTopicPanel: {
-    chatId: string;
-  } & WithTabId;
-  closeCreateTopicPanel: WithTabId | undefined;
-
-  openEditTopicPanel: {
-    chatId: string;
-    topicId: number;
-  } & WithTabId;
-  closeEditTopicPanel: WithTabId | undefined;
-
-  uploadContactProfilePhoto: {
-    userId: string;
-    file?: File;
-    isSuggest?: boolean;
-  } & WithTabId;
+  openInvoice: ApiInputInvoice;
 }
 
-export type RequiredGlobalState = GlobalState & { _: never };
-const typed = typify<GlobalState, ActionPayloads & RequiredActionPayloads>();
+export type NonTypedActionNames = (
+  // updater
+  'onNotifyUpdate' |
+  // system
+  'init' | 'reset' | 'disconnect' | 'initApi' | 'sync' | 'saveSession' |
+  'showNotification' | 'dismissNotification' | 'showDialog' | 'dismissDialog' |
+  // ui
+  'toggleChatInfo' | 'setIsUiReady' | 'addRecentEmoji' | 'toggleLeftColumn' |
+  'toggleSafeLinkModal' | 'openHistoryCalendar' | 'closeHistoryCalendar' | 'disableContextMenuHint' |
+  'setNewChatMembersDialogState' | 'disableHistoryAnimations' | 'setLeftColumnWidth' | 'resetLeftColumnWidth' |
+  'openSeenByModal' | 'closeSeenByModal' | 'closeReactorListModal' | 'openReactorListModal' |
+  'toggleStatistics' | 'toggleMessageStatistics' |
+  // auth
+  'setAuthPhoneNumber' | 'setAuthCode' | 'setAuthPassword' | 'signUp' | 'returnToAuthPhoneNumber' |
+  'setAuthRememberMe' | 'clearAuthError' | 'uploadProfilePhoto' | 'goToAuthQrCode' | 'clearCache' |
+  // chats
+  'preloadTopChatMessages' | 'loadAllChats' | 'openChatWithInfo' | 'openLinkedChat' |
+  'openSupportChat' | 'focusMessageInComments' | 'openChatByPhoneNumber' |
+  'loadChatSettings' | 'loadFullChat' | 'loadTopChats' | 'requestChatUpdate' | 'updateChatMutedState' |
+  'joinChannel' | 'leaveChannel' | 'deleteChannel' | 'toggleChatPinned' | 'toggleChatArchived' | 'toggleChatUnread' |
+  'loadChatFolders' | 'loadRecommendedChatFolders' | 'editChatFolder' | 'addChatFolder' | 'deleteChatFolder' |
+  'updateChat' | 'toggleSignatures' | 'loadGroupsForDiscussion' | 'linkDiscussionGroup' | 'unlinkDiscussionGroup' |
+  'loadProfilePhotos' | 'loadMoreMembers' | 'setActiveChatFolder' | 'openNextChat' | 'setChatEnabledReactions' |
+  'addChatMembers' | 'deleteChatMember' | 'openPreviousChat' | 'editChatFolders' | 'toggleIsProtected' |
+  // messages
+  'loadViewportMessages' | 'selectMessage' | 'sendMessage' | 'cancelSendingMessage' | 'pinMessage' | 'deleteMessages' |
+  'markMessageListRead' | 'markMessagesRead' | 'loadMessage' | 'focusMessage' | 'focusLastMessage' |
+  'editMessage' | 'deleteHistory' | 'enterMessageSelectMode' | 'toggleMessageSelection' | 'exitMessageSelectMode' |
+  'openTelegramLink' | 'openChatByUsername' | 'requestThreadInfoUpdate' | 'setScrollOffset' | 'unpinAllMessages' |
+  'setReplyingToId' | 'editLastMessage' | 'saveDraft' | 'clearDraft' | 'loadPinnedMessages' |
+  'toggleMessageWebPage' | 'replyToNextMessage' | 'deleteChatUser' | 'deleteChat' | 'sendReaction' |
+  'reportMessages' | 'sendMessageAction' | 'focusNextReply' | 'openChatByInvite' | 'loadSeenBy' |
+  'loadSponsoredMessages' | 'viewSponsoredMessage' | 'loadSendAs' | 'saveDefaultSendAs' | 'loadAvailableReactions' |
+  'stopActiveEmojiInteraction' | 'interactWithAnimatedEmoji' | 'loadReactors' | 'setDefaultReaction' |
+  'sendDefaultReaction' | 'sendEmojiInteraction' | 'sendWatchingEmojiInteraction' | 'loadMessageReactions' |
+  'stopActiveReaction' | 'copySelectedMessages' | 'copyMessagesByIds' |
+  'setEditingId' |
+  // scheduled messages
+  'loadScheduledHistory' | 'sendScheduledMessages' | 'rescheduleMessage' | 'deleteScheduledMessages' |
+  // poll result
+  'openPollResults' | 'closePollResults' | 'loadPollOptionResults' |
+  // forwarding messages
+  'openForwardMenu' | 'exitForwardMode' | 'setForwardChatId' | 'forwardMessages' |
+  'openForwardMenuForSelectedMessages' |
+  // global search
+  'setGlobalSearchQuery' | 'searchMessagesGlobal' | 'addRecentlyFoundChatId' | 'clearRecentlyFoundChats' |
+  'setGlobalSearchContent' | 'setGlobalSearchChatId' | 'setGlobalSearchDate' |
+  // message search
+  'openLocalTextSearch' | 'closeLocalTextSearch' | 'setLocalTextSearchQuery' | 'setLocalMediaSearchType' |
+  'searchTextMessagesLocal' | 'searchMediaMessagesLocal' | 'searchMessagesByDate' |
+  // management
+  'toggleManagement' | 'closeManagement' | 'checkPublicLink' | 'updatePublicLink' | 'updatePrivateLink' |
+  'setEditingExportedInvite' | 'loadExportedChatInvites' | 'editExportedChatInvite' | 'exportChatInvite' |
+  'deleteExportedChatInvite' | 'deleteRevokedExportedChatInvites' | 'setOpenedInviteInfo' | 'loadChatInviteImporters' |
+  'loadChatJoinRequests' | 'hideChatJoinRequest' | 'hideAllChatJoinRequests' | 'requestNextManagementScreen' |
+  'loadChatInviteRequesters' | 'hideChatReportPanel' |
+  // groups
+  'togglePreHistoryHidden' | 'updateChatDefaultBannedRights' | 'updateChatMemberBannedRights' | 'updateChatAdmin' |
+  'acceptInviteConfirmation' |
+  // users
+  'loadFullUser' | 'loadNearestCountry' | 'loadTopUsers' | 'loadContactList' |
+  'loadCurrentUser' | 'updateProfile' | 'checkUsername' |
+  'deleteContact' | 'loadUser' | 'setUserSearchQuery' | 'loadCommonChats' | 'reportSpam' |
+  // chat creation
+  'createChannel' | 'createGroupChat' | 'resetChatCreation' |
+  // settings
+  'setSettingOption' | 'loadPasswordInfo' | 'clearTwoFaError' |
+  'updatePassword' | 'updateRecoveryEmail' | 'clearPassword' | 'provideTwoFaEmailCode' | 'checkPassword' |
+  'loadBlockedContacts' | 'blockContact' | 'unblockContact' |
+  'loadNotificationSettings' | 'updateContactSignUpNotification' | 'updateNotificationSettings' |
+  'updateWebNotificationSettings' | 'loadLanguages' | 'loadPrivacySettings' | 'setPrivacyVisibility' |
+  'setPrivacySettings' | 'loadNotificationExceptions' | 'setThemeSettings' | 'updateIsOnline' |
+  'loadContentSettings' | 'updateContentSettings' |
+  'loadCountryList' | 'ensureTimeFormat' | 'loadAppConfig' |
+  // stickers & GIFs
+  'setStickerSearchQuery' | 'loadSavedGifs' | 'saveGif' | 'setGifSearchQuery' | 'searchMoreGifs' |
+  'faveSticker' | 'unfaveSticker' | 'toggleStickerSet' | 'loadAnimatedEmojis' | 'loadStickers' |
+  'loadStickersForEmoji' | 'clearStickersForEmoji' | 'loadEmojiKeywords' | 'loadGreetingStickers' |
+  // bots
+  'sendBotCommand' | 'loadTopInlineBots' | 'queryInlineBot' | 'sendInlineBotResult' |
+  'resetInlineBot' |
+  // misc
+  'loadWebPagePreview' | 'clearWebPagePreview' | 'loadWallpapers' | 'uploadWallpaper' |
+  'setDeviceToken' | 'deleteDeviceToken' |
+  'checkVersionNotification' | 'createServiceNotification' |
+  // payment
+  'closePaymentModal' | 'addPaymentError' | 'validateRequestedInfo' | 'setPaymentStep' | 'sendPaymentForm' |
+  'getReceipt' | 'sendCredentialsInfo' | 'clearPaymentError' | 'clearReceipt' |
+  // calls
+  'joinGroupCall' | 'toggleGroupCallMute' | 'toggleGroupCallPresentation' | 'leaveGroupCall' |
+  'toggleGroupCallVideo' | 'requestToSpeak' | 'setGroupCallParticipantVolume' | 'toggleGroupCallPanel' |
+  'createGroupCall' | 'joinVoiceChatByLink' | 'subscribeToGroupCallUpdates' | 'createGroupCallInviteLink' |
+  'loadMoreGroupCallParticipants' | 'connectToActiveGroupCall' |
+  // stats
+  'loadStatistics' | 'loadMessageStatistics' | 'loadStatisticsAsyncGraph'
+);
+
+const typed = typify<GlobalState, ActionPayloads, NonTypedActionNames>();
 export type GlobalActions = ReturnType<typeof typed.getActions>;
-export type ActionReturnType = GlobalState | void | Promise<void>;
-export type TabArgs<T> = T extends RequiredGlobalState ? [
-  tabId: number,
-] : [
-  tabId?: number | undefined,
-];

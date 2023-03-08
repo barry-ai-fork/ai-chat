@@ -1,7 +1,6 @@
 import { addActionHandler } from '../../index';
-import type { ActionReturnType } from '../../types';
 
-addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
+addActionHandler('apiUpdate', (global, actions, update) => {
   switch (update['@type']) {
     case 'updateTwoFaStateWaitCode': {
       return {

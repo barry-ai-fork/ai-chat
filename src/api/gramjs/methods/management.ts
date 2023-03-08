@@ -2,11 +2,7 @@ import { Api as GramJs } from '../../../lib/gramjs';
 
 import { invokeRequest } from './client';
 import { buildInputEntity, buildInputPeer } from '../gramjsBuilders';
-import type {
-  ApiChat, ApiError, ApiUser, OnApiUpdate,
-} from '../../types';
-
-import { USERNAME_PURCHASE_ERROR } from '../../../config';
+import type { ApiChat, ApiUser, OnApiUpdate } from '../../types';
 import { addEntitiesWithPhotosToLocalDb } from '../helpers';
 import { buildApiExportedInvite, buildChatInviteImporter } from '../apiBuilders/chats';
 import { buildApiUser } from '../apiBuilders/users';
@@ -14,32 +10,15 @@ import { buildCollectionByKey } from '../../../util/iteratees';
 
 let onUpdate: OnApiUpdate;
 
-export const ACCEPTABLE_USERNAME_ERRORS = new Set([USERNAME_PURCHASE_ERROR, 'USERNAME_INVALID']);
-
 export function init(_onUpdate: OnApiUpdate) {
   onUpdate = _onUpdate;
 }
 
-export async function checkChatUsername({ username }: { username: string }) {
-  try {
-    const result = await invokeRequest(new GramJs.channels.CheckUsername({
-      channel: new GramJs.InputChannelEmpty(),
-      username,
-    }), undefined, true);
-
-    return { result, error: undefined };
-  } catch (error) {
-    const errorMessage = (error as ApiError).message;
-
-    if (ACCEPTABLE_USERNAME_ERRORS.has(errorMessage)) {
-      return {
-        result: false,
-        error: errorMessage,
-      };
-    }
-
-    throw error;
-  }
+export function checkChatUsername({ username }: { username: string }) {
+  return invokeRequest(new GramJs.channels.CheckUsername({
+    channel: new GramJs.InputChannelEmpty(),
+    username,
+  }));
 }
 
 export async function setChatUsername(
@@ -50,19 +29,13 @@ export async function setChatUsername(
     username,
   }));
 
-  const usernames = chat.usernames
-    ? chat.usernames.map((u) => (u.isEditable ? { ...u, username } : u))
-    : [{ username, isEditable: true, isActive: true }];
-
   if (result) {
     onUpdate({
       '@type': 'updateChat',
       id: chat.id,
-      chat: { usernames },
+      chat: { username },
     });
   }
-
-  return result;
 }
 
 export async function updatePrivateLink({
@@ -76,6 +49,7 @@ export async function updatePrivateLink({
     expireDate,
   }));
 
+  // TODO Verify Exported Invite logic
   if (!(result instanceof GramJs.ChatInviteExported)) return undefined;
 
   onUpdate({
@@ -91,7 +65,7 @@ export async function updatePrivateLink({
 
 export async function fetchExportedChatInvites({
   peer, admin, limit = 0, isRevoked,
-}: { peer: ApiChat; admin: ApiUser; limit?: number; isRevoked?: boolean }) {
+}: { peer: ApiChat; admin: ApiUser; limit: number; isRevoked?: boolean }) {
   const exportedInvites = await invokeRequest(new GramJs.messages.GetExportedChatInvites({
     peer: buildInputPeer(peer.id, peer.accessHash),
     adminId: buildInputEntity(admin.id, admin.accessHash) as GramJs.InputUser,
@@ -101,15 +75,10 @@ export async function fetchExportedChatInvites({
 
   if (!exportedInvites) return undefined;
   addEntitiesWithPhotosToLocalDb(exportedInvites.users);
-
-  const invites = (exportedInvites.invites
-    .filter((invite): invite is GramJs.ChatInviteExported => invite instanceof GramJs.ChatInviteExported))
+  // TODO Verify Exported Invite logic
+  return (exportedInvites.invites
+    .filter((l) => l instanceof GramJs.ChatInviteExported) as GramJs.ChatInviteExported[])
     .map(buildApiExportedInvite);
-
-  return {
-    invites,
-    users: exportedInvites.users.map(buildApiUser).filter(Boolean),
-  };
 }
 
 export async function editExportedChatInvite({
@@ -123,6 +92,7 @@ export async function editExportedChatInvite({
   isRequestNeeded?: boolean;
   title?: string;
 }) {
+  // TODO Verify Exported Invite logic
   const invite = await invokeRequest(new GramJs.messages.EditExportedChatInvite({
     link,
     peer: buildInputPeer(peer.id, peer.accessHash),
@@ -141,7 +111,6 @@ export async function editExportedChatInvite({
     return {
       oldInvite: replaceInvite,
       newInvite: replaceInvite,
-      users: invite.users.map(buildApiUser).filter(Boolean),
     };
   }
 
@@ -153,7 +122,6 @@ export async function editExportedChatInvite({
     return {
       oldInvite,
       newInvite,
-      users: invite.users.map(buildApiUser).filter(Boolean),
     };
   }
   return undefined;
@@ -176,6 +144,7 @@ export async function exportChatInvite({
     title,
   }));
 
+  // TODO Verify Exported Invite logic
   if (!(invite instanceof GramJs.ChatInviteExported)) return undefined;
   return buildApiExportedInvite(invite);
 }
@@ -209,7 +178,7 @@ export async function deleteRevokedExportedChatInvites({
 export async function fetchChatInviteImporters({
   peer, link, offsetDate = 0, offsetUser, limit = 0, isRequested,
 }: {
-  peer: ApiChat; link?: string; offsetDate?: number; offsetUser?: ApiUser; limit?: number; isRequested?: boolean;
+  peer: ApiChat; link?: string; offsetDate: number; offsetUser?: ApiUser; limit: number; isRequested?: boolean;
 }) {
   const result = await invokeRequest(new GramJs.messages.GetChatInviteImporters({
     peer: buildInputPeer(peer.id, peer.accessHash),

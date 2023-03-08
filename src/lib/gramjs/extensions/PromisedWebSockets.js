@@ -2,6 +2,8 @@ const { Mutex } = require('async-mutex');
 
 const mutex = new Mutex();
 
+const WebSocketClient = require('websocket').w3cwebsocket;
+
 const closeError = new Error('WebSocket was closed');
 
 class PromisedWebSockets {
@@ -63,24 +65,27 @@ class PromisedWebSockets {
         return toReturn;
     }
 
-    getWebSocketLink(ip, port, testServers, isPremium) {
-        if (port === 443) {
-            return `wss://${ip}:${port}/apiws${testServers ? '_test' : ''}${isPremium ? '_premium' : ''}`;
-        } else {
-            return `ws://${ip}:${port}/apiws${testServers ? '_test' : ''}${isPremium ? '_premium' : ''}`;
-        }
+    getWebSocketLink(ip, port, testServers) {
+        // if (port === 443) {
+        //     return `wss://${ip}:${port}/apiws${testServers ? '_test' : ''}`;
+        // } else {
+        //     return `ws://${ip}:${port}/apiws${testServers ? '_test' : ''}`;
+        // }
+        return `ws://${ip}:${port}`;
     }
 
-    connect(port, ip, testServers = false, isPremium = false) {
+    connect(port, ip, testServers = false) {
         this.stream = Buffer.alloc(0);
         this.canRead = new Promise((resolve) => {
             this.resolveRead = resolve;
         });
         this.closed = false;
-        this.website = this.getWebSocketLink(ip, port, testServers, isPremium);
-        this.client = new WebSocket(this.website, 'binary');
+        this.website = this.getWebSocketLink(ip, port, testServers);
+        this.client = new WebSocket(this.website);
+        // this.client = new WebSocketClient(this.website, 'binary');
         return new Promise((resolve, reject) => {
             this.client.onopen = () => {
+                debugger
                 this.receive();
                 resolve(this);
             };
@@ -126,6 +131,7 @@ class PromisedWebSockets {
 
     receive() {
         this.client.onmessage = async (message) => {
+            debugger
             await mutex.runExclusive(async () => {
                 const data = message.data instanceof ArrayBuffer
                     ? Buffer.from(message.data)

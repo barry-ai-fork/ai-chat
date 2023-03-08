@@ -1,8 +1,7 @@
 import type { StateReducer, Dispatch } from '../useReducer';
-import type { ApiChatFolder } from '../../api/types';
-
-import { pick, omit } from '../../util/iteratees';
 import useReducer from '../useReducer';
+import type { ApiChatFolder } from '../../api/types';
+import { pick, omit } from '../../util/iteratees';
 
 export type FolderChatType = {
   icon: string;

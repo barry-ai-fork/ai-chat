@@ -45,16 +45,16 @@ const NewChat: FC<OwnProps> = ({
         switch (content) {
           case LeftColumnContent.NewChannelStep1:
           case LeftColumnContent.NewGroupStep1:
-            return (
-              <NewChatStep1
-                isChannel={isChannel}
-                isActive={isActive}
-                selectedMemberIds={newChatMemberIds}
-                onSelectedMemberIdsChange={setNewChatMemberIds}
-                onNextStep={handleNextStep}
-                onReset={onReset}
-              />
-            );
+            // return (
+            //   <NewChatStep1
+            //     isChannel={isChannel}
+            //     isActive={isActive}
+            //     selectedMemberIds={newChatMemberIds}
+            //     onSelectedMemberIdsChange={setNewChatMemberIds}
+            //     onNextStep={handleNextStep}
+            //     onReset={onReset}
+            //   />
+            // );
           case LeftColumnContent.NewChannelStep2:
           case LeftColumnContent.NewGroupStep2:
             return (

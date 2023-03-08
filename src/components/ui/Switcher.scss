@@ -43,7 +43,7 @@
     display: inline-block;
     border-radius: 0.5rem;
     position: relative;
-    transition: background-color 150ms;
+    transition: background-color 0.2s ease-in;
   }
 
   .widget:after {
@@ -55,7 +55,8 @@
     height: 1.125rem;
     background-color: var(--color-background);
     border-radius: 0.75rem;
-    transition: transform 200ms;
+    /* stylelint-disable-next-line plugin/no-low-performance-animation-properties */
+    transition: border-color 0.2s ease-out;
     border: 0.125rem solid var(--color-gray);
   }
 
@@ -64,7 +65,12 @@
   }
 
   input:checked + .widget:after {
-    transform: translateX(100%);
+    left: calc(100% - 1.125rem);
+    transform: translateX(calc(-100% + 1.125rem));
     border-color: var(--color-primary);
+  }
+
+  .widget:active:after {
+    width: 1.25rem;
   }
 }

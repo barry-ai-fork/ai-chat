@@ -1,7 +1,5 @@
 import type { RefObject } from 'react';
-import {
-  useState, useEffect, useLayoutEffect, useCallback,
-} from '../lib/teact/teact';
+import { useState, useEffect } from '../lib/teact/teact';
 import useFlag from './useFlag';
 
 export function useResize(
@@ -9,31 +7,18 @@ export function useResize(
   onResize: (width: number) => void,
   onReset: NoneToVoidFunction,
   initialWidth?: number,
-  cssPropertyName?: string,
 ) {
   const [isActive, markIsActive, unmarkIsActive] = useFlag();
   const [initialMouseX, setInitialMouseX] = useState<number>();
   const [initialElementWidth, setInitialElementWidth] = useState<number>();
 
-  const setElementStyle = useCallback((width?: number) => {
-    if (!elementRef.current) {
-      return;
-    }
-
-    const widthPx = width ? `${width}px` : '';
-    elementRef.current.style.width = widthPx;
-    if (cssPropertyName) {
-      elementRef.current.style.setProperty(cssPropertyName, widthPx);
-    }
-  }, [cssPropertyName, elementRef]);
-
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!elementRef.current || !initialWidth) {
       return;
     }
 
-    setElementStyle(initialWidth);
-  }, [cssPropertyName, elementRef, initialWidth, setElementStyle]);
+    elementRef.current.style.width = `${initialWidth}px`;
+  }, [elementRef, initialWidth]);
 
   function handleMouseUp() {
     document.body.classList.remove('cursor-ew-resize');
@@ -51,7 +36,7 @@ export function useResize(
 
   function resetResize(e: React.MouseEvent<HTMLElement, MouseEvent>) {
     e.preventDefault();
-    setElementStyle(undefined);
+    elementRef.current!.style.width = '';
     onReset();
   }
 
@@ -60,7 +45,7 @@ export function useResize(
 
     const handleMouseMove = (e: MouseEvent) => {
       const newWidth = Math.ceil(initialElementWidth + e.clientX - initialMouseX);
-      setElementStyle(newWidth);
+      elementRef.current!.style.width = `${newWidth}px`;
     };
 
     function stopDrag() {
@@ -81,7 +66,7 @@ export function useResize(
     document.addEventListener('blur', stopDrag, false);
 
     return cleanup;
-  }, [initialElementWidth, initialMouseX, elementRef, onResize, isActive, unmarkIsActive, setElementStyle]);
+  }, [initialElementWidth, initialMouseX, elementRef, onResize, isActive, unmarkIsActive]);
 
   return { initResize, resetResize, handleMouseUp };
 }

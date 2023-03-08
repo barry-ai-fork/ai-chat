@@ -1,7 +1,7 @@
 import { addActionHandler, getGlobal, setGlobal } from '../../index';
 import { selectActiveGroupCall, selectGroupCallParticipant, selectPhoneCallUser } from '../../selectors/calls';
 import { updateGroupCall, updateGroupCallParticipant } from '../../reducers/calls';
-import { buildCollectionByKey, omit } from '../../../util/iteratees';
+import { omit } from '../../../util/iteratees';
 import type { ApiCallProtocol } from '../../../lib/secret-sauce';
 import {
   handleUpdateGroupCallConnection,
@@ -13,12 +13,8 @@ import { ARE_CALLS_SUPPORTED } from '../../../util/environment';
 import { callApi } from '../../../api/gramjs';
 import * as langProvider from '../../../util/langProvider';
 import { EMOJI_DATA, EMOJI_OFFSETS } from '../../../util/phoneCallEmojiConstants';
-import type { ActionReturnType } from '../../types';
-import { updateTabState } from '../../reducers/tabs';
-import { getCurrentTabId } from '../../../util/establishMultitabRole';
-import { addUsers } from '../../reducers';
 
-addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
+addActionHandler('apiUpdate', (global, actions, update) => {
   const { activeGroupCallId } = global.groupCalls;
 
   switch (update['@type']) {
@@ -36,7 +32,7 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
       if (!activeGroupCallId) break;
 
       if (update.connectionState === 'disconnected') {
-        if ('leaveGroupCall' in actions) actions.leaveGroupCall({ isFromLibrary: true, tabId: getCurrentTabId() });
+        actions.leaveGroupCall({ isFromLibrary: true });
         break;
       }
 
@@ -54,8 +50,8 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
     }
     case 'updateGroupCallConnection': {
       if (update.data.stream) {
-        actions.showNotification({ message: 'Big live streams are not yet supported', tabId: getCurrentTabId() });
-        if ('leaveGroupCall' in actions) actions.leaveGroupCall({ tabId: getCurrentTabId() });
+        actions.showNotification({ message: 'Big live streams are not yet supported' });
+        actions.leaveGroupCall();
         break;
       }
       void handleUpdateGroupCallConnection(update.data, update.presentation);
@@ -107,11 +103,8 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
       if (state === 'active' || state === 'accepted') {
         if (!verifyPhoneCallProtocol(call.protocol)) {
           const user = selectPhoneCallUser(global);
-          if ('hangUp' in actions) actions.hangUp({ tabId: getCurrentTabId() });
-          actions.showNotification({
-            message: langProvider.translate('VoipPeerIncompatible', user?.firstName),
-            tabId: getCurrentTabId(),
-          });
+          actions.hangUp();
+          actions.showNotification({ message: langProvider.getTranslation('VoipPeerIncompatible', user?.firstName) });
           return undefined;
         }
       }
@@ -120,10 +113,11 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
         // Discarded from other device
         if (!phoneCall) return undefined;
 
-        return updateTabState(global, {
+        return {
+          ...global,
           ...(call.needRating && { ratingPhoneCall: call }),
           isCallPanelVisible: undefined,
-        }, getCurrentTabId());
+        };
       } else if (state === 'accepted' && accessHash && gB) {
         (async () => {
           const { gA, keyFingerprint, emojis } = await callApi('confirmPhoneCall', [gB, EMOJI_DATA, EMOJI_OFFSETS])!;
@@ -134,20 +128,14 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
             emojis,
           } as ApiPhoneCall;
 
-          global = {
+          setGlobal({
             ...global,
             phoneCall: newCall,
-          };
-          setGlobal(global);
+          });
 
-          const result = await callApi('confirmCall', {
+          callApi('confirmCall', {
             call, gA, keyFingerprint,
           });
-          if (result) {
-            global = getGlobal();
-            global = addUsers(global, buildCollectionByKey(result.users, 'id'));
-            setGlobal(global);
-          }
         })();
       } else if (state === 'active' && connections && phoneCall?.state !== 'active') {
         if (!isOutgoing) {
@@ -161,11 +149,10 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
               emojis,
             } as ApiPhoneCall;
 
-            global = {
+            setGlobal({
               ...global,
               phoneCall: newCall,
-            };
-            setGlobal(global);
+            });
           })();
         }
         void joinPhoneCall(
@@ -181,7 +168,7 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
       if (!global.phoneCall) return global;
 
       if (connectionState === 'closed' || connectionState === 'disconnected' || connectionState === 'failed') {
-        if ('hangUp' in actions) actions.hangUp({ tabId: getCurrentTabId() });
+        actions.hangUp();
         return undefined;
       }
 

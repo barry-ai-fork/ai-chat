@@ -4,8 +4,6 @@ import type { OwnProps as AnimatedIconProps } from './AnimatedIcon';
 import type { ApiSticker } from '../../api/types';
 import { ApiMediaFormat } from '../../api/types';
 
-import { getStickerPreviewHash } from '../../global/helpers';
-
 import useMedia from '../../hooks/useMedia';
 
 import AnimatedIconWithPreview from './AnimatedIconWithPreview';
@@ -20,9 +18,9 @@ function AnimatedIconFromSticker(props: OwnProps) {
   } = props;
 
   const thumbDataUri = sticker?.thumbnail?.dataUri;
-  const localMediaHash = sticker && `sticker${sticker.id}`;
+  const localMediaHash = `sticker${sticker?.id}`;
   const previewBlobUrl = useMedia(
-    sticker ? getStickerPreviewHash(sticker.id) : undefined,
+    sticker ? `${localMediaHash}?size=m` : undefined,
     noLoad && !forcePreview,
     ApiMediaFormat.BlobUrl,
     lastSyncTime,

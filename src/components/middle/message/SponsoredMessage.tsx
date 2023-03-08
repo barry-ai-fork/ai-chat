@@ -89,7 +89,7 @@ const SponsoredMessage: FC<OwnProps & StateProps> = ({
     if (message.chatInviteHash) {
       openChatByInvite({ hash: message.chatInviteHash });
     } else if (message.channelPostId) {
-      focusMessage({ chatId: message.chatId!, messageId: message.channelPostId });
+      focusMessage({ chatId: message.chatId, messageId: message.channelPostId });
     } else {
       openChat({ id: message.chatId });
 
@@ -121,7 +121,7 @@ const SponsoredMessage: FC<OwnProps & StateProps> = ({
             {channel && renderText(message.chatInviteTitle || getChatTitle(lang, channel, bot) || '')}
           </div>
 
-          <div className="text-content with-meta" dir="auto" ref={contentRef}>
+          <p className="text-content with-meta" dir="auto" ref={contentRef}>
             <span className="text-content-inner" dir="auto">
               {renderTextWithEntities(message.text.text, message.text.entities)}
             </span>
@@ -131,7 +131,7 @@ const SponsoredMessage: FC<OwnProps & StateProps> = ({
                 {message.isRecommended ? lang('Message.RecommendedLabel') : lang('SponsoredMessage')}
               </span>
             </span>
-          </div>
+          </p>
 
           <Button color="secondary" size="tiny" ripple onClick={handleClick} className="SponsoredMessage__button">
             {lang(message.isBot

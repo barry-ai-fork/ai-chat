@@ -1,12 +1,11 @@
 import React from '../../../lib/teact/teact';
 
 import type {
-  ApiChat, ApiMessage, ApiUser, ApiGroupCall, ApiTopic,
+  ApiChat, ApiMessage, ApiUser, ApiGroupCall,
 } from '../../../api/types';
 import type { TextPart } from '../../../types';
-import type { ObserveFn } from '../../../hooks/useIntersectionObserver';
-import type { LangFn } from '../../../hooks/useLang';
 
+import type { LangFn } from '../../../hooks/useLang';
 import {
   getChatTitle,
   getMessageSummaryText,
@@ -14,19 +13,17 @@ import {
 } from '../../../global/helpers';
 import trimText from '../../../util/trimText';
 import { formatCurrency } from '../../../util/formatCurrency';
+import { renderMessageSummary } from './renderMessageText';
 import renderText from './renderText';
 
 import UserLink from '../UserLink';
 import MessageLink from '../MessageLink';
 import ChatLink from '../ChatLink';
 import GroupCallLink from '../GroupCallLink';
-import MessageSummary from '../MessageSummary';
-import CustomEmoji from '../CustomEmoji';
-import TopicDefaultIcon from '../TopicDefaultIcon';
 
 interface RenderOptions {
   asPlainText?: boolean;
-  isEmbedded?: boolean;
+  asTextWithSpoilers?: boolean;
 }
 
 const MAX_LENGTH = 32;
@@ -40,36 +37,23 @@ export function renderActionMessageText(
   targetUsers?: ApiUser[],
   targetMessage?: ApiMessage,
   targetChatId?: string,
-  topic?: ApiTopic,
   options: RenderOptions = {},
-  observeIntersectionForLoading?: ObserveFn,
-  observeIntersectionForPlaying?: ObserveFn,
 ) {
   if (!message.content.action) {
     return [];
   }
 
   const {
-    text, translationValues, amount, currency, call, score, topicEmojiIconId,
+    text, translationValues, amount, currency, call, score,
   } = message.content.action;
   const content: TextPart[] = [];
-  const noLinks = options.asPlainText || options.isEmbedded;
+  const noLinks = options.asPlainText || options.asTextWithSpoilers;
   const translationKey = text === 'Chat.Service.Group.UpdatedPinnedMessage1' && !targetMessage
     ? 'Message.PinnedGenericMessage'
     : text;
-
   let unprocessed = lang(translationKey, translationValues?.length ? translationValues : undefined);
   if (translationKey.includes('ScoredInGame')) { // Translation hack for games
     unprocessed = unprocessed.replace('un1', '%action_origin%').replace('un2', '%message%');
-  }
-  if (translationKey === 'ActionGiftOutbound') { // Translation hack for Premium Gift
-    unprocessed = unprocessed.replace('un2', '%gift_payment_amount%').replace(/\*\*/g, '');
-  }
-  if (translationKey === 'ActionGiftInbound') { // Translation hack for Premium Gift
-    unprocessed = unprocessed
-      .replace('un1', '%action_origin%')
-      .replace('un2', '%gift_payment_amount%')
-      .replace(/\*\*/g, '');
   }
   let processed: TextPart[];
 
@@ -96,42 +80,6 @@ export function renderActionMessageText(
   unprocessed = processed.pop() as string;
   content.push(...processed);
 
-  if (unprocessed.includes('%action_topic%')) {
-    const topicEmoji = topic?.iconEmojiId ? <CustomEmoji documentId={topic.iconEmojiId} /> : '';
-    const topicString = topic ? `${topic.title}` : 'a topic';
-    processed = processPlaceholder(
-      unprocessed,
-      '%action_topic%',
-      [topicEmoji, topicString],
-      '',
-    );
-    unprocessed = processed.pop() as string;
-    content.push(...processed);
-  }
-
-  if (unprocessed.includes('%action_topic_icon%')) {
-    const topicIcon = topicEmojiIconId || topic?.iconEmojiId;
-    const hasIcon = topicIcon && topicIcon !== '0';
-    processed = processPlaceholder(
-      unprocessed,
-      '%action_topic_icon%',
-      hasIcon ? <CustomEmoji documentId={topicIcon!} />
-        : topic ? <TopicDefaultIcon topicId={topic!.id} title={topic!.title} /> : '...',
-    );
-    unprocessed = processed.pop() as string;
-    content.push(...processed);
-  }
-
-  if (unprocessed.includes('%gift_payment_amount%')) {
-    processed = processPlaceholder(
-      unprocessed,
-      '%gift_payment_amount%',
-      formatCurrency(amount!, currency!, lang.code),
-    );
-    unprocessed = processed.pop() as string;
-    content.push(...processed);
-  }
-
   if (unprocessed.includes('%score%')) {
     processed = processPlaceholder(
       unprocessed,
@@ -146,7 +94,7 @@ export function renderActionMessageText(
     unprocessed,
     '%target_user%',
     targetUsers
-      ? targetUsers.map((user) => renderUserContent(user, noLinks)).filter(Boolean)
+      ? targetUsers.map((user) => renderUserContent(user, noLinks)).filter<TextPart>(Boolean as any)
       : 'User',
   );
 
@@ -157,9 +105,7 @@ export function renderActionMessageText(
     unprocessed,
     '%message%',
     targetMessage
-      ? renderMessageContent(
-        lang, targetMessage, options, observeIntersectionForLoading, observeIntersectionForPlaying,
-      )
+      ? renderMessageContent(lang, targetMessage, options)
       : 'a message',
   );
   unprocessed = processed.pop() as string;
@@ -182,9 +128,7 @@ export function renderActionMessageText(
       ? renderMigratedContent(targetChatId, noLinks)
       : 'another chat',
   );
-  processed.forEach((part) => {
-    content.push(...renderText(part));
-  });
+  content.push(...processed);
 
   if (options.asPlainText) {
     return content.join('').trim();
@@ -203,32 +147,19 @@ function renderProductContent(message: ApiMessage) {
     : 'a product';
 }
 
-function renderMessageContent(
-  lang: LangFn,
-  message: ApiMessage,
-  options: RenderOptions = {},
-  observeIntersectionForLoading?: ObserveFn,
-  observeIntersectionForPlaying?: ObserveFn,
-) {
-  const { asPlainText, isEmbedded } = options;
+function renderMessageContent(lang: LangFn, message: ApiMessage, options: RenderOptions = {}) {
+  const { asPlainText, asTextWithSpoilers } = options;
 
   if (asPlainText) {
     return getMessageSummaryText(lang, message, undefined, MAX_LENGTH);
   }
 
-  const messageSummary = (
-    <MessageSummary
-      lang={lang}
-      message={message}
-      truncateLength={MAX_LENGTH}
-      observeIntersectionForLoading={observeIntersectionForLoading}
-      observeIntersectionForPlaying={observeIntersectionForPlaying}
-      withTranslucentThumbs
-    />
-  );
+  const messageSummary = renderMessageSummary(lang, message, undefined, undefined, MAX_LENGTH);
 
-  if (isEmbedded) {
-    return messageSummary;
+  if (asTextWithSpoilers) {
+    return (
+      <span>{messageSummary}</span>
+    );
   }
 
   return (
@@ -248,7 +179,7 @@ function renderUserContent(sender: ApiUser, noLinks?: boolean): string | TextPar
   const text = trimText(getUserFullName(sender), MAX_LENGTH);
 
   if (noLinks) {
-    return renderText(text!);
+    return text;
   }
 
   return <UserLink className="action-link" sender={sender}>{sender && renderText(text!)}</UserLink>;
@@ -258,7 +189,7 @@ function renderChatContent(lang: LangFn, chat: ApiChat, noLinks?: boolean): stri
   const text = trimText(getChatTitle(lang, chat), MAX_LENGTH);
 
   if (noLinks) {
-    return renderText(text!);
+    return text;
   }
 
   return <ChatLink className="action-link" chatId={chat.id}>{chat && renderText(text!)}</ChatLink>;
@@ -271,12 +202,10 @@ function renderMigratedContent(chatId: string, noLinks?: boolean): string | Text
     return text;
   }
 
-  return <ChatLink className="action-link underlined-link" chatId={chatId}>{text}</ChatLink>;
+  return <ChatLink className="action-link" chatId={chatId}>{text}</ChatLink>;
 }
 
-function processPlaceholder(
-  text: string, placeholder: string, replaceValue?: TextPart | TextPart[], separator = ',',
-): TextPart[] {
+function processPlaceholder(text: string, placeholder: string, replaceValue?: TextPart | TextPart[]): TextPart[] {
   const placeholderPosition = text.indexOf(placeholder);
   if (placeholderPosition < 0 || !replaceValue) {
     return [text];
@@ -288,7 +217,7 @@ function processPlaceholder(
     replaceValue.forEach((value, index) => {
       content.push(value);
       if (index + 1 < replaceValue.length) {
-        content.push(`${separator} `);
+        content.push(', ');
       }
     });
   } else {
@@ -296,5 +225,5 @@ function processPlaceholder(
   }
   content.push(text.substring(placeholderPosition + placeholder.length));
 
-  return content.flat();
+  return content;
 }

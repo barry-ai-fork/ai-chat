@@ -1,14 +1,6 @@
-type HandlerName =
-  'onEnter'
-  | 'onBackspace'
-  | 'onDelete'
-  | 'onEsc'
-  | 'onUp'
-  | 'onDown'
-  | 'onLeft'
-  | 'onRight'
-  | 'onTab';
-type Handler = (e: KeyboardEvent) => void | boolean;
+type HandlerName = 'onEnter' | 'onBackspace' | 'onDelete' | 'onEsc' | 'onUp' | 'onDown' | 'onLeft' | 'onRight'
+| 'onTab';
+type Handler = (e: KeyboardEvent) => void;
 type CaptureOptions = Partial<Record<HandlerName, Handler>>;
 
 const keyToHandlerName: Record<string, HandlerName> = {
@@ -72,14 +64,10 @@ function handleKeyDown(e: KeyboardEvent) {
   if (!length) {
     return;
   }
+  e.stopPropagation();
 
-  for (let i = length - 1; i >= 0; i--) {
-    const handler = handlers[handlerName][i]!;
-    if (handler(e) !== false) {
-      e.stopPropagation();
-      break;
-    }
-  }
+  const handler = handlers[handlerName][length - 1];
+  handler!(e);
 }
 
 function releaseKeyboardListener(options: CaptureOptions) {

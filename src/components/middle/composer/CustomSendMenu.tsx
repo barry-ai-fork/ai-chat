@@ -39,7 +39,7 @@ const CustomSendMenu: FC<OwnProps> = ({
       autoClose
       positionX="right"
       positionY={isOpenToBottom ? 'top' : 'bottom'}
-      className="CustomSendMenu with-menu-transitions"
+      className="CustomSendMenu"
       onClose={onClose}
       onCloseAnimationEnd={onCloseAnimationEnd}
       onMouseEnter={!IS_TOUCH_ENV ? handleMouseEnter : undefined}

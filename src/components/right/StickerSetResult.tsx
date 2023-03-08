@@ -1,24 +1,28 @@
 import type { FC } from '../../lib/teact/teact';
 import React, {
-  useEffect, memo, useMemo, useCallback, useRef,
+  useEffect, memo, useMemo, useCallback,
 } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
-import type { ApiSticker, ApiStickerSet } from '../../api/types';
+import type { ApiStickerSet } from '../../api/types';
 import type { ObserveFn } from '../../hooks/useIntersectionObserver';
 
 import { STICKER_SIZE_SEARCH } from '../../config';
 import { selectIsCurrentUserPremium, selectShouldLoopStickers, selectStickerSet } from '../../global/selectors';
+import useFlag from '../../hooks/useFlag';
+import useOnChange from '../../hooks/useOnChange';
 import useLang from '../../hooks/useLang';
 
 import Button from '../ui/Button';
 import StickerButton from '../common/StickerButton';
+import StickerSetModal from '../common/StickerSetModal.async';
 import Spinner from '../ui/Spinner';
 
 type OwnProps = {
   stickerSetId: string;
   observeIntersection: ObserveFn;
-  isModalOpen?: boolean;
+  isSomeModalOpen: boolean;
+  onModalToggle: (isOpen: boolean) => void;
 };
 
 type StateProps = {
@@ -32,16 +36,19 @@ const STICKERS_TO_DISPLAY = 5;
 
 const StickerSetResult: FC<OwnProps & StateProps> = ({
   stickerSetId, observeIntersection, set, shouldPlay,
-  isModalOpen, isCurrentUserPremium,
+  isSomeModalOpen, onModalToggle, isCurrentUserPremium,
 }) => {
-  const { loadStickers, toggleStickerSet, openStickerSet } = getActions();
-
-  // eslint-disable-next-line no-null/no-null
-  const sharedCanvasRef = useRef<HTMLCanvasElement>(null);
+  const { loadStickers, toggleStickerSet } = getActions();
 
   const lang = useLang();
-  const isAdded = set && !set.isArchived && Boolean(set.installedDate);
+  const isAdded = set && Boolean(set.installedDate);
   const areStickersLoaded = Boolean(set?.stickers);
+
+  const [isModalOpen, openModal, closeModal] = useFlag();
+
+  useOnChange(() => {
+    onModalToggle(isModalOpen);
+  }, [isModalOpen, onModalToggle]);
 
   const displayedStickers = useMemo(() => {
     if (!set) {
@@ -58,22 +65,14 @@ const StickerSetResult: FC<OwnProps & StateProps> = ({
 
   useEffect(() => {
     // Featured stickers are initialized with one sticker in collection (cover of SickerSet)
-    if (!areStickersLoaded && displayedStickers.length < STICKERS_TO_DISPLAY && set) {
-      loadStickers({
-        stickerSetInfo: {
-          shortName: set.shortName,
-        },
-      });
+    if (!areStickersLoaded && displayedStickers.length < STICKERS_TO_DISPLAY) {
+      loadStickers({ stickerSetId });
     }
-  }, [areStickersLoaded, displayedStickers.length, loadStickers, set, stickerSetId]);
+  }, [areStickersLoaded, displayedStickers.length, loadStickers, stickerSetId]);
 
   const handleAddClick = useCallback(() => {
     toggleStickerSet({ stickerSetId });
   }, [toggleStickerSet, stickerSetId]);
-
-  const handleStickerClick = useCallback((sticker: ApiSticker) => {
-    openStickerSet({ stickerSetInfo: sticker.stickerSetInfo });
-  }, [openStickerSet]);
 
   if (!set) {
     return undefined;
@@ -99,23 +98,28 @@ const StickerSetResult: FC<OwnProps & StateProps> = ({
           {lang(isAdded ? 'Stickers.Installed' : 'Stickers.Install')}
         </Button>
       </div>
-      <div className="sticker-set-main shared-canvas-container">
-        <canvas ref={sharedCanvasRef} className="shared-canvas" />
+      <div className="sticker-set-main">
         {!canRenderStickers && <Spinner />}
         {canRenderStickers && displayedStickers.map((sticker) => (
           <StickerButton
             sticker={sticker}
             size={STICKER_SIZE_SEARCH}
             observeIntersection={observeIntersection}
-            noAnimate={!shouldPlay || isModalOpen}
-            clickArg={sticker}
-            onClick={handleStickerClick}
+            noAnimate={!shouldPlay || isModalOpen || isSomeModalOpen}
+            clickArg={undefined}
+            onClick={openModal}
             noContextMenu
             isCurrentUserPremium={isCurrentUserPremium}
-            sharedCanvasRef={sharedCanvasRef}
           />
         ))}
       </div>
+      {canRenderStickers && (
+        <StickerSetModal
+          isOpen={isModalOpen}
+          fromSticker={displayedStickers[0]}
+          onClose={closeModal}
+        />
+      )}
     </div>
   );
 };

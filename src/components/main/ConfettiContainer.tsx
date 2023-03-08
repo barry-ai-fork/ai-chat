@@ -1,22 +1,21 @@
-import React, { memo, useCallback, useRef } from '../../lib/teact/teact';
+import React, { memo, useRef } from '../../lib/teact/teact';
 import { withGlobal } from '../../global';
 
-import type { TabState } from '../../global/types';
+import type { GlobalState } from '../../global/types';
 import type { FC } from '../../lib/teact/teact';
 
+import { IS_SINGLE_COLUMN_LAYOUT } from '../../util/environment';
 import { pick } from '../../util/iteratees';
 import buildStyle from '../../util/buildStyle';
-import { selectTabState } from '../../global/selectors';
 
 import useWindowSize from '../../hooks/useWindowSize';
-import useSyncEffect from '../../hooks/useSyncEffect';
+import useOnChange from '../../hooks/useOnChange';
 import useForceUpdate from '../../hooks/useForceUpdate';
-import useAppLayout from '../../hooks/useAppLayout';
 
 import styles from './ConfettiContainer.module.scss';
 
 type StateProps = {
-  confetti?: TabState['confetti'];
+  confetti?: GlobalState['confetti'];
 };
 
 interface Confetti {
@@ -38,6 +37,7 @@ interface Confetti {
 }
 
 const CONFETTI_FADEOUT_TIMEOUT = 10000;
+const DEFAULT_CONFETTI_AMOUNT = IS_SINGLE_COLUMN_LAYOUT ? 50 : 100;
 const DEFAULT_CONFETTI_SIZE = 10;
 const CONFETTI_COLORS = ['#E8BC2C', '#D0049E', '#02CBFE', '#5723FD', '#FE8C27', '#6CB859'];
 
@@ -48,14 +48,12 @@ const ConfettiContainer: FC<StateProps> = ({ confetti }) => {
   const isRafStartedRef = useRef(false);
   const windowSize = useWindowSize();
   const forceUpdate = useForceUpdate();
-  const { isMobile } = useAppLayout();
 
-  const defaultConfettiAmount = isMobile ? 50 : 100;
   const {
     lastConfettiTime, top, width, left, height,
   } = confetti || {};
 
-  const generateConfetti = useCallback((w: number, h: number, amount = defaultConfettiAmount) => {
+  function generateConfetti(w: number, h: number, amount = DEFAULT_CONFETTI_AMOUNT) {
     for (let i = 0; i < amount; i++) {
       const leftSide = i % 2;
       const pos = {
@@ -83,9 +81,9 @@ const ConfettiContainer: FC<StateProps> = ({ confetti }) => {
         frameCount: 0,
       });
     }
-  }, [defaultConfettiAmount]);
+  }
 
-  const updateCanvas = useCallback(() => {
+  const updateCanvas = () => {
     if (!canvasRef.current || !isRafStartedRef.current) {
       return;
     }
@@ -166,9 +164,9 @@ const ConfettiContainer: FC<StateProps> = ({ confetti }) => {
     } else {
       isRafStartedRef.current = false;
     }
-  }, []);
+  };
 
-  useSyncEffect(([prevConfettiTime]) => {
+  useOnChange(([prevConfettiTime]) => {
     let hideTimeout: ReturnType<typeof setTimeout>;
     if (prevConfettiTime !== lastConfettiTime) {
       generateConfetti(width || windowSize.width, height || windowSize.height);
@@ -179,10 +177,11 @@ const ConfettiContainer: FC<StateProps> = ({ confetti }) => {
       }
     }
     return () => {
-      clearTimeout(hideTimeout);
+      if (hideTimeout) {
+        clearTimeout(hideTimeout);
+      }
     };
-  // eslint-disable-next-line react-hooks-static-deps/exhaustive-deps -- Old timeout should be cleared only if new confetti is generated
-  }, [lastConfettiTime, forceUpdate, updateCanvas]);
+  }, [lastConfettiTime, updateCanvas]);
 
   if (!lastConfettiTime || Date.now() - lastConfettiTime > CONFETTI_FADEOUT_TIMEOUT) {
     return undefined;
@@ -203,5 +202,5 @@ const ConfettiContainer: FC<StateProps> = ({ confetti }) => {
 };
 
 export default memo(withGlobal(
-  (global): StateProps => pick(selectTabState(global), ['confetti']),
+  (global): StateProps => pick(global, ['confetti']),
 )(ConfettiContainer));

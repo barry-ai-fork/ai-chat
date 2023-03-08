@@ -1,43 +1,38 @@
-import type { GlobalState, TabState, TabArgs } from '../types';
+import type { GlobalState } from '../types';
 import type { GlobalSearchContent } from '../../types';
 import type { ApiGlobalMessageSearchType, ApiMessage } from '../../api/types';
 import { areSortedArraysEqual } from '../../util/iteratees';
-import { updateTabState } from './tabs';
-import { selectTabState } from '../selectors';
-import { getCurrentTabId } from '../../util/establishMultitabRole';
 
 const getComplexKey = (message: ApiMessage) => `${message.chatId}_${message.id}`;
 
-export function updateGlobalSearch<T extends GlobalState>(
-  global: T,
-  searchStatePartial: Partial<TabState['globalSearch']>,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  return updateTabState(global, {
+export function updateGlobalSearch(
+  global: GlobalState,
+  searchStatePartial: Partial<GlobalState['globalSearch']>,
+) {
+  return {
+    ...global,
     globalSearch: {
-      ...selectTabState(global, tabId).globalSearch,
+      ...global.globalSearch,
       ...searchStatePartial,
     },
-  }, tabId);
+  };
 }
 
-export function updateGlobalSearchContent<T extends GlobalState>(
-  global: T,
+export function updateGlobalSearchContent(
+  global: GlobalState,
   currentContent: GlobalSearchContent | undefined,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  return updateGlobalSearch(global, { currentContent }, tabId);
+): GlobalState {
+  return updateGlobalSearch(global, { currentContent });
 }
 
-export function updateGlobalSearchResults<T extends GlobalState>(
-  global: T,
+export function updateGlobalSearchResults(
+  global: GlobalState,
   newFoundMessages: ApiMessage[],
   totalCount: number,
   type: ApiGlobalMessageSearchType,
   nextRate?: number,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
-  const { resultsByType } = selectTabState(global, tabId).globalSearch || {};
+): GlobalState {
+  const { resultsByType } = global.globalSearch || {};
   const newFoundMessagesById = newFoundMessages.reduce((result, message) => {
     result[getComplexKey(message)] = message;
 
@@ -50,7 +45,7 @@ export function updateGlobalSearchResults<T extends GlobalState>(
       (newId) => foundIdsForType.includes(getComplexKey(newFoundMessagesById[newId])),
     )
   ) {
-    return updateGlobalSearchFetchingStatus(global, { messages: false }, tabId);
+    return updateGlobalSearchFetchingStatus(global, { messages: false });
   }
 
   const prevFoundIds = foundIdsForType || [];
@@ -58,28 +53,27 @@ export function updateGlobalSearchResults<T extends GlobalState>(
   const foundIds = Array.prototype.concat(prevFoundIds, newFoundIds);
   const foundOrPrevFoundIds = areSortedArraysEqual(prevFoundIds, foundIds) ? prevFoundIds : foundIds;
 
-  global = updateGlobalSearchFetchingStatus(global, { messages: false }, tabId);
+  global = updateGlobalSearchFetchingStatus(global, { messages: false });
 
   return updateGlobalSearch(global, {
     resultsByType: {
-      ...(selectTabState(global, tabId).globalSearch || {}).resultsByType,
+      ...(global.globalSearch || {}).resultsByType,
       [type]: {
         totalCount,
         nextOffsetId: nextRate,
         foundIds: foundOrPrevFoundIds,
       },
     },
-  }, tabId);
+  });
 }
 
-export function updateGlobalSearchFetchingStatus<T extends GlobalState>(
-  global: T, newState: { chats?: boolean; messages?: boolean },
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-): T {
+export function updateGlobalSearchFetchingStatus(
+  global: GlobalState, newState: { chats?: boolean; messages?: boolean },
+) {
   return updateGlobalSearch(global, {
     fetchingStatus: {
-      ...selectTabState(global, tabId).globalSearch.fetchingStatus,
+      ...global.globalSearch.fetchingStatus,
       ...newState,
     },
-  }, tabId);
+  });
 }

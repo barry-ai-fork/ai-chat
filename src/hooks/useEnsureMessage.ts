@@ -15,7 +15,7 @@ const useEnsureMessage = (
   const loadMessageThrottled = useMemo(() => {
     const throttled = throttle(loadMessage, 500, true);
     return () => {
-      throttled({ chatId, messageId: messageId!, replyOriginForId: replyOriginForId! });
+      throttled({ chatId, messageId, replyOriginForId });
     };
   }, [loadMessage, chatId, messageId, replyOriginForId]);
 

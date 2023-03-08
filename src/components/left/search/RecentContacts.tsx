@@ -5,7 +5,6 @@ import React, {
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiUser } from '../../../api/types';
-import type { AnimationLevel } from '../../../types';
 
 import { getUserFirstOrLastName } from '../../../global/helpers';
 import renderText from '../../common/helpers/renderText';
@@ -27,7 +26,6 @@ type StateProps = {
   topUserIds?: string[];
   usersById: Record<string, ApiUser>;
   recentlyFoundChatIds?: string[];
-  animationLevel: AnimationLevel;
 };
 
 const SEARCH_CLOSE_TIMEOUT_MS = 250;
@@ -36,10 +34,7 @@ const NBSP = '\u00A0';
 const runThrottled = throttle((cb) => cb(), 60000, true);
 
 const RecentContacts: FC<OwnProps & StateProps> = ({
-  topUserIds,
-  usersById,
-  recentlyFoundChatIds,
-  animationLevel,
+  topUserIds, usersById, recentlyFoundChatIds,
   onReset,
 }) => {
   const {
@@ -58,7 +53,7 @@ const RecentContacts: FC<OwnProps & StateProps> = ({
     });
   }, [loadTopUsers]);
 
-  useHorizontalScroll(topUsersRef, !topUserIds);
+  useHorizontalScroll(topUsersRef.current, !topUserIds);
 
   const handleClick = useCallback((id: string) => {
     openChat({ id, shouldReplaceHistory: true });
@@ -67,10 +62,6 @@ const RecentContacts: FC<OwnProps & StateProps> = ({
       addRecentlyFoundChatId({ id });
     }, SEARCH_CLOSE_TIMEOUT_MS);
   }, [openChat, addRecentlyFoundChatId, onReset]);
-
-  const handleClearRecentlyFoundChats = useCallback(() => {
-    clearRecentlyFoundChats();
-  }, [clearRecentlyFoundChats]);
 
   const lang = useLang();
 
@@ -81,7 +72,7 @@ const RecentContacts: FC<OwnProps & StateProps> = ({
           <div ref={topUsersRef} className="top-peers no-selection">
             {topUserIds.map((userId) => (
               <div className="top-peer-item" onClick={() => handleClick(userId)} dir={lang.isRtl ? 'rtl' : undefined}>
-                <Avatar user={usersById[userId]} animationLevel={animationLevel} withVideo />
+                <Avatar user={usersById[userId]} />
                 <div className="top-peer-name">{renderText(getUserFirstOrLastName(usersById[userId]) || NBSP)}</div>
               </div>
             ))}
@@ -98,7 +89,7 @@ const RecentContacts: FC<OwnProps & StateProps> = ({
               size="smaller"
               color="translucent"
               ariaLabel="Clear recent chats"
-              onClick={handleClearRecentlyFoundChats}
+              onClick={clearRecentlyFoundChats}
               isRtl={lang.isRtl}
             >
               <i className="icon-close" />
@@ -120,14 +111,12 @@ export default memo(withGlobal<OwnProps>(
   (global): StateProps => {
     const { userIds: topUserIds } = global.topPeers;
     const usersById = global.users.byId;
-    const { recentlyFoundChatIds } = global;
-    const { animationLevel } = global.settings.byKey;
+    const { recentlyFoundChatIds } = global.globalSearch;
 
     return {
       topUserIds,
       usersById,
       recentlyFoundChatIds,
-      animationLevel,
     };
   },
 )(RecentContacts));
